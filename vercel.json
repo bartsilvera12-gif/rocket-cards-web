@@ -59,7 +59,6 @@
       ]
     }
   ],
-  "_comentario_rewrites": "Fallback de SPA: toda ruta sin archivo sirve index.html, y el router del cliente decide. Sin cleanUrls a proposito: con cleanUrls:true, /index.html responde 308 a /, el destino del rewrite no resolvia y Vercel devolvia 404 en /catalogo y /producto/*.",
   "rewrites": [
     {
       "source": "/(.*)",

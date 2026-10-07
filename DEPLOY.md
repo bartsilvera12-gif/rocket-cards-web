@@ -65,6 +65,23 @@ por filtro.
 Para que esto ande, el servidor tiene que devolver `index.html` en cualquier ruta
 que no sea un archivo real; `vercel.json` ya lo hace con un rewrite.
 
+Dos cosas de esa configuración que conviene no tocar sin saber:
+
+- **No hay `cleanUrls`.** Con `cleanUrls: true`, Vercel responde un 308 de
+  `/index.html` hacia `/`, así que el destino del rewrite dejaba de resolver y
+  `/catalogo` y `/producto/*` devolvían 404.
+- **`vercel.json` no admite comentarios.** Su esquema declara
+  `additionalProperties: false`: cualquier clave inventada —aunque empiece con
+  guion bajo— invalida el archivo y Vercel falla el deploy antes de compilar,
+  con todos los commits siguientes en error. Las explicaciones van acá.
+
+Para comprobar el archivo antes de subir:
+
+```bash
+curl -sL https://openapi.vercel.sh/vercel.json -o /tmp/s.json
+python -c "import json,jsonschema;jsonschema.Draft7Validator(json.load(open('/tmp/s.json'))).validate({k:v for k,v in json.load(open('vercel.json')).items() if k!='\$schema'})"
+```
+
 ## Probarlo local, igual que en producción
 
 ```bash
