@@ -37,8 +37,16 @@
   /* El buscador no puede comprimirse hasta desaparecer: por debajo de
      620px baja a su propia fila en vez de quedar en 4px de ancho. */
   #dc-root [data-hdr-search] { flex: 1 1 190px; min-width: 190px; }
+  #dc-root [data-hdr-searchbtn] { display: none; }
   @media (max-width: 620px) {
+    /* El campo de búsqueda se colapsa en una lupa: ocupaba una fila entera
+       del header para algo que casi nadie usa al entrar. Al tocarla baja
+       a su propia fila, a ancho completo. */
+    #dc-root [data-hdr-searchbtn] { display: grid; }
     #dc-root [data-hdr-search] { order: 3; flex: 1 1 100%; min-width: 0; }
+    #dc-root [data-hdr-search][data-open="0"] { display: none; }
+    /* Carrito y menú contra el borde derecho, no pegados al logo. */
+    #dc-root [data-hdr-logo] { margin-right: auto; }
   }
   /* Área táctil: los enlaces de lista medían 20px de alto. */
   footer a { display: inline-block; padding: 6px 0; }
@@ -72,7 +80,7 @@
   <header style="position:sticky;top:0;z-index:60;isolation:isolate;background:rgba(5,5,5,.94);backdrop-filter:blur(14px);border-bottom:1px solid #1a1a1a">
     <div style="max-width:1400px;margin:0 auto;padding:12px clamp(14px,3vw,32px);display:flex;flex-wrap:wrap;align-items:center;gap:clamp(10px,2vw,28px) clamp(12px,2vw,28px)">
 
-      <a href="#top" style="display:flex;align-items:center;gap:10px;flex:0 0 auto">
+      <a href="#top" data-hdr-logo="" style="display:flex;align-items:center;gap:10px;flex:0 0 auto">
         <img src="/assets/rocket-logo.webp" alt="Rocket Cards" width="44" height="44" fetchpriority="high" decoding="async" style="width:44px;height:44px;display:block" />
         <span style="display:flex;flex-direction:column;line-height:.92">
           <span style="font-family:'Saira Condensed',sans-serif;font-weight:900;font-size:19px;letter-spacing:.01em;font-style:italic">ROCKET</span>
@@ -95,7 +103,7 @@
         </nav>
       </sc-if>
 
-      <div data-hdr-search="" style="position:relative">
+      <div data-hdr-search="" data-open="{{ mSearchOpen }}" style="position:relative">
         <div style="display:flex;align-items:center;gap:10px;background:#101010;border:1px solid #1f1f1f;border-radius:3px;padding:0 12px;height:44px;transition:border-color .2s ease" style-focus="border-color:#E30613">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" style="flex:0 0 auto"><circle cx="7" cy="7" r="5" stroke="#A7A7A7" stroke-width="1.8"></circle><line x1="10.8" y1="10.8" x2="15" y2="15" stroke="#A7A7A7" stroke-width="1.8" stroke-linecap="round"></line></svg>
           <input value="{{ q }}" onInput="{{ onSearch }}" onFocus="{{ onSearchFocus }}" placeholder="Buscar carta, Pokémon, colección, N° o SKU…" aria-label="Buscar productos" style="flex:1;min-width:0;background:transparent;border:0;outline:none;color:#F5F5F5;font-size:14px;font-weight:500;height:100%" />
@@ -147,7 +155,10 @@
         </sc-if>
       </div>
 
-      <div style="display:flex;align-items:center;gap:8px;flex:0 0 auto">
+      <div data-hdr-actions="" style="display:flex;align-items:center;gap:8px;flex:0 0 auto">
+        <button onClick="{{ toggleSearch }}" data-hdr-searchbtn="" aria-label="Buscar" aria-expanded="{{ mSearchExpanded }}" style="width:44px;height:44px;background:#101010;border:1px solid #1f1f1f;cursor:pointer;border-radius:3px;color:#F5F5F5;place-items:center;transition:border-color .18s ease" style-hover="border-color:#E30613">
+          <svg width="17" height="17" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.8"></circle><line x1="10.8" y1="10.8" x2="15" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line></svg>
+        </button>
         <button onClick="{{ openCart }}" aria-label="Abrir carrito" style="position:relative;display:flex;align-items:center;gap:9px;background:#101010;border:1px solid #1f1f1f;color:#F5F5F5;height:44px;padding:0 14px;cursor:pointer;border-radius:3px;transition:border-color .2s ease,background .2s ease" style-hover="border-color:#E30613;background:#151515">
           <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden="true" style="display:block"><path d="M5.2 5.2V4a3.3 3.3 0 0 1 6.6 0v1.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path><rect x="2.6" y="5.2" width="11.8" height="9.6" rx="1" stroke="currentColor" stroke-width="1.6"></rect></svg>
           <span style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:15px;letter-spacing:.06em">{{ cartCount }}</span>
@@ -240,7 +251,7 @@
 
         <div style="position:absolute;left:0;right:0;bottom:clamp(26px,4.5vw,64px);display:flex;align-items:flex-end;justify-content:center;z-index:3">
           <sc-for list="{{ heroCards }}" as="c" hint-placeholder-count="5">
-            <div onMouseEnter="{{ heroEnter }}" onMouseLeave="{{ heroLeave }}" data-rot="{{ c.rot }}" data-lift="{{ c.lift }}" data-z="{{ c.z }}" style="width:{{ c.w }};flex:0 0 auto;margin:0 clamp(-26px,-2.2vw,-10px);aspect-ratio:2.5/3.5;border-radius:7px;overflow:hidden;pointer-events:auto;cursor:pointer;box-shadow:0 26px 52px rgba(0,0,0,.92);transform:rotate({{ c.rot }}) translateY({{ c.lift }});z-index:{{ c.z }};transition:transform .34s cubic-bezier(.2,.7,.2,1),box-shadow .34s ease;animation:rc-deal .9s cubic-bezier(.2,.7,.2,1) backwards;animation-delay:{{ c.delay }}">
+            <div onMouseEnter="{{ heroEnter }}" onMouseLeave="{{ heroLeave }}" data-rot="{{ c.rot }}" data-lift="{{ c.lift }}" data-z="{{ c.z }}" style="width:{{ c.w }};flex:0 0 auto;margin:0 clamp(-26px,-2.2vw,-14px);aspect-ratio:2.5/3.5;border-radius:7px;overflow:hidden;pointer-events:auto;cursor:pointer;box-shadow:0 26px 52px rgba(0,0,0,.92);transform:rotate({{ c.rot }}) translateY({{ c.lift }});z-index:{{ c.z }};transition:transform .34s cubic-bezier(.2,.7,.2,1),box-shadow .34s ease;animation:rc-deal .9s cubic-bezier(.2,.7,.2,1) backwards;animation-delay:{{ c.delay }}">
               <img src="{{ c.src }}" alt="{{ c.alt }}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block" />
             </div>
           </sc-for>
@@ -958,7 +969,7 @@ const NEW_IDS = ['FP-S2','ME-PB-ETB','SV-PE-PFC','ME-AH-TS','SV-PE-BB','FP-S1'];
 
 class Component extends DCLogic {
   state = {
-    q: '', searchOpen: false, searching: false, results: [],
+    q: '', searchOpen: false, searching: false, results: [], mSearchOpen: false,
     cart: [], cartOpen: false, toast: '', menuOpen: false, catMenuOpen: false, catHover: 0, car: 0, top: 0,
     view: 'home', pid: null, qty: 1, fCats: [], fAvail: false, sort: 'recent', legalDoc: 'privacidad', waHidden: false,
     w: typeof window !== 'undefined' ? window.innerWidth : 1440
@@ -1318,6 +1329,16 @@ class Component extends DCLogic {
       results: s.results.map(p => this.decorate(p)),
       skeletons: [1, 2, 3],
       onSearchFocus: () => this.setState({ searchOpen: true }),
+      // En el teléfono el buscador arranca colapsado en una lupa: el campo
+      // ocupaba una fila entera del header para algo que casi no se usa al
+      // entrar. Al abrirlo se enfoca solo, así el teclado aparece de una.
+      mSearchOpen: s.mSearchOpen ? '1' : '0',
+      mSearchExpanded: s.mSearchOpen ? 'true' : 'false',
+      toggleSearch: () => this.setState(st => ({ mSearchOpen: !st.mSearchOpen }), () => {
+        if (!this.state.mSearchOpen) return;
+        const i = document.querySelector('[data-hdr-search] input');
+        if (i) i.focus();
+      }),
       clearSearch: (e) => { e.preventDefault(); this.setState({ q: '', results: [], searchOpen: false }); },
       onSearch: (e) => {
         const q = e.target.value;
@@ -1331,11 +1352,11 @@ class Component extends DCLogic {
       },
 
       heroCards: [
-        { src: '/assets/cards/rayquaza-v.webp', alt: 'Rayquaza V · Evolving Skies 194/203', rot: '-16deg', lift: '52px', delay: '.06s', w: 'clamp(124px,16.6vw,254px)', z: 1 },
-        { src: '/assets/cards/leafeon-ex.webp', alt: 'Leafeon ex · Prismatic Evolutions 144/131', rot: '-7deg', lift: '12px', delay: '.14s', w: 'clamp(138px,18.4vw,282px)', z: 3 },
-        { src: '/assets/cards/pikachu-ex.webp', alt: 'Pikachu ex · Teracristal 238/191', rot: '0deg', lift: '-26px', delay: '.3s', w: 'clamp(160px,21.4vw,328px)', z: 6 },
-        { src: '/assets/cards/umbreon-ex.webp', alt: 'Umbreon ex · Prismatic Evolutions 161/131', rot: '6deg', lift: '10px', delay: '.38s', w: 'clamp(138px,18.4vw,282px)', z: 3 },
-        { src: '/assets/cards/jirachi-ex.webp', alt: 'Jirachi ex · Pikachu 30 155/128', rot: '13deg', lift: '34px', delay: '.46s', w: 'clamp(128px,17.2vw,264px)', z: 2 }
+        { src: '/assets/cards/rayquaza-v.webp', alt: 'Rayquaza V · Evolving Skies 194/203', rot: '-16deg', lift: '52px', delay: '.06s', w: 'clamp(88px,16.6vw,254px)', z: 1 },
+        { src: '/assets/cards/leafeon-ex.webp', alt: 'Leafeon ex · Prismatic Evolutions 144/131', rot: '-7deg', lift: '12px', delay: '.14s', w: 'clamp(104px,18.4vw,282px)', z: 3 },
+        { src: '/assets/cards/pikachu-ex.webp', alt: 'Pikachu ex · Teracristal 238/191', rot: '0deg', lift: '-26px', delay: '.3s', w: 'clamp(122px,21.4vw,328px)', z: 6 },
+        { src: '/assets/cards/umbreon-ex.webp', alt: 'Umbreon ex · Prismatic Evolutions 161/131', rot: '6deg', lift: '10px', delay: '.38s', w: 'clamp(104px,18.4vw,282px)', z: 3 },
+        { src: '/assets/cards/jirachi-ex.webp', alt: 'Jirachi ex · Pikachu 30 155/128', rot: '13deg', lift: '34px', delay: '.46s', w: 'clamp(92px,17.2vw,264px)', z: 2 }
       ],
       heroEnter: (e) => {
         const el = e.currentTarget;
