@@ -55,6 +55,14 @@
     -webkit-user-select: none; user-select: none;
   }
   #dc-root [data-rot] img { -webkit-user-drag: none; pointer-events: none; }
+  /* Más vendidos: cinco en fila en escritorio, dos por fila en el teléfono.
+     Con auto-fit solo, a tamaños intermedios quedaba una tarjeta huérfana. */
+  @media (max-width: 1100px) {
+    #dc-root [data-top-grid] { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  }
+  @media (max-width: 620px) {
+    #dc-root [data-top-grid] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  }
   /* Los dos botones del hero, lado a lado también en el teléfono. */
   @media (max-width: 480px) {
     #dc-root [data-hero-cta] { flex-wrap: nowrap; gap: 8px; }
@@ -515,43 +523,26 @@
         <div style="font-family:'Poppins',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:.26em;text-transform:uppercase;color:#C9A227;margin-bottom:10px">Lo que más sale</div>
         <h2 style="margin:0 0 18px;font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;font-size:clamp(26px,3.4vw,40px);line-height:1">Más vendidos</h2>
 
-        <!-- DESTACADO -->
-        <div onClick="{{ topHero.open }}" onMouseEnter="{{ cardEnter }}" onMouseMove="{{ cardMove }}" onMouseLeave="{{ cardLeave }}" style="cursor:pointer;position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:clamp(14px,2vw,26px);background:#111111;border:1px solid #1c1c1c;padding:clamp(14px,1.8vw,22px);margin-bottom:clamp(10px,1.3vw,16px);animation:{{ topHero.fade }};transition:border-color .22s ease" style-after="content:'';position:absolute;inset:0;padding:1.5px;background:radial-gradient(var(--glow-radius,320px) circle at var(--glow-x,50%) var(--glow-y,50%),rgba(201,162,39,calc(var(--glow-intensity,0) * 0.95)) 0%,rgba(201,162,39,calc(var(--glow-intensity,0) * 0.4)) 34%,transparent 64%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none;z-index:3">
-
-          <span style="flex:0 0 auto;font-family:'Saira Condensed',sans-serif;font-weight:900;font-style:italic;font-size:clamp(38px,4.6vw,62px);line-height:.78;letter-spacing:-.03em;color:transparent;-webkit-text-stroke:1.5px rgba(201,162,39,.5)">{{ topHero.rankLabel }}</span>
-
-          <span style="flex:0 0 auto;position:relative;display:block;width:clamp(104px,12vw,150px);aspect-ratio:1/1;border-radius:2px;overflow:hidden;background:linear-gradient(176deg,#ffffff,#f0f0f2 58%,#d8d8de)">
-            <img data-img="" src="{{ topHero.img }}" alt="{{ topHero.name }}" loading="lazy" decoding="async" style="position:absolute;left:5%;top:5%;width:90%;height:90%;object-fit:contain;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
-          </span>
-
-          <span style="flex:1 1 250px;min-width:0;display:flex;flex-direction:column;gap:7px">
-            <span style="font-family:'Poppins',sans-serif;font-weight:600;font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:#C9A227">Top de la semana</span>
-            <span style="font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;font-size:clamp(19px,2.3vw,28px);line-height:1.05;text-wrap:balance">{{ topHero.name }}</span>
-            <span style="font-size:12px;color:#A7A7A7">{{ topHero.set }}</span>
-            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:{{ topHero.stockColor }}">{{ topHero.stockLabel }}</span>
-          </span>
-
-          <span style="flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:9px;min-width:clamp(140px,15vw,180px)">
-            <span style="font-family:'Saira Condensed',sans-serif;font-weight:900;font-size:clamp(24px,2.6vw,32px);line-height:1">{{ topHero.priceLabel }}</span>
-            <button onClick="{{ topHero.add }}" style="width:100%;background:{{ topHero.btnBg }};border:0;color:{{ topHero.btnFg }};font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;padding:13px 18px;border-radius:2px;cursor:{{ topHero.cursor }};white-space:nowrap;transition:background .18s ease" style-hover="background:#FF1A27">{{ topHero.btnLabel }}</button>
-            <span data-actions="" style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#7a7a7a;opacity:0;transform:translateY(8px);transition:opacity .22s ease,transform .22s ease">Ver producto →</span>
-          </span>
-        </div>
-
-        <!-- RESTO DEL RANKING -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,max(300px,47%)),1fr));gap:1px;background:#1a1a1a;border:1px solid #1a1a1a;flex:1;align-content:start">
-          <sc-for list="{{ topRest }}" as="p" hint-placeholder-count="4">
-            <div onClick="{{ p.open }}" onMouseEnter="{{ rowEnter }}" onMouseLeave="{{ rowLeave }}" style="cursor:pointer;position:relative;background:#0A0A0A;display:flex;flex-wrap:wrap;gap:6px 13px;align-items:center;padding:11px 15px;overflow:hidden;transition:background .2s ease">
-              <span data-bar="" style="position:absolute;left:0;top:0;bottom:0;width:2px;background:#E30613;transform:scaleY(0);transform-origin:center;transition:transform .25s ease"></span>
-              <span style="flex:0 0 auto;width:22px;font-family:'Saira Condensed',sans-serif;font-weight:900;font-size:15px;color:#4a4a4a;text-align:center">{{ p.rankLabel }}</span>
-              <span style="flex:0 0 auto;position:relative;display:block;width:clamp(54px,5vw,66px);aspect-ratio:1/1;border-radius:2px;overflow:hidden;background:linear-gradient(176deg,#ffffff,#eeeef0 60%,#dcdce1)">
-                <img src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" decoding="async" style="position:absolute;left:6%;top:6%;width:88%;height:88%;object-fit:contain" />
-              </span>
-              <span style="flex:1 1 130px;min-width:0;display:flex;flex-direction:column;gap:3px">
-                <span style="font-size:13px;font-weight:700;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ p.name }}</span>
-                <span style="font-size:11px;color:#8d8d8d">{{ p.set }}</span>
-              </span>
-              <span style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:16px;flex:0 0 auto;white-space:nowrap;margin-left:auto">{{ p.priceLabel }}</span>
+        <!-- Ranking: misma tarjeta que el resto del sitio, con el puesto -->
+        <div data-top-grid="" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:clamp(10px,1.2vw,16px)">
+          <sc-for list="{{ topList }}" as="p" hint-placeholder-count="5">
+            <div onClick="{{ p.open }}" onMouseEnter="{{ cardEnter }}" onMouseMove="{{ cardMove }}" onMouseLeave="{{ cardLeave }}" style-after="content:'';position:absolute;inset:0;padding:1.5px;background:radial-gradient(var(--glow-radius,240px) circle at var(--glow-x,50%) var(--glow-y,50%),rgba(201,162,39,calc(var(--glow-intensity,0) * 0.95)) 0%,rgba(201,162,39,calc(var(--glow-intensity,0) * 0.45)) 32%,transparent 62%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none;z-index:3;transition:opacity .3s ease" style="cursor:pointer;position:relative;background:#121212;border:1px solid {{ p.borde }};transition:border-color .22s ease;display:flex;flex-direction:column">
+              <div style="position:relative;aspect-ratio:1/1;overflow:hidden;background:linear-gradient(176deg,#ffffff,#f0f0f2 58%,#d8d8de)">
+                <img data-img="" src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:9px;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
+                <span style="position:absolute;top:0;left:0;font-family:'Saira Condensed',sans-serif;font-weight:900;font-style:italic;font-size:19px;line-height:1;padding:7px 11px 8px;background:#0A0A0A;color:{{ p.rankColor }}">{{ p.rankLabel }}</span>
+                <sc-if value="{{ p.esTop }}" hint-placeholder-val="{{ true }}">
+                  <span style="position:absolute;top:0;right:0;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;padding:7px 10px;background:#C9A227;color:#0A0A0A">Top</span>
+                </sc-if>
+                <div data-actions="" style="position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:6px;opacity:0;transform:translateY(8px);transition:opacity .22s ease,transform .22s ease">
+                  <button onClick="{{ p.add }}" style="flex:1;background:{{ p.btnBg }};border:0;color:{{ p.btnFg }};font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:10px 6px;cursor:{{ p.cursor }};border-radius:2px">{{ p.btnLabel }}</button>
+                </div>
+              </div>
+              <div style="padding:12px 12px 14px;display:flex;flex-direction:column;gap:4px;flex:1">
+                <div style="font-size:11px;color:#C9A227;font-family:'IBM Plex Mono',monospace;letter-spacing:.08em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.set }}</div>
+                <div style="font-size:13px;font-weight:700;line-height:1.32;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ p.name }}</div>
+                <div style="font-family:'Saira Condensed',sans-serif;font-weight:900;font-size:19px;margin-top:auto;padding-top:9px">{{ p.priceLabel }}</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;color:{{ p.stockColor }}">{{ p.stockLabel }}</div>
+              </div>
             </div>
           </sc-for>
         </div>
@@ -986,7 +977,7 @@ const NEW_IDS = ['FP-S2','ME-PB-ETB','SV-PE-PFC','ME-AH-TS','SV-PE-BB','FP-S1'];
 class Component extends DCLogic {
   state = {
     q: '', searchOpen: false, searching: false, results: [], mSearchOpen: false,
-    cart: [], cartOpen: false, toast: '', menuOpen: false, catMenuOpen: false, catHover: 0, car: 0, top: 0,
+    cart: [], cartOpen: false, toast: '', menuOpen: false, catMenuOpen: false, catHover: 0, car: 0,
     view: 'home', pid: null, qty: 1, fCats: [], fAvail: false, sort: 'recent', legalDoc: 'privacidad', waHidden: false,
     w: typeof window !== 'undefined' ? window.innerWidth : 1440
   };
@@ -1029,9 +1020,6 @@ class Component extends DCLogic {
     window.addEventListener('resize', this._onScroll, { passive: true });
     window.addEventListener('load', this._onScroll);
     this._waTimer = setInterval(this._onScroll, 500);
-    this._topTimer = setInterval(() => {
-      if (this.state.view === 'home' && !this.state.cartOpen) this.setState(st => ({ top: st.top + 1 }));
-    }, 4200);
     this._onScroll();
     this._onDocClick = (e) => {
       if (this.state.searchOpen && !e.target.closest('input')) this.setState({ searchOpen: false });
@@ -1044,7 +1032,6 @@ class Component extends DCLogic {
     window.removeEventListener('resize', this._onScroll);
     window.removeEventListener('load', this._onScroll);
     clearInterval(this._waTimer);
-    clearInterval(this._topTimer);
     document.removeEventListener('click', this._onDocClick);
     clearTimeout(this._searchTimer); clearTimeout(this._toastTimer); clearTimeout(this._catTimer);
     window.removeEventListener('popstate', this._onPop);
@@ -1518,14 +1505,12 @@ class Component extends DCLogic {
       ofertas: pick(p => !!p.old),
       hasOfertas: CATALOG.some(p => !!p.old),
       noOfertas: !CATALOG.some(p => !!p.old),
-      topHero: Object.assign(this.decorate(byId(TOP_IDS[s.top % TOP_IDS.length])), {
-        fade: 'rc-fade .5s ease',
-        rankLabel: String((s.top % TOP_IDS.length) + 1).padStart(2, '0')
-      }),
-      // El puesto sale de TOP_IDS, no del orden de la lista: así no se mueve
-      // cuando el destacado rota y cada producto conserva su número.
-      topRest: TOP_IDS.filter((_, i) => i !== (s.top % TOP_IDS.length)).map(id =>
-        Object.assign(this.decorate(byId(id)), { rankLabel: String(TOP_IDS.indexOf(id) + 1).padStart(2, '0') })),
+      topList: TOP_IDS.map((id, i) => Object.assign(this.decorate(byId(id)), {
+        rankLabel: String(i + 1).padStart(2, '0'),
+        esTop: i === 0,
+        rankColor: i === 0 ? '#C9A227' : '#4a4a4a',
+        borde: i === 0 ? 'rgba(201,162,39,.5)' : '#1c1c1c'
+      })),
       rowEnter: (e) => { const el = e.currentTarget; el.style.background = '#121212'; const b = el.querySelector('[data-bar]'); if (b) b.style.transform = 'scaleY(1)'; },
       rowLeave: (e) => { const el = e.currentTarget; el.style.background = '#0A0A0A'; const b = el.querySelector('[data-bar]'); if (b) b.style.transform = 'scaleY(0)'; },
 
