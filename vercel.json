@@ -60,10 +60,11 @@
       ]
     }
   ],
+  "_comentario_rewrites": "Fallback de SPA. El destino es \"/\" y no \"/index.html\" porque cleanUrls:true convierte /index.html en un redirect 308 a /: el rewrite apuntaba a algo que no resuelve y Vercel devolvia 404 en /catalogo y /producto/*.",
   "rewrites": [
     {
       "source": "/(.*)",
-      "destination": "/index.html"
+      "destination": "/"
     }
   ]
 }
