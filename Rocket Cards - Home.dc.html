@@ -48,6 +48,22 @@
     /* Carrito y menú contra el borde derecho, no pegados al logo. */
     #dc-root [data-hdr-logo] { margin-right: auto; }
   }
+  /* Las cartas del hero se tocan para traerlas al frente, así que no deben
+     comportarse como texto: sin resaltado azul del navegador ni selección. */
+  #dc-root [data-rot] {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none; user-select: none;
+  }
+  #dc-root [data-rot] img { -webkit-user-drag: none; pointer-events: none; }
+  /* Los dos botones del hero, lado a lado también en el teléfono. */
+  @media (max-width: 480px) {
+    #dc-root [data-hero-cta] { flex-wrap: nowrap; gap: 8px; }
+    #dc-root [data-hero-cta] a {
+      padding: 12px 14px !important;
+      font-size: 12.5px !important;
+      letter-spacing: .07em !important;
+    }
+  }
   /* Área táctil: los enlaces de lista medían 20px de alto. */
   footer a { display: inline-block; padding: 6px 0; }
   footer [style*="flex-direction:column"] { gap: 1px !important; }
@@ -240,7 +256,7 @@
         <p style="margin:clamp(8px,1.2vw,14px) 0 0;max-width:470px;position:relative;z-index:4;font-size:clamp(12.5px,1.2vw,14.5px);line-height:1.6;color:#A7A7A7;text-wrap:pretty;animation:rc-rise .8s cubic-bezier(.2,.7,.2,1) .26s backwards">
           Productos sellados, sobres y Elite Trainer Box originales para verdaderos coleccionistas.
         </p>
-        <div style="display:flex;flex-wrap:wrap;gap:11px;justify-content:center;animation:rc-rise .8s cubic-bezier(.2,.7,.2,1) .34s backwards">
+        <div data-hero-cta="" style="display:flex;flex-wrap:wrap;gap:11px;justify-content:center;animation:rc-rise .8s cubic-bezier(.2,.7,.2,1) .34s backwards">
           <a href="#top" onClick="{{ openCatalog }}" style="background:#E30613;color:#fff;font-family:'Saira Condensed',sans-serif;font-weight:800;letter-spacing:.14em;text-transform:uppercase;font-size:14px;padding:13px 26px;border-radius:999px;white-space:nowrap;transition:background .18s ease,transform .18s ease" style-hover="background:#FF1A27;color:#fff;transform:translateY(-2px)">Explorar cartas →</a>
           <a href="#nuevos" style="border:1px solid rgba(201,162,39,.55);color:#C9A227;font-family:'Saira Condensed',sans-serif;font-weight:800;letter-spacing:.14em;text-transform:uppercase;font-size:14px;padding:13px 26px;border-radius:999px;white-space:nowrap;transition:border-color .18s ease,background .18s ease,color .18s ease" style-hover="border-color:#C9A227;background:#17120a;color:#E8C659">Nuevos ingresos</a>
         </div>
@@ -251,7 +267,7 @@
 
         <div style="position:absolute;left:0;right:0;bottom:clamp(26px,4.5vw,64px);display:flex;align-items:flex-end;justify-content:center;z-index:3">
           <sc-for list="{{ heroCards }}" as="c" hint-placeholder-count="5">
-            <div onMouseEnter="{{ heroEnter }}" onMouseLeave="{{ heroLeave }}" data-rot="{{ c.rot }}" data-lift="{{ c.lift }}" data-z="{{ c.z }}" style="width:{{ c.w }};flex:0 0 auto;margin:0 clamp(-30px,-2.2vw,-26px);aspect-ratio:2.5/3.5;border-radius:7px;overflow:hidden;pointer-events:auto;cursor:pointer;box-shadow:0 26px 52px rgba(0,0,0,.92);transform:rotate({{ c.rot }}) translateY({{ c.lift }});z-index:{{ c.z }};transition:transform .34s cubic-bezier(.2,.7,.2,1),box-shadow .34s ease;animation:rc-deal .9s cubic-bezier(.2,.7,.2,1) backwards;animation-delay:{{ c.delay }}">
+            <div onClick="{{ heroTap }}" onMouseEnter="{{ heroEnter }}" onMouseLeave="{{ heroLeave }}" data-rot="{{ c.rot }}" data-lift="{{ c.lift }}" data-z="{{ c.z }}" style="width:{{ c.w }};flex:0 0 auto;margin:0 clamp(-30px,-2.2vw,-26px);aspect-ratio:2.5/3.5;border-radius:7px;overflow:hidden;pointer-events:auto;cursor:pointer;box-shadow:0 26px 52px rgba(0,0,0,.92);transform:rotate({{ c.rot }}) translateY({{ c.lift }});z-index:{{ c.z }};transition:transform .34s cubic-bezier(.2,.7,.2,1),box-shadow .34s ease;animation:rc-deal .9s cubic-bezier(.2,.7,.2,1) backwards;animation-delay:{{ c.delay }}">
               <img src="{{ c.src }}" alt="{{ c.alt }}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block" />
             </div>
           </sc-for>
@@ -1106,6 +1122,14 @@ class Component extends DCLogic {
     });
   }
 
+  /** Devuelve una carta del abanico a su posición de reposo. */
+  heroReset(el) {
+    el.dataset.picked = '0';
+    el.style.transform = 'rotate(' + el.dataset.rot + ') translateY(' + el.dataset.lift + ')';
+    el.style.zIndex = el.dataset.z;
+    el.style.boxShadow = '0 26px 52px rgba(0,0,0,.92)';
+  }
+
   railScroll(e, dir) {
     const wrap = e.currentTarget.closest('[data-rail-wrap]');
     const rail = wrap && wrap.querySelector('[data-rail]');
@@ -1366,9 +1390,21 @@ class Component extends DCLogic {
       },
       heroLeave: (e) => {
         const el = e.currentTarget;
-        el.style.transform = 'rotate(' + el.dataset.rot + ') translateY(' + el.dataset.lift + ')';
-        el.style.zIndex = el.dataset.z;
-        el.style.boxShadow = '0 26px 52px rgba(0,0,0,.92)';
+        if (el.dataset.picked === '1') return;   // elegida: se queda adelante
+        this.heroReset(el);
+      },
+      heroTap: (e) => {
+        const el = e.currentTarget;
+        const yaEstaba = el.dataset.picked === '1';
+        for (const c of el.parentElement.children) {
+          c.dataset.picked = '0';
+          if (c !== el) this.heroReset(c);
+        }
+        if (yaEstaba) { this.heroReset(el); return; }
+        el.dataset.picked = '1';
+        el.style.transform = 'rotate(0deg) translateY(calc(' + el.dataset.lift + ' - 34px)) scale(1.07)';
+        el.style.zIndex = '20';
+        el.style.boxShadow = '0 34px 70px rgba(0,0,0,.95), 0 0 0 1px rgba(227,6,19,.5)';
       },
       goTop: (e) => { if (e) e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); },
       topBandEnter: (e) => {
