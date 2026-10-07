@@ -38,7 +38,7 @@ export const RARITY = {
 export const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 
 const FALLBACK = [
-  { id: 'X1', name: 'Booster Pack', set: 'Rocket Cards', img: '/assets/rocket-logo.png', price: 60000, stock: 10 },
+  { id: 'X1', name: 'Booster Pack', set: 'Rocket Cards', img: '/assets/rocket-logo.webp', price: 60000, stock: 10 },
 ];
 
 const shop = () => (typeof window !== 'undefined' && window.ROCKET_SHOP) || {};

@@ -74,7 +74,7 @@
     <div style="max-width:1400px;margin:0 auto;padding:12px clamp(14px,3vw,32px);display:flex;flex-wrap:wrap;align-items:center;gap:clamp(10px,2vw,28px) clamp(12px,2vw,28px)">
 
       <a href="#top" style="display:flex;align-items:center;gap:10px;flex:0 0 auto">
-        <img src="/assets/rocket-logo.png" alt="Rocket Cards" style="width:44px;height:44px;display:block" />
+        <img src="/assets/rocket-logo.webp" alt="Rocket Cards" width="44" height="44" fetchpriority="high" decoding="async" style="width:44px;height:44px;display:block" />
         <span style="display:flex;flex-direction:column;line-height:.92">
           <span style="font-family:'Saira Condensed',sans-serif;font-weight:900;font-size:19px;letter-spacing:.01em;font-style:italic">ROCKET</span>
           <span style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:.42em;color:#E30613">CARDS</span>
@@ -124,7 +124,7 @@
               <div>
                 <sc-for list="{{ results }}" as="r" hint-placeholder-count="4">
                   <a href="#top" onClick="{{ r.open }}" style="display:flex;gap:12px;align-items:center;padding:11px 14px;border-bottom:1px solid #151515" style-hover="background:#141414">
-                    <img src="{{ r.img }}" alt="{{ r.name }}" loading="lazy" style="width:52px;height:52px;flex:0 0 auto;object-fit:contain;border:1px solid #1d1d1d;background:#0A0A0A;padding:3px" />
+                    <img src="{{ r.img }}" alt="{{ r.name }}" loading="lazy" decoding="async" style="width:52px;height:52px;flex:0 0 auto;object-fit:contain;border:1px solid #1d1d1d;background:#0A0A0A;padding:3px" />
                     <div style="flex:1;min-width:0">
                       <div style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</div>
                       <div style="font-size:12px;color:#A7A7A7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.set }}</div>
@@ -242,7 +242,7 @@
         <div style="position:absolute;left:0;right:0;bottom:clamp(26px,4.5vw,64px);display:flex;align-items:flex-end;justify-content:center;z-index:3">
           <sc-for list="{{ heroCards }}" as="c" hint-placeholder-count="5">
             <div onMouseEnter="{{ heroEnter }}" onMouseLeave="{{ heroLeave }}" data-rot="{{ c.rot }}" data-lift="{{ c.lift }}" data-z="{{ c.z }}" style="width:{{ c.w }};flex:0 0 auto;margin:0 clamp(-26px,-2.2vw,-10px);aspect-ratio:2.5/3.5;border-radius:7px;overflow:hidden;pointer-events:auto;cursor:pointer;box-shadow:0 26px 52px rgba(0,0,0,.92);transform:rotate({{ c.rot }}) translateY({{ c.lift }});z-index:{{ c.z }};transition:transform .34s cubic-bezier(.2,.7,.2,1),box-shadow .34s ease;animation:rc-deal .9s cubic-bezier(.2,.7,.2,1) backwards;animation-delay:{{ c.delay }}">
-              <img src="{{ c.src }}" alt="{{ c.alt }}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block" />
+              <img src="{{ c.src }}" alt="{{ c.alt }}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block" />
             </div>
           </sc-for>
         </div>
@@ -338,7 +338,7 @@
         <sc-for list="{{ sobres }}" as="p" hint-placeholder-count="3">
           <div onClick="{{ p.open }}" onMouseEnter="{{ cardEnter }}" onMouseMove="{{ cardMove }}" onMouseLeave="{{ cardLeave }}" style-after="content:'';position:absolute;inset:0;padding:1.5px;background:radial-gradient(var(--glow-radius,240px) circle at var(--glow-x,50%) var(--glow-y,50%),rgba(227,6,19,calc(var(--glow-intensity,0) * 0.95)) 0%,rgba(227,6,19,calc(var(--glow-intensity,0) * 0.45)) 32%,transparent 62%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none;border-radius:inherit;z-index:3;transition:opacity .3s ease" style="cursor:pointer;position:relative;flex:0 0 auto;width:clamp(186px,21vw,248px);scroll-snap-align:start;background:#121212;border:1px solid #1c1c1c;transition:border-color .22s ease;display:flex;flex-direction:column">
             <div style="position:relative;aspect-ratio:1/1;overflow:hidden;background:#0E0E0E">
-              <img data-img="" src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:10px;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
+              <img data-img="" src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:10px;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
               <sc-if value="{{ p.hasTag }}" hint-placeholder-val="{{ false }}">
                 <span style="position:absolute;top:10px;left:10px;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding:5px 9px;background:{{ p.tagBg }};color:{{ p.tagFg }}">{{ p.tag }}</span>
               </sc-if>
@@ -385,7 +385,7 @@
           <sc-for list="{{ sellados }}" as="p" hint-placeholder-count="4">
             <div onClick="{{ p.open }}" onMouseEnter="{{ cardEnter }}" onMouseMove="{{ cardMove }}" onMouseLeave="{{ cardLeave }}" style-after="content:'';position:absolute;inset:0;padding:1.5px;background:radial-gradient(var(--glow-radius,240px) circle at var(--glow-x,50%) var(--glow-y,50%),rgba(227,6,19,calc(var(--glow-intensity,0) * 0.95)) 0%,rgba(227,6,19,calc(var(--glow-intensity,0) * 0.45)) 32%,transparent 62%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none;border-radius:inherit;z-index:3;transition:opacity .3s ease" style="cursor:pointer;position:relative;flex:0 0 auto;width:clamp(186px,21vw,248px);scroll-snap-align:start;background:#121212;border:1px solid #1c1c1c;transition:border-color .22s ease;display:flex;flex-direction:column">
               <div style="position:relative;aspect-ratio:1/1;overflow:hidden;background:#0E0E0E">
-                <img data-img="" src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:10px;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
+                <img data-img="" src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:10px;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
                 <sc-if value="{{ p.hasTag }}" hint-placeholder-val="{{ false }}">
                   <span style="position:absolute;top:10px;left:10px;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding:5px 9px;background:{{ p.tagBg }};color:{{ p.tagFg }}">{{ p.tag }}</span>
                 </sc-if>
@@ -428,7 +428,7 @@
         <sc-for list="{{ etbs }}" as="p" hint-placeholder-count="5">
           <div onClick="{{ p.open }}" onMouseEnter="{{ cardEnter }}" onMouseMove="{{ cardMove }}" onMouseLeave="{{ cardLeave }}" style-after="content:'';position:absolute;inset:0;padding:1.5px;background:radial-gradient(var(--glow-radius,240px) circle at var(--glow-x,50%) var(--glow-y,50%),rgba(227,6,19,calc(var(--glow-intensity,0) * 0.95)) 0%,rgba(227,6,19,calc(var(--glow-intensity,0) * 0.45)) 32%,transparent 62%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none;border-radius:inherit;z-index:3;transition:opacity .3s ease" style="cursor:pointer;position:relative;flex:0 0 auto;width:clamp(186px,21vw,248px);scroll-snap-align:start;background:#121212;border:1px solid #1c1c1c;transition:border-color .22s ease;display:flex;flex-direction:column">
             <div style="position:relative;aspect-ratio:1/1;overflow:hidden;background:#0E0E0E">
-              <img data-img="" src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:10px;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
+              <img data-img="" src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:10px;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
               <sc-if value="{{ p.hasTag }}" hint-placeholder-val="{{ false }}">
                 <span style="position:absolute;top:10px;left:10px;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding:5px 9px;background:{{ p.tagBg }};color:{{ p.tagFg }}">{{ p.tag }}</span>
               </sc-if>
@@ -475,7 +475,7 @@
           <div style="position:relative;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr));gap:10px">
             <sc-for list="{{ ofertas }}" as="p" hint-placeholder-count="2">
               <div onClick="{{ p.open }}" style="cursor:pointer;position:relative;background:#050505;padding:12px;display:flex;flex-direction:column;gap:7px">
-                <img src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" style="width:100%;aspect-ratio:1/1;object-fit:contain;background:#0A0A0A" />
+                <img src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" decoding="async" style="width:100%;aspect-ratio:1/1;object-fit:contain;background:#0A0A0A" />
                 <span style="font-size:12.5px;font-weight:700;line-height:1.3;color:#fff">{{ p.name }}</span>
                 <span style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:17px;color:#fff">{{ p.priceLabel }}</span>
               </div>
@@ -495,7 +495,7 @@
           <span style="flex:0 0 auto;font-family:'Saira Condensed',sans-serif;font-weight:900;font-style:italic;font-size:clamp(38px,4.6vw,62px);line-height:.78;letter-spacing:-.03em;color:transparent;-webkit-text-stroke:1.5px rgba(201,162,39,.5)">{{ topHero.rankLabel }}</span>
 
           <span style="flex:0 0 auto;position:relative;display:block;width:clamp(104px,12vw,150px);aspect-ratio:1/1;border-radius:2px;overflow:hidden;background:linear-gradient(176deg,#ffffff,#f0f0f2 58%,#d8d8de)">
-            <img data-img="" src="{{ topHero.img }}" alt="{{ topHero.name }}" loading="lazy" style="position:absolute;left:5%;top:5%;width:90%;height:90%;object-fit:contain;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
+            <img data-img="" src="{{ topHero.img }}" alt="{{ topHero.name }}" loading="lazy" decoding="async" style="position:absolute;left:5%;top:5%;width:90%;height:90%;object-fit:contain;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
           </span>
 
           <span style="flex:1 1 250px;min-width:0;display:flex;flex-direction:column;gap:7px">
@@ -519,7 +519,7 @@
               <span data-bar="" style="position:absolute;left:0;top:0;bottom:0;width:2px;background:#E30613;transform:scaleY(0);transform-origin:center;transition:transform .25s ease"></span>
               <span style="flex:0 0 auto;width:22px;font-family:'Saira Condensed',sans-serif;font-weight:900;font-size:15px;color:#4a4a4a;text-align:center">{{ p.rankLabel }}</span>
               <span style="flex:0 0 auto;position:relative;display:block;width:clamp(54px,5vw,66px);aspect-ratio:1/1;border-radius:2px;overflow:hidden;background:linear-gradient(176deg,#ffffff,#eeeef0 60%,#dcdce1)">
-                <img src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" style="position:absolute;left:6%;top:6%;width:88%;height:88%;object-fit:contain" />
+                <img src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" decoding="async" style="position:absolute;left:6%;top:6%;width:88%;height:88%;object-fit:contain" />
               </span>
               <span style="flex:1 1 130px;min-width:0;display:flex;flex-direction:column;gap:3px">
                 <span style="font-size:13px;font-weight:700;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ p.name }}</span>
@@ -602,7 +602,7 @@
           <sc-for list="{{ catalogProducts }}" as="p" hint-placeholder-count="8">
             <div onClick="{{ p.open }}" onMouseEnter="{{ cardEnter }}" onMouseMove="{{ cardMove }}" onMouseLeave="{{ cardLeave }}" style-after="content:'';position:absolute;inset:0;padding:1.5px;background:radial-gradient(var(--glow-radius,240px) circle at var(--glow-x,50%) var(--glow-y,50%),rgba(227,6,19,calc(var(--glow-intensity,0) * 0.95)) 0%,rgba(227,6,19,calc(var(--glow-intensity,0) * 0.45)) 32%,transparent 62%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none;border-radius:inherit;z-index:3;transition:opacity .3s ease" style="cursor:pointer;position:relative;background:#121212;border:1px solid #1c1c1c;transition:border-color .22s ease;display:flex;flex-direction:column">
               <div style="position:relative;aspect-ratio:1/1;overflow:hidden;background:#0E0E0E">
-                <img data-img="" src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:10px;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
+                <img data-img="" src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:10px;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
                 <sc-if value="{{ p.hasTag }}" hint-placeholder-val="{{ false }}">
                   <span style="position:absolute;top:10px;left:10px;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding:5px 9px;background:{{ p.tagBg }};color:{{ p.tagFg }}">{{ p.tag }}</span>
                 </sc-if>
@@ -699,7 +699,7 @@
         <sc-for list="{{ related }}" as="p" hint-placeholder-count="4">
           <div onClick="{{ p.open }}" onMouseEnter="{{ cardEnter }}" onMouseMove="{{ cardMove }}" onMouseLeave="{{ cardLeave }}" style-after="content:'';position:absolute;inset:0;padding:1.5px;background:radial-gradient(var(--glow-radius,240px) circle at var(--glow-x,50%) var(--glow-y,50%),rgba(227,6,19,calc(var(--glow-intensity,0) * 0.95)) 0%,rgba(227,6,19,calc(var(--glow-intensity,0) * 0.45)) 32%,transparent 62%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none;border-radius:inherit;z-index:3;transition:opacity .3s ease" style="cursor:pointer;position:relative;background:#121212;border:1px solid #1c1c1c;transition:border-color .22s ease;display:flex;flex-direction:column">
             <div style="position:relative;aspect-ratio:1/1;overflow:hidden;background:#0E0E0E">
-              <img data-img="" src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:10px;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
+              <img data-img="" src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:10px;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
             </div>
             <div style="padding:12px;display:flex;flex-direction:column;gap:4px">
               <div style="font-size:13px;font-weight:700;line-height:1.35">{{ p.name }}</div>
@@ -748,7 +748,7 @@
     <span data-glow="" style="position:absolute;left:50%;bottom:-120px;width:min(760px,120%);height:240px;transform:translateX(-50%);background:radial-gradient(ellipse at 50% 100%,rgba(227,6,19,.26) 0%,rgba(227,6,19,0) 70%);opacity:.55;transition:opacity .3s ease;pointer-events:none"></span>
     <span style="position:relative;max-width:1400px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap">
       <span style="display:flex;align-items:center;gap:14px;min-width:0">
-        <img src="/assets/rocket-logo.png" alt="" aria-hidden="true" style="width:38px;height:38px;display:block;opacity:.9" />
+        <img src="/assets/rocket-logo.webp" alt="" aria-hidden="true" style="width:38px;height:38px;display:block;opacity:.9" />
         <span style="display:flex;flex-direction:column;gap:3px;min-width:0">
           <span style="font-family:'Saira Condensed',sans-serif;font-weight:900;font-style:italic;text-transform:uppercase;font-size:clamp(20px,2.6vw,30px);line-height:1">Volvé al inicio</span>
           <span style="font-size:12.5px;color:#A7A7A7">Seguí explorando sellados, sobres y ETB</span>
@@ -766,7 +766,7 @@
     <div style="max-width:1400px;margin:0 auto;padding:clamp(44px,6vw,76px) clamp(16px,3vw,32px);display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:clamp(26px,3vw,44px)">
       <div style="grid-column:span 1;min-width:200px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-          <img src="/assets/rocket-logo.png" alt="Rocket Cards" style="width:40px;height:40px;display:block" />
+          <img src="/assets/rocket-logo.webp" alt="Rocket Cards" style="width:40px;height:40px;display:block" />
           <span style="display:flex;flex-direction:column;line-height:.92">
             <span style="font-family:'Saira Condensed',sans-serif;font-weight:900;font-size:17px;font-style:italic">ROCKET</span>
             <span style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:10px;letter-spacing:.4em;color:#E30613">CARDS</span>
@@ -825,7 +825,7 @@
           <div style="flex:1;overflow-y:auto;padding:6px 20px">
             <sc-for list="{{ cartItems }}" as="it" hint-placeholder-count="2">
               <div style="display:flex;gap:13px;padding:16px 0;border-bottom:1px solid #151515">
-                <img src="{{ it.img }}" alt="{{ it.name }}" loading="lazy" style="width:62px;height:62px;flex:0 0 auto;object-fit:contain;border:1px solid #1d1d1d;background:#0A0A0A;padding:4px" />
+                <img src="{{ it.img }}" alt="{{ it.name }}" loading="lazy" decoding="async" style="width:62px;height:62px;flex:0 0 auto;object-fit:contain;border:1px solid #1d1d1d;background:#0A0A0A;padding:4px" />
                 <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
                   <div style="font-size:13.5px;font-weight:700;line-height:1.3">{{ it.name }}</div>
                   <div style="font-size:11.5px;color:#A7A7A7">{{ it.set }}</div>
@@ -878,18 +878,18 @@ const CATALOG = [
   { id:'KO-COL', name:'Knock Out Collection', set:'Pokémon TCG · Collection', cat:'sellados', img:'/assets/catalogo/knock-out-collection.webp', price:300000, stock:4 },
   { id:'ME-CR-BB', name:'Mega Evolution — Chaos Rising Booster Bundle', set:'Mega Evolution · 6 sobres', cat:'sellados', img:'/assets/catalogo/chaos-rising-bundle.webp', price:350000, stock:7 },
   { id:'ME-CR-PK', name:'Mega Evolution — Chaos Rising Booster Pack', set:'Mega Evolution · 1 sobre', cat:'sobres', img:'/assets/catalogo/chaos-rising-pack.webp', price:60000, stock:36 },
-  { id:'ME-PO-PK', name:'Mega Evolution — Perfect Order Booster Pack', set:'Mega Evolution · 1 sobre', cat:'sobres', img:'/assets/catalogo/perfect-order-pack.jpg', price:60000, stock:42 },
+  { id:'ME-PO-PK', name:'Mega Evolution — Perfect Order Booster Pack', set:'Mega Evolution · 1 sobre', cat:'sobres', img:'/assets/catalogo/perfect-order-pack.webp', price:60000, stock:42 },
   { id:'ME-PB-ETB', name:'Mega Evolution — Pitch Black Elite Trainer Box', set:'Mega Evolution · ETB', cat:'etb', img:'/assets/catalogo/pitch-black-etb.webp', price:650000, stock:3, tag:'NUEVO' },
   { id:'ME-PB-BB', name:'Mega Evolution — Pitch Black Booster Bundle', set:'Mega Evolution · 6 sobres', cat:'sellados', img:'/assets/catalogo/pitch-black-bundle.webp', price:350000, stock:8 },
   { id:'ME-PB-PK', name:'Mega Evolution — Pitch Black Booster Pack', set:'Mega Evolution · 1 sobre', cat:'sobres', img:'/assets/catalogo/pitch-black-pack.webp', price:65000, stock:30 },
   { id:'ME-AH-TS', name:'Mega Evolution — Ascended Heroes Tech Sticker Collection', set:'Mega Evolution · Collection', cat:'sellados', img:'/assets/catalogo/ascended-heroes-sticker.webp', price:310000, stock:6 },
-  { id:'ME-PF-ETB', name:'Mega Evolution — Phantasmal Flames Elite Trainer Box', set:'Mega Evolution · ETB', cat:'etb', img:'/assets/catalogo/phantasmal-flames-etb.jpg', price:1200000, stock:2 },
-  { id:'SV-BB-ETB', name:'Scarlet & Violet — Black Bolt Elite Trainer Box', set:'Scarlet & Violet · ETB', cat:'etb', img:'/assets/catalogo/black-bolt-etb.jpg', price:1400000, stock:2 },
+  { id:'ME-PF-ETB', name:'Mega Evolution — Phantasmal Flames Elite Trainer Box', set:'Mega Evolution · ETB', cat:'etb', img:'/assets/catalogo/phantasmal-flames-etb.webp', price:1200000, stock:2 },
+  { id:'SV-BB-ETB', name:'Scarlet & Violet — Black Bolt Elite Trainer Box', set:'Scarlet & Violet · ETB', cat:'etb', img:'/assets/catalogo/black-bolt-etb.webp', price:1400000, stock:2 },
   { id:'SV-DR-BB', name:'Scarlet & Violet — Destined Rivals Booster Bundle', set:'Scarlet & Violet · 6 sobres', cat:'sellados', img:'/assets/catalogo/destined-rivals-bundle.webp', price:600000, stock:0, tag:'AGOTADO' },
-  { id:'SV-KO-ETB', name:'Scarlet & Violet — Koraidon Elite Trainer Box', set:'Scarlet & Violet · ETB', cat:'etb', img:'/assets/catalogo/koraidon-etb.jpg', price:1500000, stock:1 },
-  { id:'SV-DR-ETB', name:'Scarlet & Violet — Destined Rivals Elite Trainer Box', set:'Scarlet & Violet · ETB', cat:'etb', img:'/assets/catalogo/destined-rivals-etb.jpg', price:1100000, stock:3 },
+  { id:'SV-KO-ETB', name:'Scarlet & Violet — Koraidon Elite Trainer Box', set:'Scarlet & Violet · ETB', cat:'etb', img:'/assets/catalogo/koraidon-etb.webp', price:1500000, stock:1 },
+  { id:'SV-DR-ETB', name:'Scarlet & Violet — Destined Rivals Elite Trainer Box', set:'Scarlet & Violet · ETB', cat:'etb', img:'/assets/catalogo/destined-rivals-etb.webp', price:1100000, stock:3 },
   { id:'SV-PE-PFC', name:'Scarlet & Violet — Prismatic Evolutions Premium Figure Collection', set:'Prismatic Evolutions · Premium', cat:'sellados', img:'/assets/catalogo/prismatic-figure-collection.webp', price:1500000, stock:1, premium:true },
-  { id:'SV-PE-BB', name:'Prismatic Evolutions — Booster Bundle (ING)', set:'Prismatic Evolutions · 6 sobres', cat:'sellados', img:'/assets/catalogo/prismatic-bundle.jpg', price:600000, stock:4 }
+  { id:'SV-PE-BB', name:'Prismatic Evolutions — Booster Bundle (ING)', set:'Prismatic Evolutions · 6 sobres', cat:'sellados', img:'/assets/catalogo/prismatic-bundle.webp', price:600000, stock:4 }
 ];
 
 // Puente para pack-opening/: le da el catalogo real y las acciones de la tienda.
@@ -939,7 +939,7 @@ const TOP_IDS = ['ME-PB-PK', 'ME-CR-PK', 'ME-PO-PK', 'ME-CR-BB', 'FP-S2'];
 const CAT_IMG = {
   sellados: '/assets/catalogo/prismatic-figure-collection.webp',
   sobres: '/assets/catalogo/pitch-black-pack.webp',
-  etb: '/assets/catalogo/koraidon-etb.jpg'
+  etb: '/assets/catalogo/koraidon-etb.webp'
 };
 
 const NEW_IDS = ['FP-S2','ME-PB-ETB','SV-PE-PFC','ME-AH-TS','SV-PE-BB','FP-S1'];
@@ -1322,11 +1322,11 @@ class Component extends DCLogic {
       },
 
       heroCards: [
-        { src: '/assets/cards/vanilluxe.jpg', alt: 'Vanilluxe · Guardians Rising', rot: '-16deg', lift: '52px', delay: '.06s', w: 'clamp(104px,14vw,214px)', z: 1 },
-        { src: '/assets/cards/chikorita.jpg', alt: 'Chikorita · Ascension', rot: '-7deg', lift: '12px', delay: '.14s', w: 'clamp(116px,15.5vw,238px)', z: 3 },
-        { src: '/assets/cards/pikachu-ex.jpg', alt: 'Pikachu ex · Teracristal 238/191', rot: '0deg', lift: '-26px', delay: '.3s', w: 'clamp(134px,18vw,276px)', z: 6 },
-        { src: '/assets/cards/flareon.jpg', alt: 'Flareon · Ancient Origins', rot: '6deg', lift: '10px', delay: '.38s', w: 'clamp(116px,15.5vw,238px)', z: 3 },
-        { src: '/assets/cards/mimikyu.jpg', alt: 'Mimikyu · Cosmic Eclipse', rot: '13deg', lift: '34px', delay: '.46s', w: 'clamp(108px,14.5vw,222px)', z: 2 }
+        { src: '/assets/cards/vanilluxe.webp', alt: 'Vanilluxe · Guardians Rising', rot: '-16deg', lift: '52px', delay: '.06s', w: 'clamp(104px,14vw,214px)', z: 1 },
+        { src: '/assets/cards/chikorita.webp', alt: 'Chikorita · Ascension', rot: '-7deg', lift: '12px', delay: '.14s', w: 'clamp(116px,15.5vw,238px)', z: 3 },
+        { src: '/assets/cards/pikachu-ex.webp', alt: 'Pikachu ex · Teracristal 238/191', rot: '0deg', lift: '-26px', delay: '.3s', w: 'clamp(134px,18vw,276px)', z: 6 },
+        { src: '/assets/cards/flareon.webp', alt: 'Flareon · Ancient Origins', rot: '6deg', lift: '10px', delay: '.38s', w: 'clamp(116px,15.5vw,238px)', z: 3 },
+        { src: '/assets/cards/mimikyu.webp', alt: 'Mimikyu · Cosmic Eclipse', rot: '13deg', lift: '34px', delay: '.46s', w: 'clamp(108px,14.5vw,222px)', z: 2 }
       ],
       heroEnter: (e) => {
         const el = e.currentTarget;
@@ -1383,7 +1383,10 @@ class Component extends DCLogic {
         const abs = Math.abs(off);
         const isCur = off === 0;
         return Object.assign({}, p, {
-          imgCss: 'url("' + p.img + '")',
+          // Solo la diapositiva visible y sus dos vecinas. Las demas tienen
+          // opacidad 0, asi que descargarlas era peso puro: al avanzar, la
+          // siguiente entra en rango y se carga con un paso de anticipacion.
+          imgCss: abs > 1 ? 'none' : 'url("' + p.img + '")',
           liTransform: 'translateX(' + (off * 74) + '%) scale(' + (isCur ? 1 : 0.84) + ') rotateX(' + (isCur ? 0 : 9) + 'deg)',
           liOpacity: abs > 1 ? 0 : 1,
           liZ: 10 - abs,

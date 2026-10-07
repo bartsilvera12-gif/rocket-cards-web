@@ -34,6 +34,21 @@ Una sola página, pero cada vista tiene su URL real: `/`, `/catalogo`,
 `/catalogo/sobres`, `/producto/<slug>`, `/privacidad`, `/terminos`.
 El botón atrás funciona entre vistas.
 
+## Imágenes
+
+Las fotos del proveedor venían a tamaño completo: 4,4 MB en total, con el logo
+en 760px y 274 KB para dibujarse a 44px. `scripts/optimize-images.py` las deja
+en WebP al tamaño que la página realmente usa (el carrusel, que es el uso más
+grande, muestra 576px) y guarda las originales en `assets-originales/`, fuera
+de git y del deploy.
+
+```bash
+python scripts/optimize-images.py --dry-run   # ver qué haría
+python scripts/optimize-images.py             # aplicar
+```
+
+Si agregás fotos nuevas, pasá el script antes de commitear.
+
 ## Desarrollo
 
 ```bash

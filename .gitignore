@@ -6,3 +6,6 @@ node_modules/
 uploads/
 screenshots/
 .thumbnail
+
+# originales a tamanio completo, antes de optimizar
+assets-originales/

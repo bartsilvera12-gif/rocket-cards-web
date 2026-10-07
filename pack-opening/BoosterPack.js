@@ -29,7 +29,7 @@ function PackArt() {
     h('div', { className: 'rcpo-slash' }),
     h('div', { className: 'rcpo-seal' }, h('span', null, 'ABRIR AQUÍ')),
     h('div', { className: 'rcpo-packlogo' },
-      h('img', { src: '/assets/rocket-logo.png', alt: '', draggable: false }),
+      h('img', { src: '/assets/rocket-logo.webp', alt: '', draggable: false }),
       h('div', { className: 'rcpo-packname' }, 'ROCKET'),
       h('div', { className: 'rcpo-packsub' }, 'CARDS')
     ),
