@@ -17,7 +17,7 @@ const CSS = `
   background:radial-gradient(70% 90% at 82% 50%,rgba(227,6,19,.15),transparent 64%),
              radial-gradient(60% 80% at 10% 60%,rgba(201,162,39,.05),transparent 70%)}
 .rcpo-copy{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:11px;max-width:40ch}
-.rcpo-kicker{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.3em;color:var(--red2);text-transform:uppercase}
+.rcpo-kicker{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.3em;color:var(--gold);text-transform:uppercase}
 .rcpo-title{font-family:'Saira Condensed',sans-serif;font-weight:900;font-style:italic;
   font-size:clamp(28px,4.4vw,52px);line-height:.94;margin:0;text-transform:uppercase}
 .rcpo-title em{color:var(--red);font-style:italic}
