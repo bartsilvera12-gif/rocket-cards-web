@@ -21,6 +21,7 @@ const TYPES = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
   '.webp': 'image/webp', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
   '.woff2': 'font/woff2', '.pdf': 'application/pdf',
+  '.webmanifest': 'application/manifest+json',
 };
 
 const isFile = (p) => stat(p).then((s) => s.isFile(), () => false);

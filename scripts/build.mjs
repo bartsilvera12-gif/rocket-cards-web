@@ -20,10 +20,16 @@ const PAGE = 'Rocket Cards - Home.dc.html';
 
 /** Todo lo que se publica. Si agregás un archivo nuevo, va acá. */
 const INCLUDE = [
-  'support.js',      // runtime de la plantilla
-  'reveal.js',       // animación de entrada por scroll
-  'pack-opening',    // módulo de apertura de sobres
-  'assets',          // logo, fotos de catálogo y cartas
+  'support.js',           // runtime de la plantilla
+  'reveal.js',            // animación de entrada por scroll
+  'pack-opening',         // módulo de apertura de sobres
+  'assets',               // logo, fotos de catálogo y cartas
+  'favicon.ico',          // iconos (los genera scripts/favicon.py)
+  'favicon.svg',
+  'apple-touch-icon.png',
+  'icon-192.png',
+  'icon-512.png',
+  'site.webmanifest',
 ];
 
 const exists = (p) => stat(p).then(() => true, () => false);
