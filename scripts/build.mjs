@@ -18,11 +18,13 @@ const DIST = join(ROOT, 'dist');
 
 const PAGE = 'Rocket Cards - Home.dc.html';
 
-/** Todo lo que se publica. Si agregás un archivo nuevo, va acá. */
+/** Todo lo que se publica. Si agregás un archivo nuevo, va acá.
+ *  (pack-opening/ sigue en el repo pero no se publica: la sección está
+ *  desconectada. Para reactivarla, sumarlo acá y volver a poner el script
+ *  y el div #rc-pack-slot en la página.) */
 const INCLUDE = [
   'support.js',           // runtime de la plantilla
   'reveal.js',            // animación de entrada por scroll
-  'pack-opening',         // módulo de apertura de sobres
   'assets',               // logo, fotos de catálogo y cartas
   'favicon.ico',          // iconos (los genera scripts/favicon.py)
   'favicon.svg',
