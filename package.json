@@ -1,0 +1,10 @@
+{
+  "name": "rocket-cards",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Rocket Cards - tienda Pokemon TCG (sitio estatico)",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "preview": "node scripts/build.mjs && node scripts/serve.mjs 4322"
+  }
+}

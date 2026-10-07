@@ -1,0 +1,8 @@
+dist/
+.vercel/
+node_modules/
+
+# material de trabajo, no se publica
+uploads/
+screenshots/
+.thumbnail

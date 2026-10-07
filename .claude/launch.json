@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "rocket-cards",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "4321"],
+      "port": 4321
+    },
+    {
+      "name": "rocket-cards-prod",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["scripts/serve.mjs", "4322"],
+      "port": 4322
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+# El build usa lista blanca (scripts/build.mjs), pero esto evita
+# que estos archivos siquiera se suban al paso de build.
+uploads/
+screenshots/
+.thumbnail
+.claude/
