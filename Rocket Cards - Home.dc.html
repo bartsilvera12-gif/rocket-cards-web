@@ -219,7 +219,7 @@
     </sc-if>
 
     <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
-      <nav style="border-top:1px solid #1a1a1a;background:#0D0D0D;padding:8px clamp(14px,3vw,32px) 18px;display:flex;flex-direction:column;animation:rc-fade .18s ease">
+      <nav style="position:absolute;top:100%;left:0;right:0;z-index:70;border-top:1px solid #1a1a1a;background:#0D0D0D;box-shadow:0 28px 60px rgba(0,0,0,.72);max-height:calc(100vh - 100%);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px clamp(14px,3vw,32px) 18px;display:flex;flex-direction:column;animation:rc-fade .18s ease">
         <a href="#top" onClick="{{ goHome }}" style="padding:13px 0;border-bottom:1px solid #151515;font-family:'Saira Condensed',sans-serif;font-size:17px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Inicio</a>
         <a href="#top" onClick="{{ openCatalog }}" style="padding:13px 0;border-bottom:1px solid #151515;font-family:'Saira Condensed',sans-serif;font-size:17px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Catálogo completo</a>
         <sc-for list="{{ catFeatured }}" as="cat" hint-placeholder-count="3">
@@ -319,8 +319,8 @@
         <a href="#top" onClick="{{ openCatalog }}" style="font-family:'Saira Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#A7A7A7;padding:10px 0;display:inline-block">Ver todo →</a>
       </div>
 
-      <div style="position:relative;width:clamp(280px,min(64vmin,88vw),620px);height:clamp(420px,86vmin,760px);margin:0 auto;perspective:1200px;transform-style:preserve-3d">
-        <ul style="position:absolute;inset:0;margin:0;padding:0;list-style:none">
+      <div onPointerDown="{{ carDown }}" onPointerMove="{{ carMove }}" onPointerUp="{{ carUp }}" onPointerCancel="{{ carUp }}" onLostPointerCapture="{{ carUp }}" style="position:relative;width:clamp(280px,min(64vmin,88vw),620px);height:clamp(420px,86vmin,760px);margin:0 auto;perspective:1200px;transform-style:preserve-3d;touch-action:pan-y;-webkit-tap-highlight-color:transparent">
+        <ul data-car="" style="position:absolute;inset:0;margin:0;padding:0;list-style:none">
           <sc-for list="{{ carSlides }}" as="s" hint-placeholder-count="4">
             <li onClick="{{ s.select }}" onMouseMove="{{ s.move }}" onMouseLeave="{{ s.leave }}" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;text-align:center;cursor:pointer;transform:{{ s.liTransform }};opacity:{{ s.liOpacity }};z-index:{{ s.liZ }};pointer-events:{{ s.liPE }};transform-origin:bottom;transition:transform .55s cubic-bezier(.4,0,.2,1),opacity .55s ease">
               <div data-par="" style="flex:1;align-self:stretch;position:relative;min-height:0;background:transparent;border:0;overflow:hidden;transition:transform .15s ease-out">
@@ -1438,6 +1438,42 @@ class Component extends DCLogic {
       ],
 
       carCounter: ('0' + (s.car + 1)) + ' / ' + ('0' + NEW_IDS.length),
+      // Deslizar con el dedo. Un solo camino para dedo, mouse y lápiz con
+      // Pointer Events. Mientras se arrastra, las diapositivas acompañan
+      // amortiguadas; al soltar, salta de a una o vuelve a su lugar.
+      carDown: (e) => {
+        if (e.pointerType === 'mouse' && e.buttons !== 1) return;
+        this._car = { x0: e.clientX, y0: e.clientY, on: true, eje: '' };
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+      },
+      carMove: (e) => {
+        const d = this._car;
+        if (!d || !d.on) return;
+        const dx = e.clientX - d.x0, dy = e.clientY - d.y0;
+        // Hasta no saber si el gesto es horizontal o vertical no se toca nada,
+        // para no robarle el scroll a la página.
+        if (!d.eje) {
+          if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+          d.eje = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+          if (d.eje === 'y') { d.on = false; return; }
+        }
+        d.dx = dx;
+        const ul = e.currentTarget.querySelector('[data-car]');
+        if (ul) { ul.style.transition = 'none'; ul.style.transform = 'translateX(' + (dx * 0.35).toFixed(1) + 'px)'; }
+        e.preventDefault();
+      },
+      carUp: (e) => {
+        const d = this._car;
+        if (!d || !d.on) { this._car = null; return; }
+        this._car = null;
+        const ul = e.currentTarget.querySelector('[data-car]');
+        if (ul) { ul.style.transition = 'transform .32s cubic-bezier(.2,.7,.2,1)'; ul.style.transform = ''; }
+        const dx = d.dx || 0;
+        if (Math.abs(dx) < 45) return;            // muy corto: vuelve solo
+        this._carSwipe = Date.now();              // que no dispare el click
+        const n = NEW_IDS.length;
+        this.setState(st => ({ car: (st.car + (dx < 0 ? 1 : -1) + n) % n }));
+      },
       carPrev: () => this.setState(st => ({ car: (st.car - 1 + NEW_IDS.length) % NEW_IDS.length })),
       carNext: () => this.setState(st => ({ car: (st.car + 1) % NEW_IDS.length })),
       carSlides: NEW_IDS.map((id, i) => {
@@ -1459,7 +1495,10 @@ class Component extends DCLogic {
           veil: isCur ? 1 : 0,
           textOpacity: isCur ? 1 : 0,
           textVis: isCur ? 'visible' : 'hidden',
-          select: (e) => { if (isCur) { if (e) e.stopPropagation(); this.openProduct(id); } else this.setState({ car: i }); },
+          select: (e) => {
+            if (Date.now() - (this._carSwipe || 0) < 400) return;   // venía de un deslizamiento
+            if (isCur) { if (e) e.stopPropagation(); this.openProduct(id); } else this.setState({ car: i });
+          },
           move: (e) => {
             if (!isCur) return;
             const el = e.currentTarget.querySelector('[data-par]');
