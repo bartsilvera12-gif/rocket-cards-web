@@ -333,9 +333,10 @@
       </div>
       <span style="font-size:13px;color:#A7A7A7;max-width:320px;text-wrap:pretty">Sellados de origen. Ideal para probar suerte sin ir a la caja completa.</span>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,236px),1fr));gap:clamp(10px,1.4vw,18px)">
+    <div data-rail-wrap="" style="position:relative">
+      <div data-rail="" style="display:flex;gap:clamp(10px,1.4vw,18px);overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:14px">
         <sc-for list="{{ sobres }}" as="p" hint-placeholder-count="3">
-          <div onClick="{{ p.open }}" onMouseEnter="{{ cardEnter }}" onMouseMove="{{ cardMove }}" onMouseLeave="{{ cardLeave }}" style-after="content:'';position:absolute;inset:0;padding:1.5px;background:radial-gradient(var(--glow-radius,240px) circle at var(--glow-x,50%) var(--glow-y,50%),rgba(227,6,19,calc(var(--glow-intensity,0) * 0.95)) 0%,rgba(227,6,19,calc(var(--glow-intensity,0) * 0.45)) 32%,transparent 62%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none;border-radius:inherit;z-index:3;transition:opacity .3s ease" style="cursor:pointer;position:relative;background:#121212;border:1px solid #1c1c1c;transition:border-color .22s ease;display:flex;flex-direction:column">
+          <div onClick="{{ p.open }}" onMouseEnter="{{ cardEnter }}" onMouseMove="{{ cardMove }}" onMouseLeave="{{ cardLeave }}" style-after="content:'';position:absolute;inset:0;padding:1.5px;background:radial-gradient(var(--glow-radius,240px) circle at var(--glow-x,50%) var(--glow-y,50%),rgba(227,6,19,calc(var(--glow-intensity,0) * 0.95)) 0%,rgba(227,6,19,calc(var(--glow-intensity,0) * 0.45)) 32%,transparent 62%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none;border-radius:inherit;z-index:3;transition:opacity .3s ease" style="cursor:pointer;position:relative;flex:0 0 auto;width:clamp(186px,21vw,248px);scroll-snap-align:start;background:#121212;border:1px solid #1c1c1c;transition:border-color .22s ease;display:flex;flex-direction:column">
             <div style="position:relative;aspect-ratio:1/1;overflow:hidden;background:#0E0E0E">
               <img data-img="" src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:10px;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
               <sc-if value="{{ p.hasTag }}" hint-placeholder-val="{{ false }}">
@@ -356,6 +357,15 @@
             </div>
           </div>
         </sc-for>
+      </div>
+      <div data-rail-nav="" style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:6px">
+        <button onClick="{{ railPrev }}" aria-label="Anterior" style="width:40px;height:40px;border-radius:50%;background:#121212;border:1px solid #242424;color:#F5F5F5;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .2s ease,transform .2s ease,opacity .2s ease" style-hover="border-color:#E30613;transform:translateY(-2px)">
+          <svg width="16" height="11" viewBox="0 0 17 12" fill="none" aria-hidden="true" style="transform:rotate(180deg)"><path d="M1 6h14M11 1.5 15.5 6 11 10.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </button>
+        <button onClick="{{ railNext }}" aria-label="Siguiente" style="width:40px;height:40px;border-radius:50%;background:#121212;border:1px solid #242424;color:#F5F5F5;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .2s ease,transform .2s ease,opacity .2s ease" style-hover="border-color:#E30613;transform:translateY(-2px)">
+          <svg width="16" height="11" viewBox="0 0 17 12" fill="none" aria-hidden="true"><path d="M1 6h14M11 1.5 15.5 6 11 10.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </button>
+      </div>
     </div>
   </section>
 
@@ -392,7 +402,7 @@
             </div>
           </sc-for>
         </div>
-        <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:6px">
+        <div data-rail-nav="" style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:6px">
           <button onClick="{{ railPrev }}" aria-label="Anterior" style="width:40px;height:40px;border-radius:50%;background:#121212;border:1px solid #242424;color:#F5F5F5;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .2s ease,transform .2s ease" style-hover="border-color:#E30613;transform:translateY(-2px)">
             <svg width="16" height="11" viewBox="0 0 17 12" fill="none" aria-hidden="true" style="transform:rotate(180deg)"><path d="M1 6h14M11 1.5 15.5 6 11 10.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
           </button>
@@ -413,9 +423,10 @@
       </div>
       <span style="font-size:13px;color:#A7A7A7;max-width:340px;text-wrap:pretty">Caja completa con sobres, fundas, dados y accesorios del set.</span>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,236px),1fr));gap:clamp(10px,1.4vw,18px)">
+    <div data-rail-wrap="" style="position:relative">
+      <div data-rail="" style="display:flex;gap:clamp(10px,1.4vw,18px);overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:14px">
         <sc-for list="{{ etbs }}" as="p" hint-placeholder-count="5">
-          <div onClick="{{ p.open }}" onMouseEnter="{{ cardEnter }}" onMouseMove="{{ cardMove }}" onMouseLeave="{{ cardLeave }}" style-after="content:'';position:absolute;inset:0;padding:1.5px;background:radial-gradient(var(--glow-radius,240px) circle at var(--glow-x,50%) var(--glow-y,50%),rgba(227,6,19,calc(var(--glow-intensity,0) * 0.95)) 0%,rgba(227,6,19,calc(var(--glow-intensity,0) * 0.45)) 32%,transparent 62%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none;border-radius:inherit;z-index:3;transition:opacity .3s ease" style="cursor:pointer;position:relative;background:#121212;border:1px solid #1c1c1c;transition:border-color .22s ease;display:flex;flex-direction:column">
+          <div onClick="{{ p.open }}" onMouseEnter="{{ cardEnter }}" onMouseMove="{{ cardMove }}" onMouseLeave="{{ cardLeave }}" style-after="content:'';position:absolute;inset:0;padding:1.5px;background:radial-gradient(var(--glow-radius,240px) circle at var(--glow-x,50%) var(--glow-y,50%),rgba(227,6,19,calc(var(--glow-intensity,0) * 0.95)) 0%,rgba(227,6,19,calc(var(--glow-intensity,0) * 0.45)) 32%,transparent 62%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none;border-radius:inherit;z-index:3;transition:opacity .3s ease" style="cursor:pointer;position:relative;flex:0 0 auto;width:clamp(186px,21vw,248px);scroll-snap-align:start;background:#121212;border:1px solid #1c1c1c;transition:border-color .22s ease;display:flex;flex-direction:column">
             <div style="position:relative;aspect-ratio:1/1;overflow:hidden;background:#0E0E0E">
               <img data-img="" src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:10px;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
               <sc-if value="{{ p.hasTag }}" hint-placeholder-val="{{ false }}">
@@ -436,6 +447,15 @@
             </div>
           </div>
         </sc-for>
+      </div>
+      <div data-rail-nav="" style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:6px">
+        <button onClick="{{ railPrev }}" aria-label="Anterior" style="width:40px;height:40px;border-radius:50%;background:#121212;border:1px solid #242424;color:#F5F5F5;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .2s ease,transform .2s ease,opacity .2s ease" style-hover="border-color:#E30613;transform:translateY(-2px)">
+          <svg width="16" height="11" viewBox="0 0 17 12" fill="none" aria-hidden="true" style="transform:rotate(180deg)"><path d="M1 6h14M11 1.5 15.5 6 11 10.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </button>
+        <button onClick="{{ railNext }}" aria-label="Siguiente" style="width:40px;height:40px;border-radius:50%;background:#121212;border:1px solid #242424;color:#F5F5F5;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .2s ease,transform .2s ease,opacity .2s ease" style-hover="border-color:#E30613;transform:translateY(-2px)">
+          <svg width="16" height="11" viewBox="0 0 17 12" fill="none" aria-hidden="true"><path d="M1 6h14M11 1.5 15.5 6 11 10.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </button>
+      </div>
     </div>
   </section>
 
@@ -950,6 +970,7 @@ class Component extends DCLogic {
       window.scrollTo(0, 0);
     };
     window.addEventListener('popstate', this._onPop);
+    requestAnimationFrame(() => this.syncRails());
 
     window.ROCKET_SHOP = Object.assign(window.ROCKET_SHOP || {}, {
       catalog: CATALOG,
@@ -957,7 +978,7 @@ class Component extends DCLogic {
       addToCart: (id) => { const p = CATALOG.find(x => x.id === id); if (p) this.addToCart(p); },
       openProduct: (id) => this.openProduct(id)
     });
-    this._onResize = () => this.setState({ w: window.innerWidth });
+    this._onResize = () => { this.setState({ w: window.innerWidth }); this.syncRails(); };
     window.addEventListener('resize', this._onResize);
     this._onScroll = () => {
       const fo = document.querySelector('footer');
@@ -1028,6 +1049,40 @@ class Component extends DCLogic {
     });
   }
 
+  /**
+   * Ajusta las flechas de cada carrusel: si todo entra en pantalla no hay
+   * nada que desplazar y se esconden, y en los extremos se apaga la que
+   * no lleva a ningun lado. Sin esto, "Sobres" (3 productos) mostraba dos
+   * flechas que no hacian nada en pantallas anchas.
+   */
+  syncRails() {
+    document.querySelectorAll('[data-rail-wrap]').forEach((wrap) => {
+      const rail = wrap.querySelector('[data-rail]');
+      const nav = wrap.querySelector('[data-rail-nav]');
+      if (!rail || !nav) return;
+      const max = rail.scrollWidth - rail.clientWidth;
+      if (max <= 2) { nav.style.display = 'none'; return; }
+      nav.style.display = 'flex';
+      const x = rail.scrollLeft;
+      const btns = nav.querySelectorAll('button');
+      const apagar = (b, off) => {
+        if (!b) return;
+        b.disabled = off;
+        b.style.opacity = off ? '.3' : '1';
+        b.style.cursor = off ? 'default' : 'pointer';
+      };
+      apagar(btns[0], x <= 2);
+      apagar(btns[1], x >= max - 2);
+      if (!rail.dataset.railBound) {
+        rail.dataset.railBound = '1';
+        rail.addEventListener('scroll', () => {
+          if (this._railRaf) return;
+          this._railRaf = requestAnimationFrame(() => { this._railRaf = 0; this.syncRails(); });
+        }, { passive: true });
+      }
+    });
+  }
+
   railScroll(e, dir) {
     const wrap = e.currentTarget.closest('[data-rail-wrap]');
     const rail = wrap && wrap.querySelector('[data-rail]');
@@ -1050,6 +1105,7 @@ class Component extends DCLogic {
   // así que el estado anterior lo guardamos nosotros.
   componentDidUpdate() {
     this.syncUrl();
+    this.syncRails();
     if (this._lastView !== this.state.view) {
       this._lastView = this.state.view;
       if (this._onScroll) { requestAnimationFrame(this._onScroll); setTimeout(this._onScroll, 120); }
