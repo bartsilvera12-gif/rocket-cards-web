@@ -34,6 +34,41 @@ Una sola página, pero cada vista tiene su URL real: `/`, `/catalogo`,
 `/catalogo/sobres`, `/producto/<slug>`, `/privacidad`, `/terminos`.
 El botón atrás funciona entre vistas.
 
+## Categorías
+
+Las categorías se definen **una sola vez**, en `CATEGORIAS` dentro de
+`Rocket Cards - Home.dc.html`:
+
+```js
+const CATEGORIAS = [
+  { key: 'singles', name: 'Singles', kicker: 'Carta suelta',
+    note: 'Cartas individuales', notaMenu: 'Cartas individuales',
+    accent: '#FF1A27', img: '/assets/cards/pikachu-ex.webp' }
+];
+```
+
+De ahí salen las cinco cosas que antes se enumeraban por separado: el filtro del
+router (`/catalogo/<key>`), las imágenes, el mega menú del header, las tarjetas de
+la home y los chips de filtro del catálogo. Agregar una categoría es una línea.
+
+Una categoría sin productos muestra **"Próximamente"** en la tarjeta en vez de
+"0 productos", que parecía un error. En cuanto se carga el primer producto la
+etiqueta cambia sola.
+
+### Cargar singles
+
+Cada carta suelta es una entrada más de `CATALOG`, con `cat: 'singles'`:
+
+```js
+{ id:'SV-PIKA-238', name:'Pikachu ex — Teracristal 238/191', set:'Scarlet & Violet · Paldean Fates',
+  cat:'singles', img:'/assets/singles/pikachu-ex-238.webp', price:450000, stock:1 },
+```
+
+- `id` es el SKU y entra en el buscador, así que conviene que sea legible.
+- `stock` en singles suele ser 1: es una carta única.
+- La imagen va en `assets/` (cualquier subcarpeta); el build copia `assets` entero.
+- `tag:'NUEVO'` es opcional y pinta la etiqueta en la tarjeta.
+
 ## Imágenes
 
 Las fotos del proveedor venían a tamaño completo: 4,4 MB en total, con el logo

@@ -201,7 +201,7 @@
             <span style="width:44px;height:44px;flex:0 0 auto;border:1px solid #1f1f1f;background-color:#0A0A0A;background-image:{{ cat.imgCss }};background-size:contain;background-position:center;background-repeat:no-repeat;display:block"></span>
             <span style="flex:1;min-width:0">
               <span style="display:block;font-family:'Saira Condensed',sans-serif;font-size:16px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;line-height:1.15">{{ cat.name }}</span>
-              <span style="display:block;font-size:11.5px;color:#A7A7A7;margin-top:2px">{{ cat.count }} productos</span>
+              <span style="display:block;font-size:11.5px;color:#A7A7A7;margin-top:2px">{{ cat.countLabel }}</span>
             </span>
           </a>
         </sc-for>
@@ -261,7 +261,7 @@
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,268px),1fr));gap:clamp(10px,1.2vw,16px)">
       <sc-for list="{{ catFeatured }}" as="cat" hint-placeholder-count="3">
-        <a href="#top" onClick="{{ openCatalog }}" onMouseEnter="{{ cardEnter }}" onMouseMove="{{ cardMove }}" onMouseLeave="{{ cardLeave }}" style-after="content:'';position:absolute;inset:0;padding:1.5px;background:radial-gradient(var(--glow-radius,240px) circle at var(--glow-x,50%) var(--glow-y,50%),rgba(227,6,19,calc(var(--glow-intensity,0) * 0.95)) 0%,rgba(227,6,19,calc(var(--glow-intensity,0) * 0.45)) 32%,transparent 62%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none;border-radius:inherit;z-index:3;transition:opacity .3s ease" style="position:relative;display:flex;flex-direction:column;justify-content:flex-end;min-height:clamp(230px,26vw,320px);border:1px solid #1c1c1c;background:#0D0D0D;overflow:hidden;transition:border-color .22s ease" style-hover="color:#F5F5F5">
+        <a href="#top" onClick="{{ cat.go }}" onMouseEnter="{{ cardEnter }}" onMouseMove="{{ cardMove }}" onMouseLeave="{{ cardLeave }}" style-after="content:'';position:absolute;inset:0;padding:1.5px;background:radial-gradient(var(--glow-radius,240px) circle at var(--glow-x,50%) var(--glow-y,50%),rgba(227,6,19,calc(var(--glow-intensity,0) * 0.95)) 0%,rgba(227,6,19,calc(var(--glow-intensity,0) * 0.45)) 32%,transparent 62%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none;border-radius:inherit;z-index:3;transition:opacity .3s ease" style="position:relative;display:flex;flex-direction:column;justify-content:flex-end;min-height:clamp(230px,26vw,320px);border:1px solid #1c1c1c;background:#0D0D0D;overflow:hidden;transition:border-color .22s ease" style-hover="color:#F5F5F5">
           <div data-img="" role="img" aria-label="{{ cat.name }}" style="position:absolute;inset:0;background-color:#0C0C0C;background-image:{{ cat.imgCss }};background-size:cover;background-position:center 28%;filter:brightness(.58) contrast(1.06) saturate(.92);transition:transform .5s cubic-bezier(.2,.7,.2,1)"></div>
           <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,5,5,.3) 0%,rgba(5,5,5,.62) 42%,rgba(5,5,5,.95) 78%,#050505 100%)"></div>
           <div style="position:relative;padding:clamp(18px,2.2vw,26px)">
@@ -271,7 +271,7 @@
             </div>
             <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;font-size:clamp(24px,3vw,34px);line-height:1;letter-spacing:.01em">{{ cat.name }}</div>
             <div style="display:flex;align-items:baseline;gap:10px;margin-top:8px">
-              <span style="font-size:12.5px;color:#A7A7A7">{{ cat.count }} productos</span>
+              <span style="font-size:12.5px;color:#A7A7A7">{{ cat.countLabel }}</span>
               <span style="font-size:12.5px;color:#A7A7A7">·</span>
               <span style="font-size:12.5px;color:#A7A7A7">{{ cat.note }}</span>
             </div>
@@ -936,11 +936,26 @@ const TERMINOS = [
 
 const TOP_IDS = ['ME-PB-PK', 'ME-CR-PK', 'ME-PO-PK', 'ME-CR-BB', 'FP-S2'];
 
-const CAT_IMG = {
-  sellados: '/assets/catalogo/prismatic-figure-collection.webp',
-  sobres: '/assets/catalogo/pitch-black-pack.webp',
-  etb: '/assets/catalogo/koraidon-etb.webp'
-};
+const CATEGORIAS = [
+  { key: 'sellados', name: 'Sellados y coleccionables', kicker: 'Producto sellado',
+    note: 'Bundle · Collections · Premium', notaMenu: 'Booster Box · Bundle · Collections',
+    accent: '#E30613', img: '/assets/catalogo/prismatic-figure-collection.webp' },
+  { key: 'sobres', name: 'Sobres', kicker: 'Unidad suelta',
+    note: 'Sellados de origen', notaMenu: 'Sellados de origen',
+    accent: '#F5F5F5', img: '/assets/catalogo/pitch-black-pack.webp' },
+  { key: 'etb', name: 'ETB', kicker: 'Elite Trainer Box',
+    note: 'Set completo + accesorios', notaMenu: 'Elite Trainer Box',
+    accent: '#C9A227', img: '/assets/catalogo/koraidon-etb.webp' },
+  // Cartas sueltas. Arranca sin productos: se cargan en CATALOG con cat:'singles'.
+  { key: 'singles', name: 'Singles', kicker: 'Carta suelta',
+    note: 'Cartas individuales', notaMenu: 'Cartas individuales',
+    accent: '#FF1A27', img: '/assets/cards/pikachu-ex.webp' }
+];
+
+const CAT_IMG = CATEGORIAS.reduce((o, c) => { o[c.key] = c.img; return o; }, {});
+const CAT_KEYS = CATEGORIAS.map(c => c.key);
+const catCount = (key) => CATALOG.filter(p => p.cat === key).length;
+const catCountLabel = (n) => n > 0 ? n + ' productos' : 'Próximamente';
 
 const NEW_IDS = ['FP-S2','ME-PB-ETB','SV-PE-PFC','ME-AH-TS','SV-PE-BB','FP-S1'];
 
@@ -1147,7 +1162,7 @@ class Component extends DCLogic {
     let seg;
     try { seg = decodeURIComponent(path || '/'); } catch (_) { seg = path || '/'; }
     seg = seg.replace(/^\/+|\/+$/g, '').split('/');
-    const CATS = ['sellados', 'sobres', 'etb'];
+    const CATS = CAT_KEYS;
     if (seg[0] === 'producto' && seg[1]) {
       const key = seg[1].toLowerCase();
       const p = CATALOG.find(x => this.slugOf(x) === key) || CATALOG.find(x => x.id.toLowerCase() === key);
@@ -1285,20 +1300,17 @@ class Component extends DCLogic {
         clearTimeout(this._catTimer);
         this._catTimer = setTimeout(() => this.setState({ catMenuOpen: false, catHover: 0 }), 220);
       },
-      megaCats: [
-        { name: 'Sellados y coleccionables', i: 0, cat: 'sellados' },
-        { name: 'Sobres', i: 1, cat: 'sobres' },
-        { name: 'ETB', i: 2, cat: 'etb' }
-      ].map(c => ({
+      megaCats: CATEGORIAS.map((c, i) => ({
         name: c.name,
-        count: CATALOG.filter(p => p.cat === c.cat).length,
-        note: ['Booster Box · Bundle · Collections', 'Sellados de origen', 'Elite Trainer Box'][c.i],
-        imgCss: 'url("' + CAT_IMG[c.cat] + '")',
-        color: s.catHover === c.i ? '#FF1A27' : '#F5F5F5',
-        hover: () => this.setState({ catHover: c.i }),
-        go: (e) => { if (e) e.preventDefault(); this.openCat(c.cat); }
+        count: catCount(c.key),
+        countLabel: catCountLabel(catCount(c.key)),
+        note: c.notaMenu,
+        imgCss: 'url("' + c.img + '")',
+        color: s.catHover === i ? '#FF1A27' : '#F5F5F5',
+        hover: () => this.setState({ catHover: i }),
+        go: (e) => { if (e) e.preventDefault(); this.openCat(c.key); }
       })),
-      megaImageCss: 'url("' + CAT_IMG[['sellados','sobres','etb'][s.catHover || 0]] + '")',
+      megaImageCss: 'url("' + (CATEGORIAS[s.catHover || 0] || CATEGORIAS[0]).img + '")',
 
       q: s.q,
       hasQuery: s.q.length > 0,
@@ -1355,14 +1367,12 @@ class Component extends DCLogic {
       marquee: [1, 2],
       quickLinks: ['Singles', 'Booster Boxes', 'ETB', 'Accesorios'],
 
-      catFeatured: [
-        { name: 'Sellados y coleccionables', cat: 'sellados', kicker: 'Producto sellado', note: 'Bundle · Collections · Premium', accent: '#E30613', ph: 'FOTO PRODUCTO SELLADO' },
-        { name: 'Sobres', cat: 'sobres', kicker: 'Unidad suelta', note: 'Sellados de origen', accent: '#F5F5F5', ph: 'FOTO SOBRE' },
-        { name: 'ETB', cat: 'etb', kicker: 'Elite Trainer Box', note: 'Set completo + accesorios', accent: '#C9A227', ph: 'FOTO ELITE TRAINER BOX' }
-      ].map(c => Object.assign({}, c, {
-        count: CATALOG.filter(p => p.cat === c.cat).length,
-        imgCss: 'url("' + CAT_IMG[c.cat] + '")',
-        go: (e) => { if (e) e.preventDefault(); this.openCat(c.cat); }
+      catFeatured: CATEGORIAS.map(c => ({
+        name: c.name, cat: c.key, kicker: c.kicker, note: c.note, accent: c.accent,
+        count: catCount(c.key),
+        countLabel: catCountLabel(catCount(c.key)),
+        imgCss: 'url("' + c.img + '")',
+        go: (e) => { if (e) e.preventDefault(); this.openCat(c.key); }
       })),
       catRest: [
         { n: '04', name: 'Sobres', count: 36 }, { n: '05', name: 'Booster Box', count: 18 },
@@ -1440,18 +1450,14 @@ class Component extends DCLogic {
         { title: 'Redes', links: [{ label: 'Instagram · @rocketcardspy', href: 'https://instagram.com/rocketcardspy' }, { label: 'WhatsApp', href: 'https://wa.me/595981377541' }] }
       ]),
 
-      catalogCount: CATALOG.length,
+      catalogCount: catalogList.length,
       catalogProducts: catalogList,
       catalogEmpty: catalogList.length === 0,
-      filterCats: [
-        { key: 'sellados', label: 'Sellados y coleccionables' },
-        { key: 'sobres', label: 'Sobres' },
-        { key: 'etb', label: 'ETB' }
-      ].map(c => {
+      filterCats: CATEGORIAS.map(c => ({ key: c.key, label: c.name })).map(c => {
         const on = s.fCats.indexOf(c.key) >= 0;
         return {
           label: c.label,
-          count: CATALOG.filter(p => p.cat === c.key).length,
+          count: catCount(c.key),
           bg: on ? '#E30613' : '#0A0A0A',
           color: on ? '#ffffff' : '#F5F5F5',
           toggle: () => this.setState(st => ({ fCats: on ? st.fCats.filter(x => x !== c.key) : st.fCats.concat([c.key]) }))
