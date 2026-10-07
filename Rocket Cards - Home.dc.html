@@ -213,7 +213,7 @@
   <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
   <!-- HERO -->
   <section id="top" style="padding:clamp(10px,1.6vw,20px) clamp(10px,1.6vw,20px) 0;background:#050505">
-    <div style="position:relative;overflow:hidden;border-radius:clamp(14px,1.8vw,26px);background:#0A0A0A;border:1px solid #1a1a1a;min-height:clamp(560px,82vh,860px);display:flex;flex-direction:column">
+    <div style="position:relative;overflow:hidden;border-radius:clamp(14px,1.8vw,26px);background:#0A0A0A;border:1px solid #1a1a1a;min-height:clamp(520px,74vh,800px);display:flex;flex-direction:column">
       <div style="position:absolute;inset:0;overflow:hidden;pointer-events:none">
         <div style="position:absolute;inset:-20%;background:radial-gradient(circle at 30% 30%,rgba(227,6,19,.17) 0%,rgba(227,6,19,0) 58%);animation:rc-sweep 22s ease-in-out infinite;will-change:transform"></div>
         <div style="position:absolute;inset:-20%;background:radial-gradient(circle at 70% 60%,rgba(201,162,39,.11) 0%,rgba(201,162,39,0) 55%);animation:rc-sweep-b 28s ease-in-out infinite;will-change:transform"></div>
@@ -222,9 +222,9 @@
         <div style="position:absolute;left:0;right:0;top:0;height:12%;background:linear-gradient(180deg,rgba(227,6,19,0),rgba(227,6,19,.07),rgba(227,6,19,0));animation:rc-scanline 11s linear infinite;will-change:transform"></div>
       </div>
 
-      <div style="position:relative;z-index:3;padding:clamp(26px,3.4vw,44px) clamp(18px,5vw,40px) 0;display:flex;flex-direction:column;align-items:center;text-align:center;gap:clamp(10px,1.2vw,14px)">
-        <h1 style="margin:0;font-family:'Saira Condensed',sans-serif;font-weight:900;text-transform:uppercase;font-size:clamp(30px,4.6vw,58px);line-height:.96;max-width:20ch;animation:rc-rise .8s cubic-bezier(.2,.7,.2,1) .18s backwards">
-          Tu próxima <span style="font-style:italic;color:#E30613">carta</span><br />está acá.
+      <div style="position:relative;z-index:3;padding:clamp(18px,2.2vw,30px) clamp(18px,5vw,40px) 0;display:flex;flex-direction:column;align-items:center;text-align:center;gap:clamp(8px,.9vw,11px)">
+        <h1 style="margin:0;font-family:'Saira Condensed',sans-serif;font-weight:900;text-transform:uppercase;font-size:clamp(26px,3.6vw,46px);line-height:.98;max-width:18ch;animation:rc-rise .8s cubic-bezier(.2,.7,.2,1) .18s backwards">
+          Hacé crecer tu<br /><span style="font-style:italic;color:#E30613">colección</span>.
         </h1>
         <p style="margin:clamp(8px,1.2vw,14px) 0 0;max-width:470px;position:relative;z-index:4;font-size:clamp(12.5px,1.2vw,14.5px);line-height:1.6;color:#A7A7A7;text-wrap:pretty;animation:rc-rise .8s cubic-bezier(.2,.7,.2,1) .26s backwards">
           Productos sellados, sobres y Elite Trainer Box originales para verdaderos coleccionistas.
@@ -235,7 +235,7 @@
         </div>
       </div>
 
-      <div style="position:relative;flex:1;min-height:clamp(280px,34vw,470px);margin-top:clamp(14px,2.4vw,30px)">
+      <div style="position:relative;flex:1;min-height:clamp(330px,41vw,560px);margin-top:clamp(8px,1.4vw,18px)">
         <div style="position:absolute;left:0;right:0;bottom:0;height:clamp(60px,8vw,110px);background:linear-gradient(180deg,rgba(10,10,10,0),#0A0A0A 85%);z-index:4;pointer-events:none"></div>
 
         <div style="position:absolute;left:0;right:0;bottom:clamp(26px,4.5vw,64px);display:flex;align-items:flex-end;justify-content:center;z-index:3">
@@ -1331,11 +1331,11 @@ class Component extends DCLogic {
       },
 
       heroCards: [
-        { src: '/assets/cards/rayquaza-v.webp', alt: 'Rayquaza V · Evolving Skies 194/203', rot: '-16deg', lift: '52px', delay: '.06s', w: 'clamp(104px,14vw,214px)', z: 1 },
-        { src: '/assets/cards/leafeon-ex.webp', alt: 'Leafeon ex · Prismatic Evolutions 144/131', rot: '-7deg', lift: '12px', delay: '.14s', w: 'clamp(116px,15.5vw,238px)', z: 3 },
-        { src: '/assets/cards/pikachu-ex.webp', alt: 'Pikachu ex · Teracristal 238/191', rot: '0deg', lift: '-26px', delay: '.3s', w: 'clamp(134px,18vw,276px)', z: 6 },
-        { src: '/assets/cards/umbreon-ex.webp', alt: 'Umbreon ex · Prismatic Evolutions 161/131', rot: '6deg', lift: '10px', delay: '.38s', w: 'clamp(116px,15.5vw,238px)', z: 3 },
-        { src: '/assets/cards/jirachi-ex.webp', alt: 'Jirachi ex · Pikachu 30 155/128', rot: '13deg', lift: '34px', delay: '.46s', w: 'clamp(108px,14.5vw,222px)', z: 2 }
+        { src: '/assets/cards/rayquaza-v.webp', alt: 'Rayquaza V · Evolving Skies 194/203', rot: '-16deg', lift: '52px', delay: '.06s', w: 'clamp(124px,16.6vw,254px)', z: 1 },
+        { src: '/assets/cards/leafeon-ex.webp', alt: 'Leafeon ex · Prismatic Evolutions 144/131', rot: '-7deg', lift: '12px', delay: '.14s', w: 'clamp(138px,18.4vw,282px)', z: 3 },
+        { src: '/assets/cards/pikachu-ex.webp', alt: 'Pikachu ex · Teracristal 238/191', rot: '0deg', lift: '-26px', delay: '.3s', w: 'clamp(160px,21.4vw,328px)', z: 6 },
+        { src: '/assets/cards/umbreon-ex.webp', alt: 'Umbreon ex · Prismatic Evolutions 161/131', rot: '6deg', lift: '10px', delay: '.38s', w: 'clamp(138px,18.4vw,282px)', z: 3 },
+        { src: '/assets/cards/jirachi-ex.webp', alt: 'Jirachi ex · Pikachu 30 155/128', rot: '13deg', lift: '34px', delay: '.46s', w: 'clamp(128px,17.2vw,264px)', z: 2 }
       ],
       heroEnter: (e) => {
         const el = e.currentTarget;
