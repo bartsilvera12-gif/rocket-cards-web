@@ -65,6 +65,11 @@ psql -U postgres -d rocketcards -c "ALTER ROLE rocketcards_app PASSWORD 'la-que-
 
 El script se puede volver a correr cuantas veces quieras: no borra datos.
 
+Todo el DDL va en una sola transacción y termina con
+`NOTIFY pgrst, 'reload schema';`, para que PostgREST —si lo hay adelante—
+relea el esquema una vez y no una por cada `CREATE`. La única cosa fuera de la
+transacción es el `CREATE DATABASE`, que Postgres no admite adentro.
+
 ### 2. Cargar el catálogo actual
 
 ```bash

@@ -2,8 +2,15 @@
 --
 --   psql -U postgres -f db/rocketcards.sql
 --
+-- Por psql, no pegado en un editor web: usa metacomandos (\gexec, \connect)
+-- que sólo entiende psql, y es un cambio grande.
+--
 -- Crea la base "rocketcards" con todo su esquema. Es idempotente: se puede
 -- volver a correr sin romper nada.
+--
+-- Todo el DDL va en UNA transacción y al final hay un solo
+-- NOTIFY pgrst, 'reload schema'. La única excepción es el CREATE DATABASE de
+-- acá abajo, que Postgres no admite dentro de un bloque de transacción.
 --
 -- La idea de fondo: la tienda NO consulta la base en cada visita. El servidor
 -- lee el catálogo una vez, lo guarda en memoria y lo vuelve a leer SÓLO cuando
@@ -125,6 +132,12 @@ COMMENT ON COLUMN producto.nuevo_orden IS
 -- El hash lo calcula el servidor con scrypt (nativo de Node, sin dependencias)
 -- y se guarda como "scrypt$N$r$p$salt$hash". Acá nunca entra una contraseña
 -- en claro.
+--
+-- OJO si adelante hay PostgREST (Supabase y parecidos): estas dos tablas
+-- están en el esquema "public", que es el que PostgREST publica por defecto.
+-- Tal como están, sin RLS, los hashes y los identificadores de sesión
+-- quedarían al alcance de cualquiera con la clave anónima. Antes de exponer
+-- la base por PostgREST hay que moverlas a un esquema que no se publique.
 
 CREATE TABLE IF NOT EXISTS admin (
   id              integer     GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -255,10 +268,9 @@ BEGIN
 END
 $$;
 
-COMMIT;
-
--- Los triggers van fuera del BEGIN de arriba para poder recrearlos sueltos.
 -- DROP + CREATE porque CREATE TRIGGER IF NOT EXISTS no existe en Postgres.
+-- Al ir todo en la misma transacción, el DROP no deja a la tabla ni un
+-- instante sin su trigger para nadie más.
 
 DROP TRIGGER IF EXISTS producto_fecha ON producto;
 CREATE TRIGGER producto_fecha
@@ -379,6 +391,23 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO rocketcards_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT USAGE, SELECT ON SEQUENCES TO rocketcards_app;
+
+COMMIT;
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Avisar a PostgREST
+-- ─────────────────────────────────────────────────────────────────────────
+-- PostgREST guarda el esquema en caché al arrancar: si no se lo decimos, no
+-- ve las tablas ni las funciones nuevas. Va una sola vez y después del
+-- COMMIT, no una por cada DDL: antes del commit los cambios todavía no
+-- existen para nadie más, y repetirlo por cada CREATE lo obliga a releer el
+-- catálogo entero una vez por línea.
+--
+-- No tiene nada que ver con el canal 'rocketcards' de más arriba: ese avisa
+-- que cambió el CONTENIDO del catálogo (precios, stock) y lo escucha nuestro
+-- servidor; éste avisa que cambió la FORMA de la base y lo escucha PostgREST.
+
+NOTIFY pgrst, 'reload schema';
 
 \echo ''
 \echo 'Base rocketcards lista.'
