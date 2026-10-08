@@ -55,21 +55,6 @@
     -webkit-user-select: none; user-select: none;
   }
   #dc-root [data-rot] img { -webkit-user-drag: none; pointer-events: none; }
-  /* Más vendidos: cinco en fila en escritorio, dos por fila en el teléfono.
-     Con auto-fit solo, a tamaños intermedios quedaba una tarjeta huérfana. */
-  /* Más vendidos. El destacado ocupa 2x2 y los otros cuatro lo rodean; al
-     angostarse pasa a ocupar el ancho completo y el resto se apila. */
-  @media (max-width: 1100px) {
-    #dc-root [data-top-grid] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-    #dc-root [data-top-item][data-rank="01"] { grid-column: span 2 !important; grid-row: span 1 !important; }
-  }
-  @media (max-width: 620px) {
-    #dc-root [data-top-grid] { grid-template-columns: minmax(0, 1fr) !important; grid-auto-rows: auto !important; }
-    #dc-root [data-top-item][data-rank="01"] { grid-column: span 1 !important; grid-row: span 1 !important; }
-    /* El destacado vuelve a una columna: a este ancho dos no entran. */
-    #dc-root [data-top-hero] { grid-template-columns: minmax(0, 1fr) !important; }
-    #dc-root [data-top-hero] > * { grid-column: 1 / -1 !important; grid-row: auto !important; }
-  }
   /* Los dos botones del hero, lado a lado también en el teléfono. */
   @media (max-width: 480px) {
     #dc-root [data-hero-cta] { flex-wrap: nowrap; gap: 8px; }
@@ -129,7 +114,6 @@
             </a>
 
           </div>
-          <a href="#ofertas" onClick="{{ goOfertas }}" style="font-family:'Saira Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#E30613">Ofertas</a>
           <a href="#contacto" onClick="{{ goContacto }}" style="font-family:'Saira Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:.1em;text-transform:uppercase">Contacto</a>
         </nav>
       </sc-if>
@@ -220,7 +204,6 @@
             <div style="font-family:'Poppins',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:.26em;text-transform:uppercase;color:#C9A227;margin-bottom:18px">Más</div>
             <div style="display:flex;flex-direction:column;gap:9px">
               <a href="#nuevos" onClick="{{ goNuevos }}" style="font-size:14px;color:#A7A7A7;padding:7px 0;display:inline-block">Nuevos ingresos</a>
-              <a href="#ofertas" onClick="{{ goOfertas }}" style="font-size:14px;color:#A7A7A7;padding:7px 0;display:inline-block">Ofertas</a>
               <a href="#contacto" onClick="{{ goContacto }}" style="font-size:14px;color:#A7A7A7;padding:7px 0;display:inline-block">Pedidos especiales</a>
             </div>
           </div>
@@ -246,7 +229,6 @@
             </span>
           </a>
         </sc-for>
-        <a href="#ofertas" onClick="{{ goOfertas }}" style="padding:13px 0;border-bottom:1px solid #151515;font-family:'Saira Condensed',sans-serif;font-size:17px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#E30613">Ofertas</a>
         <a href="#contacto" onClick="{{ goContacto }}" style="padding:13px 0;border-bottom:1px solid #151515;font-family:'Saira Condensed',sans-serif;font-size:17px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Contacto</a>
       </nav>
     </sc-if>
@@ -499,86 +481,6 @@
       </div>
     </div>
   </section>
-
-  <!-- OFERTAS + MÁS VENDIDOS -->
-  <section id="ofertas" style="background:#0D0D0D;border-top:1px solid rgba(201,162,39,.14);border-bottom:1px solid #141414">
-    <div style="max-width:1400px;margin:0 auto;padding:clamp(52px,7vw,96px) clamp(16px,3vw,32px);display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:clamp(20px,2.6vw,34px);align-items:stretch">
-
-      <sc-if value="{{ hasOfertas }}" hint-placeholder-val="{{ false }}">
-      <div style="position:relative;overflow:hidden;background:#E30613;display:flex;flex-direction:column;justify-content:space-between;gap:clamp(22px,3vw,38px);padding:clamp(26px,3.4vw,46px);min-height:clamp(320px,34vw,440px)">
-        <div style="position:absolute;right:-90px;top:-90px;width:300px;height:300px;border:1px solid rgba(255,255,255,.22);border-radius:50%;pointer-events:none"></div>
-        <div style="position:absolute;right:-30px;bottom:-130px;width:260px;height:260px;border:1px solid rgba(255,255,255,.14);border-radius:50%;pointer-events:none"></div>
-        <div style="position:relative">
-          <div style="font-family:'Poppins',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:.26em;text-transform:uppercase;color:rgba(255,255,255,.88);margin-bottom:12px">06 — Promociones</div>
-          <h2 style="margin:0;font-family:'Saira Condensed',sans-serif;font-weight:900;font-style:italic;text-transform:uppercase;font-size:clamp(38px,5.6vw,74px);line-height:.9;color:#fff">Ofertas<br />Rocket</h2>
-        </div>
-        <sc-if value="{{ hasOfertas }}" hint-placeholder-val="{{ false }}">
-          <div style="position:relative;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr));gap:10px">
-            <sc-for list="{{ ofertas }}" as="p" hint-placeholder-count="2">
-              <div onClick="{{ p.open }}" style="cursor:pointer;position:relative;background:#050505;padding:12px;display:flex;flex-direction:column;gap:7px">
-                <img src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" decoding="async" style="width:100%;aspect-ratio:1/1;object-fit:contain;background:#0A0A0A" />
-                <span style="font-size:12.5px;font-weight:700;line-height:1.3;color:#fff">{{ p.name }}</span>
-                <span style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:17px;color:#fff">{{ p.priceLabel }}</span>
-              </div>
-            </sc-for>
-          </div>
-        </sc-if>
-      </div>
-      </sc-if>
-
-      <div style="display:flex;flex-direction:column;min-width:0">
-        <div style="font-family:'Poppins',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:.26em;text-transform:uppercase;color:#C9A227;margin-bottom:10px">Lo que más sale</div>
-        <h2 style="margin:0 0 18px;font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;font-size:clamp(26px,3.4vw,40px);line-height:1">Más vendidos</h2>
-
-        <!-- Bento: el 1 ocupa 2x2 y los otros cuatro lo rodean -->
-        <div data-top-grid="" style="position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:clamp(10px,1.1vw,16px)">
-          <div aria-hidden="true" style="position:absolute;left:-3%;right:40%;top:-6%;bottom:-6%;pointer-events:none;background:radial-gradient(55% 60% at 30% 45%,rgba(201,162,39,.13),transparent 68%)"></div>
-
-          <sc-for list="{{ topList }}" as="p" hint-placeholder-count="5">
-            <div data-top-item="" data-rank="{{ p.rankLabel }}" onClick="{{ p.open }}" onMouseEnter="{{ cardEnter }}" onMouseMove="{{ cardMove }}" onMouseLeave="{{ cardLeave }}" style-after="content:'';position:absolute;inset:0;padding:1.5px;background:radial-gradient(var(--glow-radius,300px) circle at var(--glow-x,50%) var(--glow-y,50%),rgba(201,162,39,calc(var(--glow-intensity,0) * 0.9)) 0%,rgba(201,162,39,calc(var(--glow-intensity,0) * 0.35)) 34%,transparent 64%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none;z-index:4;transition:opacity .3s ease" style="position:relative;grid-column:{{ p.areaCol }};grid-row:{{ p.areaFila }};cursor:pointer;overflow:hidden;background:linear-gradient(158deg,#16140f 0%,#101010 46%,#0C0C0C 100%);border:1px solid {{ p.borde }};box-shadow:{{ p.sombra }};transition:border-color .22s ease,transform .22s ease" style-hover="transform:translateY(-3px)">
-
-              <span aria-hidden="true" style="position:absolute;right:10px;top:4px;z-index:3;pointer-events:none;font-family:'Saira Condensed',sans-serif;font-weight:900;font-style:italic;line-height:.76;letter-spacing:-.05em;color:transparent;-webkit-text-stroke:2px {{ p.numTrazo }};font-size:{{ p.numSize }}">{{ p.rankLabel }}</span>
-
-              <sc-if value="{{ p.esTop }}" hint-placeholder-val="{{ true }}">
-                <div data-top-hero="" style="position:relative;z-index:2;height:100%;display:grid;grid-template-columns:minmax(0,.92fr) minmax(0,1fr);grid-template-rows:auto 1fr auto;column-gap:clamp(14px,1.5vw,24px);row-gap:clamp(8px,.9vw,12px);padding:clamp(14px,1.5vw,22px)">
-                  <div style="grid-column:1/-1;display:flex;align-items:center;gap:10px">
-                    <span style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:10px;letter-spacing:.2em;text-transform:uppercase;padding:6px 11px;background:#C9A227;color:#0A0A0A">Top de la semana</span>
-                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:{{ p.stockColor }}">{{ p.stockLabel }}</span>
-                  </div>
-                  <div style="grid-row:2 / span 2;align-self:stretch;min-height:clamp(150px,14vw,230px);position:relative;overflow:hidden;border-radius:6px;background:radial-gradient(72% 66% at 50% 34%,#fbfbfc 0%,#eeeef1 52%,#c6c6cf 100%);box-shadow:0 0 0 1px rgba(201,162,39,.22) inset,0 0 26px rgba(0,0,0,.45) inset">
-                    <img data-img="" src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:clamp(10px,1.2vw,20px);transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
-                  </div>
-                  <div style="grid-column:2;align-self:center;display:flex;flex-direction:column;gap:6px">
-                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.1em;color:#C9A227;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.set }}</span>
-                    <span style="font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;font-size:clamp(17px,1.7vw,24px);line-height:1.08;text-wrap:balance">{{ p.name }}</span>
-                  </div>
-                  <div style="grid-column:2;align-self:end;display:flex;flex-direction:column;align-items:flex-start;gap:11px">
-                    <span style="font-family:'Saira Condensed',sans-serif;font-weight:900;font-size:clamp(24px,2.3vw,32px);line-height:1">{{ p.priceLabel }}</span>
-                    <button onClick="{{ p.add }}" style="background:{{ p.btnBg }};border:0;color:{{ p.btnFg }};font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;padding:12px 20px;border-radius:2px;cursor:{{ p.cursor }};white-space:nowrap">{{ p.btnLabel }}</button>
-                  </div>
-                </div>
-              </sc-if>
-
-              <sc-if value="{{ p.noTop }}" hint-placeholder-val="{{ false }}">
-                <div data-top-min="" style="position:relative;z-index:2;height:100%;display:flex;align-items:center;gap:clamp(10px,1vw,14px);padding:clamp(10px,1vw,14px)">
-                  <div style="flex:0 0 auto;width:clamp(76px,7.4vw,104px);aspect-ratio:1/1;position:relative;overflow:hidden;border-radius:6px;background:radial-gradient(72% 66% at 50% 34%,#fbfbfc 0%,#eeeef1 52%,#c6c6cf 100%);box-shadow:0 0 0 1px rgba(201,162,39,.22) inset,0 0 26px rgba(0,0,0,.45) inset">
-                    <img data-img="" src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:7px;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
-                  </div>
-                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
-                    <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.1em;color:#C9A227;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.set }}</span>
-                    <span style="font-size:12.5px;font-weight:700;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ p.name }}</span>
-                    <span style="font-family:'Saira Condensed',sans-serif;font-weight:900;font-size:17px;margin-top:3px">{{ p.priceLabel }}</span>
-                    <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.08em;color:{{ p.stockColor }}">{{ p.stockLabel }}</span>
-                  </div>
-                </div>
-              </sc-if>
-            </div>
-          </sc-for>
-        </div>
-      </div>
-    </div>
-  </section>
-
 
   <!-- WHATSAPP CTA -->
   <section id="contacto" style="border-top:1px solid rgba(201,162,39,.14);background:#050505">
@@ -978,8 +880,6 @@ const TERMINOS = [
   ['Jurisdicción y contacto', 'Estos términos se rigen por las leyes de la República del Paraguay. Para cualquier reclamo: [PENDIENTE — email y teléfono de contacto].']
 ];
 
-const TOP_IDS = ['ME-PB-PK', 'ME-CR-PK', 'ME-PO-PK', 'ME-CR-BB', 'FP-S2'];
-
 const CATEGORIAS = [
   { key: 'sellados', name: 'Sellados y coleccionables', kicker: 'Producto sellado',
     note: 'Bundle · Collections · Premium', notaMenu: 'Booster Box · Bundle · Collections',
@@ -1331,7 +1231,6 @@ class Component extends DCLogic {
       goHome: (e) => { if (e) e.preventDefault(); this.setState({ view: 'home', catMenuOpen: false, menuOpen: false }); window.scrollTo(0, 0); },
       openCatalog: (e) => { if (e) e.preventDefault(); this.openCat(null); },
       goNuevos: (e) => { if (e) e.preventDefault(); this.goSection('nuevos'); },
-      goOfertas: (e) => { if (e) e.preventDefault(); this.goSection('ofertas'); },
       goContacto: (e) => { if (e) e.preventDefault(); this.goSection('contacto'); },
       wide: s.w >= 1180,
       narrow: s.w < 1180,
@@ -1531,23 +1430,6 @@ class Component extends DCLogic {
       sobres: pick(p => p.cat === 'sobres'),
       sellados: pick(p => p.cat === 'sellados'),
       etbs: pick(p => p.cat === 'etb'),
-      ofertas: pick(p => !!p.old),
-      hasOfertas: CATALOG.some(p => !!p.old),
-      noOfertas: !CATALOG.some(p => !!p.old),
-      // El 1 ocupa un bloque de 2x2 y los otros cuatro van en tarjetas
-      // compactas alrededor. La jerarquía la da el tamaño, no un maquetado
-      // aparte: todas comparten foto, colección, nombre y precio.
-      topList: TOP_IDS.map((id, i) => Object.assign(this.decorate(byId(id)), {
-        rankLabel: String(i + 1).padStart(2, '0'),
-        esTop: i === 0,
-        noTop: i !== 0,
-        areaCol: i === 0 ? 'span 2' : 'span 1',
-        areaFila: i === 0 ? 'span 2' : 'span 1',
-        numTrazo: i === 0 ? 'rgba(201,162,39,.9)' : 'rgba(210,210,215,.26)',
-        numSize: i === 0 ? 'clamp(64px,6vw,104px)' : 'clamp(40px,3.6vw,56px)',
-        borde: i === 0 ? 'rgba(201,162,39,.5)' : '#1c1c1c',
-        sombra: i === 0 ? '0 24px 56px rgba(0,0,0,.6)' : '0 12px 28px rgba(0,0,0,.45)'
-      })),
       rowEnter: (e) => { const el = e.currentTarget; el.style.background = '#121212'; const b = el.querySelector('[data-bar]'); if (b) b.style.transform = 'scaleY(1)'; },
       rowLeave: (e) => { const el = e.currentTarget; el.style.background = '#0A0A0A'; const b = el.querySelector('[data-bar]'); if (b) b.style.transform = 'scaleY(0)'; },
 
@@ -1560,7 +1442,7 @@ class Component extends DCLogic {
           go: l.doc ? (e) => { e.preventDefault(); this.openLegal(l.doc); } : (l.href.charAt(0) === '#' && l.href.length > 1 ? (e) => { e.preventDefault(); this.goSection(l.href.slice(1)); } : null)
         }))
       })))([
-        { title: 'Tienda', links: [{ label: 'Sellados y coleccionables', href: '#sellados' }, { label: 'Sobres', href: '#sobres' }, { label: 'ETB', href: '#etb' }, { label: 'Nuevos ingresos', href: '#nuevos' }, { label: 'Ofertas', href: '#ofertas' }] },
+        { title: 'Tienda', links: [{ label: 'Sellados y coleccionables', href: '#sellados' }, { label: 'Sobres', href: '#sobres' }, { label: 'ETB', href: '#etb' }, { label: 'Nuevos ingresos', href: '#nuevos' }] },
         { title: 'Legal', links: [{ label: 'Política de Privacidad', href: '#politica-de-privacidad', doc: 'privacidad' }, { label: 'Términos y condiciones', href: '#terminos-y-condiciones', doc: 'terminos' }] },
         { title: 'Redes', links: [{ label: 'Instagram · @rocketcardspy', href: 'https://instagram.com/rocketcardspy' }, { label: 'WhatsApp', href: 'https://wa.me/595981377541' }] }
       ]),
