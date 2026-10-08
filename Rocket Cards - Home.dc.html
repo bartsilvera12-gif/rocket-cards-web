@@ -903,6 +903,41 @@ const catCountLabel = (n) => n > 0 ? n + ' productos' : 'Próximamente';
 
 const NEW_IDS = ['FP-S2','ME-PB-ETB','SV-PE-PFC','ME-AH-TS','SV-PE-BB','FP-S1'];
 
+/**
+ * Reemplaza el catálogo escrito arriba por el que manda la base.
+ *
+ * Los arreglos se vacían y se vuelven a llenar en vez de reasignarse: hay
+ * closures y window.ROCKET_SHOP apuntando a estos mismos objetos, y si los
+ * cambiamos por otros nuevos se quedarían mirando los viejos.
+ *
+ * Devuelve false si el dato no sirve, y en ese caso la página sigue con el
+ * catálogo que ya tenía. Es lo que pasa en el sitio estático de Vercel, donde
+ * no hay API: nadie se entera de que faltó.
+ */
+function aplicarCatalogo(d) {
+  if (!d || !Array.isArray(d.productos) || !d.productos.length) return false;
+
+  CATALOG.length = 0;
+  CATALOG.push.apply(CATALOG, d.productos);
+
+  if (Array.isArray(d.categorias) && d.categorias.length) {
+    CATEGORIAS.length = 0;
+    CATEGORIAS.push.apply(CATEGORIAS, d.categorias);
+    CAT_KEYS.length = 0;
+    CAT_KEYS.push.apply(CAT_KEYS, CATEGORIAS.map(c => c.key));
+    Object.keys(CAT_IMG).forEach(k => { delete CAT_IMG[k]; });
+    CATEGORIAS.forEach(c => { CAT_IMG[c.key] = c.img; });
+  }
+
+  // Si la base no marcó ninguno, dejamos el carrusel como estaba antes que
+  // mostrarlo vacío.
+  if (Array.isArray(d.nuevos) && d.nuevos.length) {
+    NEW_IDS.length = 0;
+    NEW_IDS.push.apply(NEW_IDS, d.nuevos);
+  }
+  return true;
+}
+
 class Component extends DCLogic {
   state = {
     q: '', searchOpen: false, searching: false, results: [], mSearchOpen: false,
@@ -930,6 +965,7 @@ class Component extends DCLogic {
     };
     window.addEventListener('popstate', this._onPop);
     requestAnimationFrame(() => this.syncRails());
+    this.conectarCatalogo();
 
     window.ROCKET_SHOP = Object.assign(window.ROCKET_SHOP || {}, {
       catalog: CATALOG,
@@ -964,6 +1000,64 @@ class Component extends DCLogic {
     document.removeEventListener('click', this._onDocClick);
     clearTimeout(this._searchTimer); clearTimeout(this._toastTimer); clearTimeout(this._catTimer);
     window.removeEventListener('popstate', this._onPop);
+    if (this._sse) { this._sse.close(); this._sse = null; }
+  }
+
+  /**
+   * Catálogo en vivo.
+   *
+   * El catálogo escrito en esta página es el que sirve al sitio estático. Si
+   * detrás hay servidor, lo pisa con el de la base y se queda escuchando: el
+   * panel de admin cambia un precio y esta pantalla lo muestra sin que nadie
+   * recargue nada.
+   *
+   * Es un stream abierto, no una consulta cada tantos segundos. Mientras el
+   * catálogo no cambie, el navegador no pide nada y la base no recibe ni una
+   * consulta, por más gente que esté mirando la tienda.
+   */
+  async conectarCatalogo(intento) {
+    const estado = await this.traerCatalogo();
+
+    // 'estatico' es el sitio de Vercel: ahí /api/catalogo devuelve el propio
+    // index.html por el fallback de rutas. No hay nada que escuchar, y abrir
+    // un EventSource contra eso sólo deja un error en la consola.
+    if (estado === 'estatico') return;
+
+    if (estado === 'caido') {
+      // Sí hay servidor pero justo no contestó. Un par de reintentos y listo.
+      if ((intento || 0) < 2) {
+        setTimeout(() => this.conectarCatalogo((intento || 0) + 1), 3000);
+      }
+      return;
+    }
+
+    if (typeof EventSource === 'undefined') return;
+    const es = new EventSource('/api/eventos');
+    this._sse = es;
+    es.addEventListener('recargar', () => this.traerCatalogo());
+    let fallos = 0;
+    es.onopen = () => { fallos = 0; };
+    es.onerror = () => { if (++fallos >= 3) { es.close(); this._sse = null; } };
+  }
+
+  /** 'vivo' | 'estatico' | 'caido' */
+  async traerCatalogo() {
+    let r;
+    try {
+      r = await fetch('/api/catalogo', { headers: { Accept: 'application/json' } });
+    } catch (_) {
+      return 'caido';
+    }
+    if (!r.ok) return 'estatico';
+    // No alcanza con el código de estado: el fallback de rutas del sitio
+    // estático responde 200 con el HTML de la página.
+    if (!(r.headers.get('content-type') || '').includes('application/json')) return 'estatico';
+    try {
+      if (aplicarCatalogo(await r.json())) this.forceUpdate();
+      return 'vivo';
+    } catch (_) {
+      return 'estatico';
+    }
   }
 
   fmt(n) { return 'Gs. ' + n.toLocaleString('es-PY'); }

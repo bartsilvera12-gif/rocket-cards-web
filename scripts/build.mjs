@@ -57,7 +57,7 @@ async function main() {
   }
 
   // Red de seguridad: que nunca se cuele lo que no debe publicarse.
-  const PROHIBIDO = ['uploads', 'screenshots', '.thumbnail', '.claude'];
+  const PROHIBIDO = ['uploads', 'screenshots', '.thumbnail', '.claude', '.env', 'server', 'db', 'admin'];
   const salida = await readdir(DIST);
   const colados = salida.filter((f) => PROHIBIDO.includes(f));
   if (colados.length) {

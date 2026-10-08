@@ -1,0 +1,918 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Panel · Rocket Cards</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@700;800;900&family=Poppins:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fondo: #050505; --panel: #0D0D0D; --panel2: #121212;
+    --linea: #1f1f1f; --linea2: #2a2a2a;
+    --texto: #F5F5F5; --suave: #A7A7A7; --tenue: #6e6e6e;
+    --rojo: #E30613; --oro: #C9A227; --verde: #3FB950;
+    --titulo: 'Saira Condensed', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--fondo); color: var(--texto);
+    font-family: 'Poppins', sans-serif; font-size: 14px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 { font-family: var(--titulo); text-transform: uppercase; margin: 0; line-height: 1; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  a { color: var(--oro); }
+
+  /* ── Estructura ── */
+  .barra {
+    position: sticky; top: 0; z-index: 20; display: flex; align-items: center;
+    gap: 16px; padding: 12px clamp(14px, 3vw, 28px);
+    background: rgba(5,5,5,.94); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--linea);
+  }
+  .marca { font-family: var(--titulo); font-weight: 900; font-size: 19px; letter-spacing: .04em; }
+  .marca em { color: var(--rojo); font-style: normal; }
+  .barra .crece { flex: 1; }
+
+  .pestanas { display: flex; gap: 2px; overflow-x: auto; padding: 0 clamp(14px, 3vw, 28px);
+              border-bottom: 1px solid var(--linea); background: var(--fondo);
+              position: sticky; top: 53px; z-index: 19; }
+  .pestanas button {
+    background: none; border: 0; border-bottom: 2px solid transparent; cursor: pointer;
+    padding: 12px 14px; font-family: var(--titulo); font-weight: 800; font-size: 13px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--suave); white-space: nowrap;
+  }
+  .pestanas button[aria-selected="true"] { color: var(--texto); border-bottom-color: var(--rojo); }
+  .pestanas button:hover { color: var(--texto); }
+
+  main { padding: clamp(16px, 3vw, 28px); max-width: 1500px; margin: 0 auto; }
+
+  /* ── Estado de la conexión ── */
+  .vivo { display: flex; align-items: center; gap: 7px; font-family: var(--mono);
+          font-size: 10.5px; letter-spacing: .1em; color: var(--tenue); white-space: nowrap; }
+  .punto { width: 7px; height: 7px; border-radius: 50%; background: var(--tenue); flex: 0 0 auto; }
+  .vivo[data-on="1"] .punto { background: var(--verde); box-shadow: 0 0 0 3px rgba(63,185,80,.16); }
+  .vivo[data-on="0"] .punto { background: var(--rojo); }
+
+  /* ── Controles ── */
+  input[type=text], input[type=number], input[type=password], input[type=search], select, textarea {
+    background: var(--panel); border: 1px solid var(--linea2); color: var(--texto);
+    padding: 9px 11px; border-radius: 3px; width: 100%; outline: 0;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--oro); }
+  input[type=number] { font-family: var(--mono); }
+  label { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .14em;
+          text-transform: uppercase; color: var(--suave); margin-bottom: 5px; }
+  .btn {
+    background: var(--rojo); border: 0; color: #fff; cursor: pointer;
+    font-family: var(--titulo); font-weight: 800; font-size: 12.5px; letter-spacing: .12em;
+    text-transform: uppercase; padding: 10px 18px; border-radius: 3px;
+  }
+  .btn.gris { background: var(--panel2); border: 1px solid var(--linea2); color: var(--texto); }
+  .btn.oro { background: var(--oro); color: #050505; }
+  .btn.chico { padding: 6px 11px; font-size: 11px; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn:hover:not(:disabled) { filter: brightness(1.12); }
+  .icono { background: none; border: 1px solid var(--linea2); color: var(--suave);
+           cursor: pointer; border-radius: 3px; padding: 5px 9px; font-size: 13px; line-height: 1; }
+  .icono:hover { color: var(--texto); border-color: var(--oro); }
+  .icono.peligro:hover { color: var(--rojo); border-color: var(--rojo); }
+
+  /* ── Tabla ── */
+  .caja { background: var(--panel); border: 1px solid var(--linea); border-radius: 4px; }
+  .herramientas { display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+                  padding: 12px; border-bottom: 1px solid var(--linea); }
+  .herramientas input[type=search] { max-width: 300px; }
+  .herramientas select { max-width: 190px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+       color: var(--suave); text-align: left; font-weight: 500; padding: 10px 12px;
+       border-bottom: 1px solid var(--linea); white-space: nowrap; }
+  td { padding: 9px 12px; border-bottom: 1px solid #141414; vertical-align: middle; }
+  tr:last-child td { border-bottom: 0; }
+  tr:hover td { background: #0F0F0F; }
+  .sku { font-family: var(--mono); font-size: 11px; color: var(--oro); }
+  .nom { font-weight: 600; font-size: 13px; }
+  .col { font-size: 11.5px; color: var(--suave); }
+  .foto { width: 46px; height: 46px; object-fit: contain; background: #Fff; border-radius: 3px;
+          border: 1px solid var(--linea2); }
+  .sinfoto { width: 46px; height: 46px; border-radius: 3px; border: 1px dashed var(--linea2);
+             display: grid; place-items: center; color: var(--tenue); font-size: 9px; }
+  .num { width: 108px; text-align: right; font-family: var(--mono); padding: 6px 8px; }
+  .acciones { display: flex; gap: 5px; justify-content: flex-end; }
+  .pildora { display: inline-block; font-family: var(--titulo); font-weight: 800; font-size: 9.5px;
+             letter-spacing: .14em; text-transform: uppercase; padding: 3px 7px; border-radius: 2px; }
+  .vacio { padding: 40px 16px; text-align: center; color: var(--suave); }
+
+  /* ── Interruptor ── */
+  .sw { position: relative; width: 38px; height: 21px; flex: 0 0 auto; }
+  .sw input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .sw span { position: absolute; inset: 0; background: #262626; border-radius: 11px; transition: background .18s; pointer-events: none; }
+  .sw span::after { content: ''; position: absolute; left: 3px; top: 3px; width: 15px; height: 15px;
+                    border-radius: 50%; background: var(--suave); transition: transform .18s, background .18s; }
+  .sw input:checked + span { background: rgba(63,185,80,.3); }
+  .sw input:checked + span::after { transform: translateX(17px); background: var(--verde); }
+
+  /* ── Modal ── */
+  .velo { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.72);
+          display: grid; place-items: center; padding: 16px; overflow: auto; }
+  .modal { background: var(--panel); border: 1px solid var(--linea2); border-radius: 5px;
+           width: min(680px, 100%); max-height: 92vh; overflow: auto;
+           box-shadow: 0 30px 80px rgba(0,0,0,.75); }
+  .modal header { display: flex; align-items: center; gap: 12px; padding: 16px 20px;
+                  border-bottom: 1px solid var(--linea); position: sticky; top: 0; background: var(--panel); }
+  .modal .cuerpo { padding: 20px; display: grid; gap: 14px;
+                   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  .modal .cuerpo .ancho { grid-column: 1 / -1; }
+  .modal footer { display: flex; gap: 10px; justify-content: flex-end; padding: 16px 20px;
+                  border-top: 1px solid var(--linea); position: sticky; bottom: 0; background: var(--panel); }
+
+  /* ── Login ── */
+  .entrada { min-height: 100dvh; display: grid; place-items: center; padding: 20px; }
+  .entrada form { width: min(360px, 100%); display: grid; gap: 14px;
+                  background: var(--panel); border: 1px solid var(--linea); padding: 28px; border-radius: 5px; }
+
+  /* ── Avisos ── */
+  .aviso { padding: 10px 13px; border-radius: 3px; font-size: 13px; border-left: 3px solid; }
+  .aviso.mal { background: rgba(227,6,19,.1); border-color: var(--rojo); }
+  .aviso.bien { background: rgba(63,185,80,.1); border-color: var(--verde); }
+  #brindis { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 80;
+             display: grid; gap: 8px; justify-items: center; pointer-events: none; }
+  #brindis div { background: #0D0D0D; border: 1px solid var(--linea2); border-left: 3px solid var(--oro);
+                 padding: 11px 16px; font-size: 13px; box-shadow: 0 16px 40px rgba(0,0,0,.7);
+                 animation: subir .25s ease; }
+  @keyframes subir { from { opacity: 0; transform: translateY(10px); } }
+
+  .fila { display: flex; align-items: center; gap: 10px; }
+  .ayuda { font-size: 11.5px; color: var(--tenue); margin-top: 4px; }
+  .orden { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
+  .orden li { display: flex; align-items: center; gap: 10px; background: var(--panel2);
+              border: 1px solid var(--linea); border-radius: 3px; padding: 8px 10px; }
+  .orden { list-style: none; margin: 0; }
+  .orden .pos { font-family: var(--titulo); font-weight: 900; font-style: italic; font-size: 18px;
+                color: var(--oro); min-width: 26px; }
+  @media (max-width: 760px) {
+    .ocultar-chico { display: none; }
+    main { padding: 12px; }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="brindis"></div>
+
+<script type="module">
+// ─────────────────────────────────────────────────────────────────────────
+// Panel de Rocket Cards
+//
+// Sin framework ni build: un módulo que arma HTML y lo mete en #app. El panel
+// no consulta la base por su cuenta — el servidor mantiene el catálogo en
+// memoria, y el stream /api/eventos avisa cuando algo cambió (lo que llega
+// desde Postgres por NOTIFY). Si otra persona edita algo desde otra máquina,
+// esta pantalla se entera sola.
+// ─────────────────────────────────────────────────────────────────────────
+
+const $ = (sel, raiz = document) => raiz.querySelector(sel);
+const app = $('#app');
+
+const esc = (s) => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+const gs = (n) => 'Gs. ' + Number(n || 0).toLocaleString('es-PY');
+const fecha = (s) => s ? new Date(s).toLocaleString('es-PY', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+
+function brindis(texto, mal) {
+  const d = document.createElement('div');
+  d.textContent = texto;
+  if (mal) d.style.borderLeftColor = 'var(--rojo)';
+  $('#brindis').append(d);
+  setTimeout(() => d.remove(), 3600);
+}
+
+// ── Cliente de la API ────────────────────────────────────────────────────
+
+async function pedir(ruta, opciones = {}) {
+  const metodo = opciones.method || (opciones.cuerpo ? 'POST' : 'GET');
+  // Dejamos marcada la hora de nuestros propios cambios: el aviso que vuelve
+  // por el stream unos milisegundos después es el eco de esto, no la novedad
+  // de que alguien más tocó algo.
+  if (metodo !== 'GET' && ruta !== '/api/admin/login') estado.cambioPropio = Date.now();
+
+  const r = await fetch(ruta, Object.assign({
+    headers: Object.assign(
+      { 'X-Rocket-Admin': '1' },
+      opciones.cuerpo ? { 'Content-Type': 'application/json' } : {}
+    ),
+    body: opciones.cuerpo ? JSON.stringify(opciones.cuerpo) : undefined,
+    credentials: 'same-origin',
+  }, { method: metodo }));
+
+  let dato = null;
+  try { dato = await r.json(); } catch (_) { /* 204 y similares */ }
+  if (r.status === 401 && estado.admin) { estado.admin = null; pintar(); }
+  if (!r.ok) throw new Error((dato && dato.error) || ('Error ' + r.status));
+  return dato;
+}
+
+// ── Estado ───────────────────────────────────────────────────────────────
+
+const estado = {
+  admin: null,
+  pestana: 'productos',
+  productos: [], categorias: [], movimientos: [], usuarios: [],
+  busqueda: '', filtroCat: '', soloOcultos: false,
+  version: null, conectado: false,
+  editando: null,      // producto en el modal, o null
+  cambioPropio: 0,     // hora del último cambio hecho desde esta pantalla
+  pendiente: null,     // versión por aplicar, en espera de que suelten el teclado
+};
+
+// ── Eventos en vivo ──────────────────────────────────────────────────────
+// Sin polling: el navegador deja una conexión abierta y el servidor escribe
+// en ella cuando Postgres avisa. Si se corta, EventSource reconecta solo.
+
+let flujo = null;
+function escuchar() {
+  if (flujo) flujo.close();
+  flujo = new EventSource('/api/eventos');
+  flujo.onopen = () => { estado.conectado = true; pintarEstado(); };
+  flujo.onerror = () => { estado.conectado = false; pintarEstado(); };
+  flujo.addEventListener('version', (e) => {
+    estado.version = JSON.parse(e.data).version;
+    pintarEstado();
+  });
+  flujo.addEventListener('recargar', async (e) => {
+    estado.version = JSON.parse(e.data).version;
+    pintarEstado();
+
+    // El eco de nuestro propio cambio: la respuesta ya actualizó la pantalla.
+    if (Date.now() - estado.cambioPropio < 2500) return;
+
+    // Alguien más editó algo. Si en este momento estás escribiendo, repintar
+    // te sacaría el cursor del campo: lo dejamos para cuando lo sueltes.
+    if (escribiendo()) { diferir(estado.version); return; }
+    await aplicarNovedad();
+  });
+}
+
+const escribiendo = () => {
+  const a = document.activeElement;
+  return !!(a && a.closest && a.closest('#hoja, .modal') && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName));
+};
+
+let reloj = null;
+
+/**
+ * Guarda la novedad para después y vuelve a mirar cada tanto. El focusout de
+ * abajo es el camino normal y aplica el cambio en el momento en que suelta el
+ * campo; esto es la red para que un cursor olvidado en un input no deje la
+ * pantalla desactualizada para siempre.
+ */
+function diferir(v) {
+  estado.pendiente = v;
+  pintarEstado();
+  clearTimeout(reloj);
+  reloj = setTimeout(function revisar() {
+    if (!escribiendo()) return aplicarNovedad().catch((e) => brindis(e.message, true));
+    reloj = setTimeout(revisar, 1500);
+  }, 1500);
+}
+
+async function aplicarNovedad() {
+  const v = estado.pendiente ?? estado.version;
+  clearTimeout(reloj);
+  estado.pendiente = null;
+  await cargar();
+  brindis('El catálogo cambió (v' + v + '). Actualicé la pantalla.');
+}
+
+document.addEventListener('focusout', () => {
+  if (estado.pendiente === null) return;
+  // Margen para que el foco salte al campo siguiente sin repintar en el medio.
+  setTimeout(() => {
+    if (estado.pendiente !== null && !escribiendo()) {
+      aplicarNovedad().catch((e) => brindis(e.message, true));
+    }
+  }, 150);
+});
+
+function pintarEstado() {
+  const el = $('#vivo');
+  if (!el) return;
+  el.dataset.on = estado.conectado ? '1' : '0';
+  el.lastElementChild.textContent = !estado.conectado
+    ? 'SIN CONEXIÓN'
+    : estado.pendiente !== null
+      ? 'NOVEDAD · v' + estado.pendiente
+      : 'EN VIVO · v' + (estado.version ?? '—');
+}
+
+// ── Carga ────────────────────────────────────────────────────────────────
+
+async function cargar() {
+  const tareas = [
+    pedir('/api/admin/productos').then((d) => { estado.productos = d.productos; estado.version = d.version; }),
+    pedir('/api/admin/categorias').then((d) => { estado.categorias = d.categorias; }),
+  ];
+  if (estado.pestana === 'historial') {
+    tareas.push(pedir('/api/admin/auditoria?limite=80').then((d) => { estado.movimientos = d.movimientos; }));
+  }
+  if (estado.pestana === 'usuarios' && estado.admin.rol === 'dueno') {
+    tareas.push(pedir('/api/admin/usuarios').then((d) => { estado.usuarios = d.usuarios; }));
+  }
+  await Promise.all(tareas);
+  pintar();
+}
+
+// ── Login ────────────────────────────────────────────────────────────────
+
+function pintarEntrada(error) {
+  app.innerHTML = `
+    <div class="entrada">
+      <form id="f-login" autocomplete="on">
+        <div>
+          <div class="marca">ROCKET <em>CARDS</em></div>
+          <div class="ayuda">Panel de administración</div>
+        </div>
+        ${error ? `<div class="aviso mal">${esc(error)}</div>` : ''}
+        <div>
+          <label for="u">Usuario</label>
+          <input id="u" name="username" type="text" autocomplete="username" required autofocus>
+        </div>
+        <div>
+          <label for="c">Contraseña</label>
+          <input id="c" name="password" type="password" autocomplete="current-password" required>
+        </div>
+        <button class="btn" type="submit">Entrar</button>
+      </form>
+    </div>`;
+
+  $('#f-login').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const boton = $('#f-login button');
+    boton.disabled = true;
+    try {
+      estado.admin = await pedir('/api/admin/login', {
+        cuerpo: { usuario: $('#u').value, clave: $('#c').value },
+      });
+      escuchar();
+      await cargar();
+    } catch (err) {
+      pintarEntrada(err.message);
+    } finally {
+      boton.disabled = false;
+    }
+  });
+}
+
+// ── Pantalla principal ───────────────────────────────────────────────────
+
+const PESTANAS = [
+  ['productos', 'Productos'],
+  ['nuevos', 'Nuevos ingresos'],
+  ['categorias', 'Categorías'],
+  ['historial', 'Historial'],
+  ['usuarios', 'Usuarios'],
+];
+
+function pintar() {
+  if (!estado.admin) return pintarEntrada();
+
+  const visibles = PESTANAS.filter(([k]) => k !== 'usuarios' || estado.admin.rol === 'dueno');
+
+  app.innerHTML = `
+    <div class="barra">
+      <div class="marca">ROCKET <em>CARDS</em></div>
+      <div class="crece"></div>
+      <div class="vivo" id="vivo" data-on="0"><i class="punto"></i><span>…</span></div>
+      <a href="/" target="_blank" rel="noopener" class="ocultar-chico"
+         style="font-size:12px;color:var(--suave);text-decoration:none">Ver tienda ↗</a>
+      <button class="icono" id="salir" title="Cerrar sesión">${esc(estado.admin.usuario)} · salir</button>
+    </div>
+    <nav class="pestanas" role="tablist">
+      ${visibles.map(([k, t]) => `
+        <button role="tab" data-ir="${k}" aria-selected="${estado.pestana === k}">${t}</button>`).join('')}
+    </nav>
+    <main id="hoja"></main>`;
+
+  $('#salir').addEventListener('click', async () => {
+    await pedir('/api/admin/logout', { method: 'POST', cuerpo: {} }).catch(() => {});
+    if (flujo) flujo.close();
+    estado.admin = null;
+    pintar();
+  });
+  app.querySelectorAll('[data-ir]').forEach((b) => b.addEventListener('click', async () => {
+    estado.pestana = b.dataset.ir;
+    pintar();
+    await cargar().catch((e) => brindis(e.message, true));
+  }));
+
+  pintarEstado();
+  const hoja = $('#hoja');
+  ({
+    productos: hojaProductos,
+    nuevos: hojaNuevos,
+    categorias: hojaCategorias,
+    historial: hojaHistorial,
+    usuarios: hojaUsuarios,
+  })[estado.pestana](hoja);
+
+  if (estado.editando) pintarModal();
+}
+
+// ── Productos ────────────────────────────────────────────────────────────
+
+function filtrados() {
+  const q = estado.busqueda.trim().toLowerCase();
+  return estado.productos.filter((p) => {
+    if (estado.filtroCat && p.categoria !== estado.filtroCat) return false;
+    if (estado.soloOcultos && p.publicado) return false;
+    if (!q) return true;
+    return (p.id + ' ' + p.nombre + ' ' + p.coleccion).toLowerCase().includes(q);
+  });
+}
+
+function hojaProductos(hoja) {
+  const lista = filtrados();
+  hoja.innerHTML = `
+    <div class="caja">
+      <div class="herramientas">
+        <input type="search" id="q" placeholder="Buscar por nombre o SKU…" value="${esc(estado.busqueda)}">
+        <select id="fc">
+          <option value="">Todas las categorías</option>
+          ${estado.categorias.map((c) => `
+            <option value="${esc(c.key)}" ${estado.filtroCat === c.key ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}
+        </select>
+        <label class="fila" style="margin:0;text-transform:none;letter-spacing:0;font-family:inherit;font-size:12.5px;color:var(--suave)">
+          <input type="checkbox" id="oc" ${estado.soloOcultos ? 'checked' : ''} style="width:auto"> Sólo ocultos
+        </label>
+        <div style="flex:1"></div>
+        <span class="col">${lista.length} de ${estado.productos.length}</span>
+        <button class="btn" id="nuevo">+ Producto</button>
+      </div>
+      ${lista.length ? `
+      <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th></th><th>Producto</th><th class="ocultar-chico">Categoría</th>
+          <th style="text-align:right">Precio</th><th style="text-align:right">Stock</th>
+          <th>Visible</th><th></th>
+        </tr></thead>
+        <tbody>
+        ${lista.map((p) => `
+          <tr data-id="${esc(p.id)}">
+            <td>${p.img
+              ? `<img class="foto" src="${esc(p.img)}" alt="" loading="lazy">`
+              : `<div class="sinfoto">sin foto</div>`}</td>
+            <td>
+              <div class="nom">${esc(p.nombre)}</div>
+              <div class="sku">${esc(p.id)}${p.etiqueta ? ' · ' + esc(p.etiqueta) : ''}${p.nuevo_orden ? ' · nuevos #' + p.nuevo_orden : ''}</div>
+            </td>
+            <td class="ocultar-chico col">${esc(p.categoria_nombre || p.categoria)}</td>
+            <td style="text-align:right">
+              <input class="num" type="number" min="0" step="1000" value="${p.precio}" data-campo="precio">
+              ${p.precio_anterior ? `<div class="col" style="text-align:right">antes ${gs(p.precio_anterior)}</div>` : ''}
+            </td>
+            <td style="text-align:right">
+              <input class="num" style="width:76px" type="number" min="0" step="1" value="${p.stock}" data-campo="stock">
+            </td>
+            <td>
+              <label class="sw"><input type="checkbox" data-campo="publicado" ${p.publicado ? 'checked' : ''}><span></span></label>
+            </td>
+            <td><div class="acciones">
+              <button class="icono" data-editar title="Editar">✎</button>
+              <button class="icono peligro" data-borrar title="Borrar">✕</button>
+            </div></td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>` : `<div class="vacio">No hay productos que coincidan.</div>`}
+    </div>
+    <p class="ayuda">El precio y el stock se guardan al salir del campo. Cada cambio avisa a la tienda al instante.</p>`;
+
+  $('#q').addEventListener('input', (e) => {
+    estado.busqueda = e.target.value;
+    const foco = document.activeElement === e.target;
+    hojaProductos(hoja);
+    if (foco) { const n = $('#q'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
+  });
+  $('#fc').addEventListener('change', (e) => { estado.filtroCat = e.target.value; hojaProductos(hoja); });
+  $('#oc').addEventListener('change', (e) => { estado.soloOcultos = e.target.checked; hojaProductos(hoja); });
+  $('#nuevo').addEventListener('click', () => { estado.editando = { nuevo: true }; pintarModal(); });
+
+  hoja.querySelectorAll('tbody tr').forEach((tr) => {
+    const id = tr.dataset.id;
+    const p = estado.productos.find((x) => x.id === id);
+
+    tr.querySelectorAll('input[data-campo]').forEach((campo) => {
+      const guardar = async () => {
+        const valor = campo.type === 'checkbox' ? campo.checked : Number(campo.value);
+        if (valor === p[campo.dataset.campo]) return;
+        campo.disabled = true;
+        try {
+          const d = await pedir('/api/admin/productos/' + encodeURIComponent(id), {
+            method: 'PATCH', cuerpo: { [campo.dataset.campo]: valor },
+          });
+          Object.assign(p, d.producto);
+          brindis(p.nombre.slice(0, 34) + ': listo');
+        } catch (err) {
+          brindis(err.message, true);
+          if (campo.type === 'checkbox') campo.checked = p[campo.dataset.campo];
+          else campo.value = p[campo.dataset.campo];
+        } finally {
+          campo.disabled = false;
+        }
+      };
+      if (campo.type === 'checkbox') campo.addEventListener('change', guardar);
+      else {
+        campo.addEventListener('blur', guardar);
+        campo.addEventListener('keydown', (e) => { if (e.key === 'Enter') campo.blur(); });
+      }
+    });
+
+    tr.querySelector('[data-editar]').addEventListener('click', () => {
+      estado.editando = Object.assign({}, p);
+      pintarModal();
+    });
+    tr.querySelector('[data-borrar]').addEventListener('click', async () => {
+      if (!confirm('¿Borrar "' + p.nombre + '"?\n\nNo se puede deshacer. Si sólo querés sacarlo de la tienda, apagá "Visible".')) return;
+      try {
+        await pedir('/api/admin/productos/' + encodeURIComponent(id), { method: 'DELETE' });
+        estado.productos = estado.productos.filter((x) => x.id !== id);
+        hojaProductos(hoja);
+        brindis('Borrado');
+      } catch (err) { brindis(err.message, true); }
+    });
+  });
+}
+
+// ── Modal de producto ────────────────────────────────────────────────────
+
+function pintarModal() {
+  const p = estado.editando;
+  const esNuevo = !!p.nuevo;
+  const velo = document.createElement('div');
+  velo.className = 'velo';
+  velo.innerHTML = `
+    <form class="modal" id="f-prod">
+      <header>
+        <h2 style="font-size:18px">${esNuevo ? 'Nuevo producto' : 'Editar producto'}</h2>
+        <div style="flex:1"></div>
+        <button type="button" class="icono" id="cerrar">✕</button>
+      </header>
+      <div class="cuerpo">
+        <div id="err" class="ancho" style="display:none"></div>
+        <div>
+          <label for="m-id">SKU</label>
+          <input id="m-id" type="text" value="${esc(p.id || '')}" ${esNuevo ? 'required' : 'disabled'}>
+          <div class="ayuda">${esNuevo ? 'Se muestra en el buscador. Ej: SV-PIKA-238' : 'No se puede cambiar.'}</div>
+        </div>
+        <div>
+          <label for="m-cat">Categoría</label>
+          <select id="m-cat" required>
+            ${estado.categorias.map((c) => `
+              <option value="${esc(c.key)}" ${p.categoria === c.key ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="ancho">
+          <label for="m-nom">Nombre</label>
+          <input id="m-nom" type="text" value="${esc(p.nombre || '')}" required>
+        </div>
+        <div class="ancho">
+          <label for="m-col">Colección</label>
+          <input id="m-col" type="text" value="${esc(p.coleccion || '')}" placeholder="Mega Evolution · ETB">
+        </div>
+        <div class="ancho">
+          <label for="m-img">Imagen</label>
+          <input id="m-img" type="text" value="${esc(p.img || '')}" placeholder="/assets/catalogo/foto.webp">
+          <div class="ayuda">Ruta dentro del sitio. La foto se sube a <code>assets/</code> con el repo.</div>
+        </div>
+        <div>
+          <label for="m-precio">Precio (Gs.)</label>
+          <input id="m-precio" type="number" min="0" step="1000" value="${p.precio ?? ''}" required>
+        </div>
+        <div>
+          <label for="m-antes">Precio anterior</label>
+          <input id="m-antes" type="number" min="0" step="1000" value="${p.precio_anterior ?? ''}" placeholder="vacío = sin oferta">
+        </div>
+        <div>
+          <label for="m-stock">Stock</label>
+          <input id="m-stock" type="number" min="0" step="1" value="${p.stock ?? 0}">
+        </div>
+        <div>
+          <label for="m-tag">Etiqueta</label>
+          <select id="m-tag">
+            ${['', 'NUEVO', 'OFERTA', 'PREVENTA', 'ÚLTIMAS UNIDADES', 'AGOTADO'].map((t) => `
+              <option value="${esc(t)}" ${(p.etiqueta || '') === t ? 'selected' : ''}>${t || '— sin etiqueta —'}</option>`).join('')}
+          </select>
+        </div>
+        <label class="fila ancho" style="text-transform:none;letter-spacing:0;font-family:inherit;font-size:13px;color:var(--texto)">
+          <span class="sw"><input type="checkbox" id="m-pub" ${p.publicado !== false ? 'checked' : ''}><span></span></span>
+          Visible en la tienda
+        </label>
+        <label class="fila ancho" style="text-transform:none;letter-spacing:0;font-family:inherit;font-size:13px;color:var(--texto)">
+          <span class="sw"><input type="checkbox" id="m-prem" ${p.premium ? 'checked' : ''}><span></span></span>
+          Premium
+        </label>
+      </div>
+      <footer>
+        <button type="button" class="btn gris" id="cancelar">Cancelar</button>
+        <button type="submit" class="btn">${esNuevo ? 'Crear' : 'Guardar'}</button>
+      </footer>
+    </form>`;
+  document.body.append(velo);
+
+  const cerrar = () => { velo.remove(); estado.editando = null; };
+  velo.addEventListener('click', (e) => { if (e.target === velo) cerrar(); });
+  $('#cerrar', velo).addEventListener('click', cerrar);
+  $('#cancelar', velo).addEventListener('click', cerrar);
+  document.addEventListener('keydown', function escapar(e) {
+    if (e.key === 'Escape' && document.body.contains(velo)) { cerrar(); document.removeEventListener('keydown', escapar); }
+  });
+
+  $('#f-prod', velo).addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const err = $('#err', velo);
+    const boton = velo.querySelector('button[type=submit]');
+    const antes = $('#m-antes', velo).value;
+    const datos = {
+      nombre: $('#m-nom', velo).value,
+      coleccion: $('#m-col', velo).value,
+      categoria: $('#m-cat', velo).value,
+      img: $('#m-img', velo).value,
+      precio: Number($('#m-precio', velo).value),
+      precio_anterior: antes === '' ? null : Number(antes),
+      stock: Number($('#m-stock', velo).value || 0),
+      etiqueta: $('#m-tag', velo).value || null,
+      premium: $('#m-prem', velo).checked,
+      publicado: $('#m-pub', velo).checked,
+    };
+    boton.disabled = true;
+    err.style.display = 'none';
+    try {
+      if (esNuevo) {
+        datos.id = $('#m-id', velo).value.trim();
+        const d = await pedir('/api/admin/productos', { cuerpo: datos });
+        estado.productos.push(Object.assign(d.producto, {
+          categoria_nombre: (estado.categorias.find((c) => c.key === d.producto.categoria) || {}).nombre,
+        }));
+        estado.productos.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+      } else {
+        const d = await pedir('/api/admin/productos/' + encodeURIComponent(p.id), { method: 'PATCH', cuerpo: datos });
+        Object.assign(estado.productos.find((x) => x.id === p.id), d.producto);
+      }
+      cerrar();
+      pintar();
+      brindis(esNuevo ? 'Producto creado' : 'Guardado');
+    } catch (ex) {
+      err.className = 'aviso mal ancho';
+      err.textContent = ex.message;
+      err.style.display = '';
+      boton.disabled = false;
+    }
+  });
+}
+
+// ── Nuevos ingresos ──────────────────────────────────────────────────────
+
+function hojaNuevos(hoja) {
+  const enCarrusel = estado.productos
+    .filter((p) => p.nuevo_orden)
+    .sort((a, b) => a.nuevo_orden - b.nuevo_orden);
+  const resto = estado.productos
+    .filter((p) => !p.nuevo_orden && p.publicado)
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+
+  hoja.innerHTML = `
+    <div class="caja">
+      <div class="herramientas">
+        <h2 style="font-size:16px">Carrusel de la portada</h2>
+        <div style="flex:1"></div>
+        <button class="btn" id="guardar-orden" disabled>Guardar orden</button>
+      </div>
+      ${enCarrusel.length ? `<ul class="orden" id="lista">
+        ${enCarrusel.map((p, i) => `
+          <li data-id="${esc(p.id)}">
+            <span class="pos">${String(i + 1).padStart(2, '0')}</span>
+            ${p.img ? `<img class="foto" src="${esc(p.img)}" alt="" loading="lazy">` : '<div class="sinfoto">—</div>'}
+            <div style="flex:1;min-width:0">
+              <div class="nom">${esc(p.nombre)}</div>
+              <div class="sku">${esc(p.id)}</div>
+            </div>
+            <button class="icono" data-sube title="Subir">↑</button>
+            <button class="icono" data-baja title="Bajar">↓</button>
+            <button class="icono peligro" data-saca title="Sacar del carrusel">✕</button>
+          </li>`).join('')}
+      </ul>` : '<div class="vacio">El carrusel está vacío.</div>'}
+      <div class="herramientas" style="border-top:1px solid var(--linea);border-bottom:0">
+        <select id="agregar" style="max-width:420px">
+          <option value="">Agregar un producto al carrusel…</option>
+          ${resto.map((p) => `<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <p class="ayuda">Hasta 12 productos. El orden es el que ve el cliente al deslizar.</p>`;
+
+  let ids = enCarrusel.map((p) => p.id);
+  const original = ids.join(',');
+  const refrescar = () => {
+    // Reescribimos nuevo_orden en memoria y volvemos a pintar la hoja.
+    estado.productos.forEach((p) => {
+      const i = ids.indexOf(p.id);
+      p.nuevo_orden = i >= 0 ? i + 1 : null;
+    });
+    hojaNuevos(hoja);
+    if (ids.join(',') !== original) $('#guardar-orden').disabled = false;
+  };
+
+  hoja.querySelectorAll('#lista li').forEach((li, i) => {
+    li.querySelector('[data-sube]').disabled = i === 0;
+    li.querySelector('[data-baja]').disabled = i === ids.length - 1;
+    li.querySelector('[data-sube]').addEventListener('click', () => {
+      [ids[i - 1], ids[i]] = [ids[i], ids[i - 1]]; refrescar();
+    });
+    li.querySelector('[data-baja]').addEventListener('click', () => {
+      [ids[i + 1], ids[i]] = [ids[i], ids[i + 1]]; refrescar();
+    });
+    li.querySelector('[data-saca]').addEventListener('click', () => {
+      ids.splice(i, 1); refrescar();
+    });
+  });
+
+  $('#agregar').addEventListener('change', (e) => {
+    if (!e.target.value) return;
+    if (ids.length >= 12) return brindis('El carrusel no lleva más de 12', true);
+    ids.push(e.target.value);
+    refrescar();
+  });
+
+  $('#guardar-orden').addEventListener('click', async (e) => {
+    e.target.disabled = true;
+    try {
+      await pedir('/api/admin/nuevos', { method: 'PUT', cuerpo: { ids } });
+      brindis('Orden guardado');
+      await cargar();
+    } catch (err) {
+      brindis(err.message, true);
+      e.target.disabled = false;
+    }
+  });
+}
+
+// ── Categorías ───────────────────────────────────────────────────────────
+
+function hojaCategorias(hoja) {
+  hoja.innerHTML = `
+    <div class="caja">
+      <div class="herramientas">
+        <h2 style="font-size:16px">Categorías</h2>
+        <div style="flex:1"></div>
+        <button class="btn" id="nueva-cat">+ Categoría</button>
+      </div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr>
+          <th>Clave (URL)</th><th>Nombre</th><th class="ocultar-chico">Bajada</th>
+          <th style="text-align:right">Productos</th><th style="text-align:right">Orden</th><th></th>
+        </tr></thead>
+        <tbody>
+        ${estado.categorias.map((c) => `
+          <tr data-key="${esc(c.key)}">
+            <td><span class="sku">/catalogo/${esc(c.key)}</span></td>
+            <td class="fila">
+              <i style="width:10px;height:10px;border-radius:2px;background:${esc(c.accent)};display:inline-block"></i>
+              <input type="text" value="${esc(c.nombre)}" data-campo="nombre" style="max-width:230px">
+            </td>
+            <td class="ocultar-chico"><input type="text" value="${esc(c.nota)}" data-campo="nota"></td>
+            <td style="text-align:right" class="col">${c.productos}</td>
+            <td style="text-align:right">
+              <input class="num" style="width:68px" type="number" value="${c.orden}" data-campo="orden">
+            </td>
+            <td><div class="acciones">
+              <button class="icono peligro" data-borrar title="Borrar" ${Number(c.productos) ? 'disabled' : ''}>✕</button>
+            </div></td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>
+    <p class="ayuda">La clave aparece en la URL y no se cambia desde acá. Una categoría con productos no se puede borrar.</p>`;
+
+  hoja.querySelectorAll('tbody tr').forEach((tr) => {
+    const key = tr.dataset.key;
+    const c = estado.categorias.find((x) => x.key === key);
+    tr.querySelectorAll('input[data-campo]').forEach((campo) => {
+      const guardar = async () => {
+        const valor = campo.type === 'number' ? Number(campo.value) : campo.value;
+        if (String(valor) === String(c[campo.dataset.campo])) return;
+        try {
+          const d = await pedir('/api/admin/categorias/' + key, {
+            method: 'PATCH', cuerpo: { [campo.dataset.campo]: valor },
+          });
+          Object.assign(c, d.categoria);
+          brindis('Guardado');
+        } catch (err) { brindis(err.message, true); campo.value = c[campo.dataset.campo]; }
+      };
+      campo.addEventListener('blur', guardar);
+      campo.addEventListener('keydown', (e) => { if (e.key === 'Enter') campo.blur(); });
+    });
+    const borrar = tr.querySelector('[data-borrar]');
+    borrar.addEventListener('click', async () => {
+      if (!confirm('¿Borrar la categoría "' + c.nombre + '"?')) return;
+      try {
+        await pedir('/api/admin/categorias/' + key, { method: 'DELETE' });
+        await cargar();
+        brindis('Borrada');
+      } catch (err) { brindis(err.message, true); }
+    });
+  });
+
+  $('#nueva-cat').addEventListener('click', async () => {
+    const nombre = prompt('Nombre de la categoría (ej: Accesorios)');
+    if (!nombre) return;
+    const key = prompt('Clave para la URL (minúsculas, sin espacios)',
+      nombre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
+    if (!key) return;
+    try {
+      await pedir('/api/admin/categorias', { cuerpo: { key, nombre, orden: estado.categorias.length + 1 } });
+      await cargar();
+      brindis('Categoría creada');
+    } catch (err) { brindis(err.message, true); }
+  });
+}
+
+// ── Historial ────────────────────────────────────────────────────────────
+
+const ACCION = { alta: ['Alta', 'var(--verde)'], cambio: ['Cambio', 'var(--oro)'], baja: ['Baja', 'var(--rojo)'] };
+
+/** Lista los campos que cambiaron, para no mostrar dos JSON enteros. */
+function diferencias(m) {
+  if (m.accion !== 'cambio' || !m.antes || !m.despues) return '';
+  const saltar = new Set(['actualizado_en', 'creado_en']);
+  return Object.keys(m.despues)
+    .filter((k) => !saltar.has(k) && JSON.stringify(m.antes[k]) !== JSON.stringify(m.despues[k]))
+    .map((k) => `${esc(k)}: <s style="color:var(--tenue)">${esc(m.antes[k])}</s> → <b>${esc(m.despues[k])}</b>`)
+    .join(' · ');
+}
+
+function hojaHistorial(hoja) {
+  hoja.innerHTML = `
+    <div class="caja">
+      <div class="herramientas"><h2 style="font-size:16px">Últimos movimientos</h2></div>
+      ${estado.movimientos.length ? `<div style="overflow-x:auto"><table>
+        <thead><tr><th>Cuándo</th><th>Quién</th><th>Qué</th><th>Detalle</th></tr></thead>
+        <tbody>
+        ${estado.movimientos.map((m) => {
+          const [et, color] = ACCION[m.accion] || [m.accion, 'var(--suave)'];
+          const nombre = (m.despues && m.despues.nombre) || (m.antes && m.antes.nombre) || m.registro_id;
+          return `<tr>
+            <td class="col" style="white-space:nowrap">${esc(fecha(m.creado_en))}</td>
+            <td class="col">${esc(m.usuario || '—')}</td>
+            <td><span class="pildora" style="color:${color};border:1px solid currentColor">${et}</span>
+                <span class="sku">${esc(m.registro_id)}</span></td>
+            <td><div class="nom">${esc(nombre)}</div>
+                <div class="col">${diferencias(m) || '—'}</div></td>
+          </tr>`;
+        }).join('')}
+        </tbody></table></div>` : '<div class="vacio">Todavía no hay movimientos.</div>'}
+    </div>`;
+}
+
+// ── Usuarios ─────────────────────────────────────────────────────────────
+
+function hojaUsuarios(hoja) {
+  hoja.innerHTML = `
+    <div class="caja">
+      <div class="herramientas"><h2 style="font-size:16px">Usuarios del panel</h2></div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Último acceso</th></tr></thead>
+        <tbody>
+        ${estado.usuarios.map((u) => `
+          <tr>
+            <td class="sku">${esc(u.usuario)}${u.activo ? '' : ' (inactivo)'}</td>
+            <td>${esc(u.nombre || '—')}</td>
+            <td class="col">${u.rol === 'dueno' ? 'Dueño' : 'Editor'}</td>
+            <td class="col">${esc(fecha(u.ultimo_acceso))}</td>
+          </tr>`).join('')}
+        </tbody></table></div>
+    </div>
+    <p class="ayuda">Los usuarios se crean desde la terminal, para que la contraseña no viaje por el navegador:<br>
+      <code>npm run admin:crear -- nombre-de-usuario</code></p>`;
+}
+
+// ── Arranque ─────────────────────────────────────────────────────────────
+
+try {
+  const d = await pedir('/api/admin/yo');
+  estado.admin = d.admin;
+  escuchar();
+  await cargar();
+} catch (_) {
+  pintarEntrada();
+}
+</script>
+</body>
+</html>

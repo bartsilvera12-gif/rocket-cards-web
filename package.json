@@ -2,9 +2,18 @@
   "name": "rocket-cards",
   "private": true,
   "version": "1.0.0",
-  "description": "Rocket Cards - tienda Pokemon TCG (sitio estatico)",
+  "description": "Rocket Cards - tienda Pokemon TCG",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "preview": "node scripts/build.mjs && node scripts/serve.mjs 4322"
+    "preview": "node scripts/build.mjs && node scripts/serve.mjs 4322",
+    "start": "node --env-file-if-exists=.env server/index.mjs",
+    "admin:crear": "node --env-file-if-exists=.env scripts/crear-admin.mjs",
+    "db:semilla": "node scripts/exportar-semilla.mjs"
+  },
+  "dependencies": {
+    "pg": "8.13.1"
+  },
+  "engines": {
+    "node": ">=20.12"
   }
 }

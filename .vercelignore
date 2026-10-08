@@ -5,3 +5,10 @@ screenshots/
 .thumbnail
 .claude/
 assets-originales/
+.env
+.env.*
+
+# del panel: no es parte del sitio estatico
+server/
+db/
+admin/

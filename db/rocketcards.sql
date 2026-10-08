@@ -238,8 +238,11 @@ BEGIN
     VALUES (TG_TABLE_NAME, nuevo ->> clave, 'alta', nuevo, quien);
     RETURN NEW;
   ELSIF TG_OP = 'UPDATE' THEN
-    IF nuevo = viejo THEN
-      RETURN NEW;                     -- un UPDATE que no cambió nada no es noticia
+    -- Un UPDATE que no cambió nada no es noticia. Hay que sacar
+    -- actualizado_en de la comparación: el trigger de fecha ya lo movió, así
+    -- que si no lo quitamos las dos filas nunca son iguales.
+    IF (nuevo - 'actualizado_en') = (viejo - 'actualizado_en') THEN
+      RETURN NEW;
     END IF;
     INSERT INTO auditoria (tabla, registro_id, accion, antes, despues, admin_id)
     VALUES (TG_TABLE_NAME, nuevo ->> clave, 'cambio', viejo, nuevo, quien);

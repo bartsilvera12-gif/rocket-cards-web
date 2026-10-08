@@ -13,6 +13,9 @@ que monta React 18 desde CDN). Encima hay tres módulos ES escritos a mano:
 | [`pack-opening/`](pack-opening) | Apertura de sobres en 3D: gesto de corte, cartas con rareza y efectos |
 | [`reveal.js`](reveal.js) | Animación de entrada por scroll de cada sección |
 | [`scripts/`](scripts) | Build de producción y servidor de desarrollo |
+| [`server/`](server) | API, caché del catálogo y servidor del panel |
+| [`admin/`](admin) | Panel de administración |
+| [`db/`](db) | Esquema de Postgres y catálogo inicial |
 
 Nada de esto necesita `npm install`: las únicas dependencias son React y ReactDOM,
 que llegan por `<script>` desde unpkg.
@@ -84,11 +87,22 @@ python scripts/optimize-images.py             # aplicar
 
 Si agregás fotos nuevas, pasá el script antes de commitear.
 
+## Dos formas de correrlo
+
+El sitio funciona **sin base de datos**: el catálogo está escrito dentro de la
+página y es lo que se publica hoy en Vercel.
+
+Con Postgres detrás, el catálogo pasa a la base y se edita desde `/admin`, sin
+tocar código. La tienda igual no consulta la base en cada visita: el servidor
+la cachea y Postgres le avisa por `LISTEN/NOTIFY` cuando algo cambió. Está todo
+en [ADMIN.md](ADMIN.md).
+
 ## Desarrollo
 
 ```bash
-npm run preview     # build + servidor como en producción, en :4322
+npm run preview     # sitio estático, build + servidor como producción, en :4322
 npm run build       # genera dist/
+npm start           # tienda + API + panel, con base, en :4000
 ```
 
 Para editar sin build alcanza con servir la carpeta raíz, pero ahí las rutas

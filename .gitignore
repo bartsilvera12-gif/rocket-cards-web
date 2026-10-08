@@ -9,3 +9,8 @@ screenshots/
 
 # originales a tamanio completo, antes de optimizar
 assets-originales/
+
+# credenciales de la base y del panel
+.env
+.env.*
+!.env.ejemplo
