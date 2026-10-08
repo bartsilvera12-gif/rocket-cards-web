@@ -1048,10 +1048,13 @@ class Component extends DCLogic {
     } catch (_) {
       return 'caido';
     }
-    if (!r.ok) return 'estatico';
     // No alcanza con el código de estado: el fallback de rutas del sitio
-    // estático responde 200 con el HTML de la página.
-    if (!(r.headers.get('content-type') || '').includes('application/json')) return 'estatico';
+    // estático responde 200 con el HTML de la página. Cortamos el cuerpo
+    // apenas vemos las cabeceras, así no nos bajamos la página dos veces.
+    if (!r.ok || !(r.headers.get('content-type') || '').includes('application/json')) {
+      try { if (r.body) r.body.cancel(); } catch (_) {}
+      return 'estatico';
+    }
     try {
       if (aplicarCatalogo(await r.json())) this.forceUpdate();
       return 'vivo';
