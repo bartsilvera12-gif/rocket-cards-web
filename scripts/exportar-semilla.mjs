@@ -46,7 +46,7 @@ const L = (s = '') => lineas.push(s);
 
 L('-- Rocket Cards — catálogo inicial');
 L('--');
-L('--   psql -U postgres -d rocketcards -f db/semilla.sql');
+L('--   psql "$DATABASE_URL" -f db/semilla.sql');
 L('--');
 L('-- Generado por scripts/exportar-semilla.mjs a partir de los arreglos');
 L('-- CATEGORIAS, CATALOG y NEW_IDS de la página. No editar a mano: una vez que');
@@ -56,6 +56,8 @@ L('-- Todo en una transacción, así los triggers mandan UN solo NOTIFY para la'
 L('-- carga entera en vez de uno por producto.');
 L('');
 L('BEGIN;');
+L('');
+L('SET LOCAL search_path TO rocketcards;');
 L('');
 L('INSERT INTO categoria (key, nombre, kicker, nota, nota_menu, accent, img, orden) VALUES');
 L(categorias.map((c, i) => '  (' + [

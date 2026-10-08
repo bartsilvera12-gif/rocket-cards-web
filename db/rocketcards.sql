@@ -1,42 +1,61 @@
--- Rocket Cards — base de datos
+-- Rocket Cards — esquema (Supabase / Postgres)
 --
---   psql -U postgres -f db/rocketcards.sql
+--   psql "$DATABASE_URL" -f db/rocketcards.sql
 --
--- Por psql, no pegado en un editor web: usa metacomandos (\gexec, \connect)
--- que sólo entiende psql, y es un cambio grande.
+-- Por psql, no pegado en el editor SQL del panel de Supabase: es un cambio
+-- grande, y el editor web corre cada bloque por su cuenta.
 --
--- Crea la base "rocketcards" con todo su esquema. Es idempotente: se puede
--- volver a correr sin romper nada.
+-- Es idempotente: se puede volver a correr sin romper nada.
 --
 -- Todo el DDL va en UNA transacción y al final hay un solo
--- NOTIFY pgrst, 'reload schema'. La única excepción es el CREATE DATABASE de
--- acá abajo, que Postgres no admite dentro de un bloque de transacción.
+-- NOTIFY pgrst, 'reload schema'.
 --
--- La idea de fondo: la tienda NO consulta la base en cada visita. El servidor
--- lee el catálogo una vez, lo guarda en memoria y lo vuelve a leer SÓLO cuando
--- Postgres le avisa que algo cambió, por el canal 'rocketcards' (LISTEN/NOTIFY).
--- Mil visitas por minuto con el catálogo quieto son cero consultas a la base.
+-- ── Por qué un esquema propio ───────────────────────────────────────────
+-- Nada de esto vive en "public". PostgREST publica "public" por defecto, así
+-- que cualquier tabla que pongamos ahí queda al alcance de la clave anónima
+-- del proyecto. Acá hay hashes de contraseña y identificadores de sesión: en
+-- "public" serían legibles desde internet aunque nosotros nunca usemos la API
+-- REST.
 --
--- El aviso se emite una sola vez por transacción, aunque se toquen cien filas:
--- ver rc_avisar_cambio() más abajo.
-
-SELECT 'CREATE DATABASE rocketcards'
-WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'rocketcards')\gexec
-
-\connect rocketcards
+-- Con el esquema "rocketcards" —que no está en la lista de esquemas expuestos
+-- de PostgREST— no hace falta RLS para que estas tablas sean inalcanzables
+-- por la API: PostgREST directamente no las ve. Nuestro servidor entra por
+-- conexión directa, que no pasa por ahí.
+--
+-- Si alguna vez querés leer "producto" desde supabase-js, no agregues este
+-- esquema a la lista de expuestos: hacé una vista en "public" con los campos
+-- públicos y ponele RLS.
+--
+-- ── Por qué no se sobrecarga la base ────────────────────────────────────
+-- La tienda no consulta la base. El servidor lee el catálogo una vez con
+-- rocketcards.catalogo(), lo guarda en memoria, y sólo vuelve a leer cuando
+-- Postgres le avisa por el canal 'rocketcards' (LISTEN/NOTIFY). Mil visitas
+-- con el catálogo quieto son cero consultas.
+--
+-- OJO con la cadena de conexión: el pooler de Supabase en modo transacción
+-- (puerto 6543) NO soporta LISTEN/NOTIFY. Hay que usar la conexión directa o
+-- el pooler en modo sesión (5432). Ver ADMIN.md.
 
 BEGIN;
+
+CREATE SCHEMA IF NOT EXISTS rocketcards;
+
+COMMENT ON SCHEMA rocketcards IS
+  'Datos de la tienda. Fuera de public a propósito: PostgREST no lo publica.';
+
+SET LOCAL search_path TO rocketcards, public;
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- Rol de la aplicación
 -- ─────────────────────────────────────────────────────────────────────────
 -- Nace SIN contraseña, así no puede conectarse hasta que le pongas una. Es a
--- propósito: un rol con contraseña escrita en un archivo del repo es un rol
--- público. Al terminar este script:
+-- propósito: un rol con la contraseña escrita en un archivo del repo es un
+-- rol público. Al terminar este script:
 --
 --   ALTER ROLE rocketcards_app PASSWORD 'la-que-elijas';
 --
--- y la misma en DATABASE_URL del servidor.
+-- En Supabase el usuario de la cadena de conexión no es "rocketcards_app" a
+-- secas: por el pooler va "rocketcards_app.<ref-del-proyecto>". Ver ADMIN.md.
 
 DO $$
 BEGIN
@@ -49,22 +68,22 @@ $$;
 -- ─────────────────────────────────────────────────────────────────────────
 -- Versión del catálogo
 -- ─────────────────────────────────────────────────────────────────────────
--- Una sola fila. Sube de a uno cada vez que cambia algo que la tienda muestra.
--- El servidor la usa como ETag: si el navegador ya tiene esa versión, le
--- responde 304 sin mirar la base ni mandar el catálogo de nuevo.
+-- Una sola fila. Sube de a uno cada vez que cambia algo que la tienda
+-- muestra. El servidor la usa como ETag: si el navegador ya tiene esa
+-- versión, le responde 304 sin mirar la base ni mandar el catálogo de nuevo.
 --
 -- El CHECK (id) con DEFAULT true es el truco para que la tabla no pueda tener
 -- más de una fila: la clave primaria sólo admite el valor true.
 
-CREATE TABLE IF NOT EXISTS rc_version (
+CREATE TABLE IF NOT EXISTS version (
   id              boolean     PRIMARY KEY DEFAULT true CHECK (id),
   version         bigint      NOT NULL DEFAULT 1,
   actualizado_en  timestamptz NOT NULL DEFAULT now()
 );
 
-INSERT INTO rc_version (id) VALUES (true) ON CONFLICT DO NOTHING;
+INSERT INTO version (id) VALUES (true) ON CONFLICT DO NOTHING;
 
-COMMENT ON TABLE rc_version IS
+COMMENT ON TABLE version IS
   'Fila única. Se incrementa una vez por transacción que modifique el catálogo.';
 
 -- ─────────────────────────────────────────────────────────────────────────
@@ -129,15 +148,12 @@ COMMENT ON COLUMN producto.nuevo_orden IS
 -- ─────────────────────────────────────────────────────────────────────────
 -- Administradores y sesiones
 -- ─────────────────────────────────────────────────────────────────────────
--- El hash lo calcula el servidor con scrypt (nativo de Node, sin dependencias)
--- y se guarda como "scrypt$N$r$p$salt$hash". Acá nunca entra una contraseña
--- en claro.
+-- El hash lo calcula el servidor con scrypt (nativo de Node, sin
+-- dependencias) y se guarda como "scrypt$N$r$p$salt$hash". Acá nunca entra
+-- una contraseña en claro.
 --
--- OJO si adelante hay PostgREST (Supabase y parecidos): estas dos tablas
--- están en el esquema "public", que es el que PostgREST publica por defecto.
--- Tal como están, sin RLS, los hashes y los identificadores de sesión
--- quedarían al alcance de cualquiera con la clave anónima. Antes de exponer
--- la base por PostgREST hay que moverlas a un esquema que no se publique.
+-- Estas dos tablas son la razón principal por la que nada de esto vive en
+-- "public": ver el comentario del encabezado.
 
 CREATE TABLE IF NOT EXISTS admin (
   id              integer     GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -170,7 +186,7 @@ CREATE INDEX IF NOT EXISTS sesion_expira_idx ON sesion (expira_en);
 -- Auditoría
 -- ─────────────────────────────────────────────────────────────────────────
 -- Quién tocó qué. El servidor declara quién está logueado con
--- SET LOCAL rocketcards.admin = '<id>' antes de escribir; si no lo declara,
+-- set_config('rocketcards.admin', ...) antes de escribir; si no lo declara,
 -- queda NULL y se ve igual que el cambio pasó.
 
 CREATE TABLE IF NOT EXISTS auditoria (
@@ -197,9 +213,15 @@ CREATE INDEX IF NOT EXISTS auditoria_registro_idx ON auditoria (tabla, registro_
 --
 -- El NOTIFY viaja recién en el COMMIT, así que el que escucha nunca ve un
 -- cambio que después se revirtió.
+--
+-- Nada que ver con el NOTIFY a 'pgrst' del final: ese avisa que cambió la
+-- FORMA de la base y lo escucha PostgREST. Éste avisa que cambió el
+-- CONTENIDO del catálogo y lo escucha nuestro servidor.
 
-CREATE OR REPLACE FUNCTION rc_avisar_cambio() RETURNS trigger
-LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION rocketcards.avisar_cambio() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = rocketcards, pg_temp
+AS $$
 DECLARE
   v bigint;
 BEGIN
@@ -208,7 +230,7 @@ BEGIN
   END IF;
   PERFORM set_config('rocketcards.avisado', txid_current()::text, true);
 
-  UPDATE rc_version
+  UPDATE version
      SET version = version + 1, actualizado_en = now()
    WHERE id
   RETURNING version INTO v;
@@ -224,22 +246,26 @@ BEGIN
 END
 $$;
 
-COMMENT ON FUNCTION rc_avisar_cambio() IS
-  'Sube rc_version y manda un NOTIFY por el canal rocketcards. Una vez por transacción.';
+COMMENT ON FUNCTION rocketcards.avisar_cambio() IS
+  'Sube version y manda un NOTIFY por el canal rocketcards. Una vez por transacción.';
 
-CREATE OR REPLACE FUNCTION rc_marcar_fecha() RETURNS trigger
-LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION rocketcards.marcar_fecha() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = rocketcards, pg_temp
+AS $$
 BEGIN
   NEW.actualizado_en := now();
   RETURN NEW;
 END
 $$;
 
--- La auditoría sí es por fila: interesa el detalle de cada uno.
--- El nombre de la columna clave llega como argumento del trigger, porque no
--- es el mismo en las dos tablas: producto.id y categoria.key.
-CREATE OR REPLACE FUNCTION rc_auditar() RETURNS trigger
-LANGUAGE plpgsql AS $$
+-- La auditoría sí es por fila: interesa el detalle de cada uno. El nombre de
+-- la columna clave llega como argumento del trigger, porque no es el mismo en
+-- las dos tablas: producto.id y categoria.key.
+CREATE OR REPLACE FUNCTION rocketcards.auditar() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = rocketcards, pg_temp
+AS $$
 DECLARE
   quien  integer := nullif(current_setting('rocketcards.admin', true), '')::integer;
   clave  text    := TG_ARGV[0];
@@ -275,34 +301,34 @@ $$;
 DROP TRIGGER IF EXISTS producto_fecha ON producto;
 CREATE TRIGGER producto_fecha
   BEFORE UPDATE ON producto
-  FOR EACH ROW EXECUTE FUNCTION rc_marcar_fecha();
+  FOR EACH ROW EXECUTE FUNCTION rocketcards.marcar_fecha();
 
 DROP TRIGGER IF EXISTS categoria_fecha ON categoria;
 CREATE TRIGGER categoria_fecha
   BEFORE UPDATE ON categoria
-  FOR EACH ROW EXECUTE FUNCTION rc_marcar_fecha();
+  FOR EACH ROW EXECUTE FUNCTION rocketcards.marcar_fecha();
 
 DROP TRIGGER IF EXISTS producto_auditar ON producto;
 CREATE TRIGGER producto_auditar
   AFTER INSERT OR UPDATE OR DELETE ON producto
-  FOR EACH ROW EXECUTE FUNCTION rc_auditar('id');
+  FOR EACH ROW EXECUTE FUNCTION rocketcards.auditar('id');
 
 DROP TRIGGER IF EXISTS categoria_auditar ON categoria;
 CREATE TRIGGER categoria_auditar
   AFTER INSERT OR UPDATE OR DELETE ON categoria
-  FOR EACH ROW EXECUTE FUNCTION rc_auditar('key');
+  FOR EACH ROW EXECUTE FUNCTION rocketcards.auditar('key');
 
 -- FOR EACH STATEMENT, no FOR EACH ROW: un UPDATE de cien filas entra acá una
 -- sola vez, y la marca de transacción se encarga del resto.
 DROP TRIGGER IF EXISTS producto_avisar ON producto;
 CREATE TRIGGER producto_avisar
   AFTER INSERT OR UPDATE OR DELETE ON producto
-  FOR EACH STATEMENT EXECUTE FUNCTION rc_avisar_cambio();
+  FOR EACH STATEMENT EXECUTE FUNCTION rocketcards.avisar_cambio();
 
 DROP TRIGGER IF EXISTS categoria_avisar ON categoria;
 CREATE TRIGGER categoria_avisar
   AFTER INSERT OR UPDATE OR DELETE ON categoria
-  FOR EACH STATEMENT EXECUTE FUNCTION rc_avisar_cambio();
+  FOR EACH STATEMENT EXECUTE FUNCTION rocketcards.avisar_cambio();
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- El catálogo, en una sola consulta
@@ -311,10 +337,12 @@ CREATE TRIGGER categoria_avisar
 -- que usa el front. El servidor llama a esto una vez y guarda el resultado;
 -- no vuelve hasta que le avisen.
 
-CREATE OR REPLACE FUNCTION rc_catalogo() RETURNS jsonb
-LANGUAGE sql STABLE AS $$
+CREATE OR REPLACE FUNCTION rocketcards.catalogo() RETURNS jsonb
+LANGUAGE sql STABLE
+SET search_path = rocketcards, pg_temp
+AS $$
   SELECT jsonb_build_object(
-    'version', (SELECT version FROM rc_version WHERE id),
+    'version', (SELECT version FROM version WHERE id),
     'categorias', COALESCE((
       SELECT jsonb_agg(jsonb_build_object(
                'key',      c.key,
@@ -351,7 +379,7 @@ LANGUAGE sql STABLE AS $$
   );
 $$;
 
-COMMENT ON FUNCTION rc_catalogo() IS
+COMMENT ON FUNCTION rocketcards.catalogo() IS
   'Todo el catálogo público en un jsonb, con los nombres de campo que usa la página.';
 
 -- ─────────────────────────────────────────────────────────────────────────
@@ -359,8 +387,10 @@ COMMENT ON FUNCTION rc_catalogo() IS
 -- ─────────────────────────────────────────────────────────────────────────
 -- La llama el servidor una vez por hora. No hace falta pg_cron.
 
-CREATE OR REPLACE FUNCTION rc_limpiar_sesiones() RETURNS integer
-LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION rocketcards.limpiar_sesiones() RETURNS integer
+LANGUAGE plpgsql
+SET search_path = rocketcards, pg_temp
+AS $$
 DECLARE
   n integer;
 BEGIN
@@ -377,43 +407,57 @@ $$;
 -- esquema. Sobre auditoria sólo inserta (vía trigger) y lee; no puede
 -- reescribir el historial.
 
-GRANT CONNECT ON DATABASE rocketcards TO rocketcards_app;
-GRANT USAGE ON SCHEMA public TO rocketcards_app;
+GRANT USAGE ON SCHEMA rocketcards TO rocketcards_app;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON producto, categoria, admin, sesion TO rocketcards_app;
 GRANT SELECT, INSERT ON auditoria TO rocketcards_app;
-GRANT SELECT, UPDATE ON rc_version TO rocketcards_app;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO rocketcards_app;
-GRANT EXECUTE ON FUNCTION rc_catalogo(), rc_limpiar_sesiones() TO rocketcards_app;
+GRANT SELECT, UPDATE ON version TO rocketcards_app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA rocketcards TO rocketcards_app;
+GRANT EXECUTE ON FUNCTION rocketcards.catalogo(), rocketcards.limpiar_sesiones()
+  TO rocketcards_app;
 
 -- Para las tablas que se agreguen más adelante.
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
+ALTER DEFAULT PRIVILEGES IN SCHEMA rocketcards
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO rocketcards_app;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
+ALTER DEFAULT PRIVILEGES IN SCHEMA rocketcards
   GRANT USAGE, SELECT ON SEQUENCES TO rocketcards_app;
+
+-- Cinturón y tiradores. El esquema no está expuesto por PostgREST, así que
+-- anon y authenticated no deberían poder llegar igual; esto lo deja escrito
+-- por si alguien agrega "rocketcards" a la lista de esquemas expuestos sin
+-- leer el encabezado de este archivo.
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon') THEN
+    REVOKE ALL ON SCHEMA rocketcards FROM anon;
+    REVOKE ALL ON ALL TABLES IN SCHEMA rocketcards FROM anon;
+    REVOKE ALL ON ALL FUNCTIONS IN SCHEMA rocketcards FROM anon;
+  END IF;
+  IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON SCHEMA rocketcards FROM authenticated;
+    REVOKE ALL ON ALL TABLES IN SCHEMA rocketcards FROM authenticated;
+    REVOKE ALL ON ALL FUNCTIONS IN SCHEMA rocketcards FROM authenticated;
+  END IF;
+END
+$$;
 
 COMMIT;
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- Avisar a PostgREST
 -- ─────────────────────────────────────────────────────────────────────────
--- PostgREST guarda el esquema en caché al arrancar: si no se lo decimos, no
--- ve las tablas ni las funciones nuevas. Va una sola vez y después del
--- COMMIT, no una por cada DDL: antes del commit los cambios todavía no
--- existen para nadie más, y repetirlo por cada CREATE lo obliga a releer el
--- catálogo entero una vez por línea.
---
--- No tiene nada que ver con el canal 'rocketcards' de más arriba: ese avisa
--- que cambió el CONTENIDO del catálogo (precios, stock) y lo escucha nuestro
--- servidor; éste avisa que cambió la FORMA de la base y lo escucha PostgREST.
+-- PostgREST guarda el esquema en caché: si no se lo decimos, no ve los
+-- cambios. Va una sola vez y después del COMMIT, no una por cada DDL: antes
+-- del commit los cambios todavía no existen para nadie más, y repetirlo por
+-- cada CREATE lo obliga a releer el catálogo entero una vez por línea.
 
 NOTIFY pgrst, 'reload schema';
 
 \echo ''
-\echo 'Base rocketcards lista.'
+\echo 'Esquema rocketcards listo.'
 \echo ''
 \echo 'Falta:'
 \echo '  1) ALTER ROLE rocketcards_app PASSWORD ''...'';'
-\echo '  2) psql -U postgres -d rocketcards -f db/semilla.sql   (catálogo actual)'
-\echo '  3) npm run admin:crear -- <usuario>                    (primer usuario)'
+\echo '  2) psql "$DATABASE_URL" -f db/semilla.sql   (catálogo actual)'
+\echo '  3) npm run admin:crear -- <usuario> --dueno'
 \echo ''

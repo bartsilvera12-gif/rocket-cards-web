@@ -1,6 +1,6 @@
 -- Rocket Cards — catálogo inicial
 --
---   psql -U postgres -d rocketcards -f db/semilla.sql
+--   psql "$DATABASE_URL" -f db/semilla.sql
 --
 -- Generado por scripts/exportar-semilla.mjs a partir de los arreglos
 -- CATEGORIAS, CATALOG y NEW_IDS de la página. No editar a mano: una vez que
@@ -10,6 +10,8 @@
 -- carga entera en vez de uno por producto.
 
 BEGIN;
+
+SET LOCAL search_path TO rocketcards;
 
 INSERT INTO categoria (key, nombre, kicker, nota, nota_menu, accent, img, orden) VALUES
   ('sellados', 'Sellados y coleccionables', 'Producto sellado', 'Bundle · Collections · Premium', 'Booster Box · Bundle · Collections', '#E30613', '/assets/catalogo/prismatic-figure-collection.webp', 1),

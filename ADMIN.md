@@ -14,11 +14,11 @@ La tienda **no consulta la base**. Ni una vez por visita.
                                                memoria)
 ```
 
-1. El servidor lee el catálogo entero **una sola vez** con `rc_catalogo()` y lo
+1. El servidor lee el catálogo entero **una sola vez** con `rocketcards.catalogo()` y lo
    guarda en memoria, ya serializado.
 2. Queda escuchando el canal `rocketcards` con `LISTEN`. Mientras nadie edite
    nada, esa conexión está quieta y no genera carga.
-3. Cuando el panel cambia algo, un trigger sube `rc_version`, manda un
+3. Cuando el panel cambia algo, un trigger sube `rocketcards.version`, manda un
    `pg_notify`, y recién ahí el servidor vuelve a leer. **Una consulta por
    edición, no una por visita.**
 4. Los navegadores abiertos reciben el aviso por `/api/eventos` (SSE) y
@@ -32,7 +32,7 @@ Mil personas mirando la tienda durante una hora, con el catálogo quieto, son
 Tres detalles que hacen que eso funcione de verdad:
 
 - **Un aviso por transacción, no por fila.** Si corregís el stock de cuarenta
-  productos de una, `rc_avisar_cambio()` manda un solo `NOTIFY`: la primera vez
+  productos de una, `rocketcards.avisar_cambio()` manda un solo `NOTIFY`: la primera vez
   deja una marca local a la transacción y las siguientes salen sin hacer nada.
 - **El `NOTIFY` viaja en el `COMMIT`.** Nadie se entera de un cambio que
   después se revirtió.
@@ -43,67 +43,88 @@ Tres detalles que hacen que eso funcione de verdad:
 
 ## Instalación
 
-Hace falta Postgres 12 o más nuevo y Node 20.12 o más nuevo.
+La base es **Supabase**. Hace falta Node 20.12 o más nuevo y `psql` instalado.
 
 ```bash
 npm install
 ```
 
-### 1. Crear la base
+### 1. Crear el esquema
 
 ```bash
-psql -U postgres -f db/rocketcards.sql
+psql "postgresql://postgres.<ref>:CLAVE@aws-0-<region>.pooler.supabase.com:5432/postgres"   -f db/rocketcards.sql
 ```
 
-Crea la base `rocketcards`, las tablas, los triggers y el rol
-`rocketcards_app`. El rol **nace sin contraseña** a propósito: un rol con la
-contraseña escrita en un archivo del repo es un rol público. Poné la tuya:
+Por `psql`, no pegado en el editor SQL del panel de Supabase: es un cambio
+grande y el editor web corre cada bloque por su cuenta.
 
-```bash
-psql -U postgres -d rocketcards -c "ALTER ROLE rocketcards_app PASSWORD 'la-que-elijas'"
-```
+Todo el DDL va en una sola transacción y termina con
+`NOTIFY pgrst, 'reload schema';`, una vez al final, para que PostgREST relea
+el esquema una sola vez y no una por cada `CREATE`.
 
 El script se puede volver a correr cuantas veces quieras: no borra datos.
 
-Todo el DDL va en una sola transacción y termina con
-`NOTIFY pgrst, 'reload schema';`, para que PostgREST —si lo hay adelante—
-relea el esquema una vez y no una por cada `CREATE`. La única cosa fuera de la
-transacción es el `CREATE DATABASE`, que Postgres no admite adentro.
+**Nada vive en `public`.** Todo queda en un esquema `rocketcards`, que no está
+en la lista de esquemas que publica PostgREST. Eso importa: acá hay hashes de
+contraseña y identificadores de sesión, y en `public` serían legibles con la
+clave anónima del proyecto aunque nosotros nunca usemos la API REST. Como
+PostgREST directamente no ve el esquema, no hace falta RLS para taparlo.
 
-### 2. Cargar el catálogo actual
+Si algún día querés leer `producto` desde `supabase-js`, **no agregues
+`rocketcards` a los esquemas expuestos**: hacé una vista en `public` con los
+campos públicos y ponele RLS.
+
+### 2. Ponerle contraseña al rol
 
 ```bash
-npm run db:semilla                                    # regenera db/semilla.sql
-psql -U postgres -d rocketcards -f db/semilla.sql
+psql "$DATABASE_URL_ADMIN" -c "ALTER ROLE rocketcards_app PASSWORD 'la-que-elijas'"
+```
+
+El script crea `rocketcards_app` **sin contraseña** a propósito: un rol con la
+clave escrita en un archivo del repo es un rol público. El rol no es dueño de
+nada —no puede tocar el esquema ni reescribir la auditoría—, por eso la app
+no corre como `postgres`.
+
+### 3. Cargar el catálogo actual
+
+```bash
+npm run db:semilla                        # regenera db/semilla.sql
+psql "$DATABASE_URL" -f db/semilla.sql
 ```
 
 `db/semilla.sql` sale de los arreglos `CATALOG`, `CATEGORIAS` y `NEW_IDS` que
-todavía están en la página. Es el puente de una sola vez. De ahí en adelante la
-fuente de verdad es la base.
+todavía están en la página. Es el puente de una sola vez. De ahí en adelante
+la fuente de verdad es la base.
 
-### 3. Configurar el servidor
+### 4. Configurar el servidor
 
 ```bash
 cp .env.ejemplo .env
 ```
 
-y completá `DATABASE_URL` con la contraseña del paso 1. `.env` está en
-`.gitignore`.
+y completá `DATABASE_URL`. **Tiene que ser conexión directa o pooler en modo
+sesión (puerto 5432).** El pooler en modo transacción (6543) reparte cada
+consulta por una conexión distinta y no soporta `LISTEN/NOTIFY`: con esa
+cadena el servidor arranca igual, pero nunca se entera de los cambios y la
+tienda queda congelada mostrando el catálogo del arranque. Es el error más
+fácil de cometer y el más difícil de ver.
 
-### 4. Crear el primer usuario
+`.env` está en `.gitignore`.
+
+### 5. Crear el primer usuario
 
 ```bash
 npm run admin:crear -- karen --dueno --nombre "Karen"
 ```
 
-Pide la contraseña por teclado y no la muestra mientras la escribís. No se pasa
-por argumento a propósito: los argumentos quedan en el historial del shell y en
-la lista de procesos de la máquina.
+Pide la contraseña por teclado y no la muestra mientras la escribís. No se
+pasa por argumento a propósito: los argumentos quedan en el historial del
+shell y en la lista de procesos de la máquina.
 
 El rol `dueno` puede todo, incluso ver y crear usuarios. `editor` sólo toca el
 catálogo.
 
-### 5. Levantar
+### 6. Levantar
 
 ```bash
 npm run build
@@ -112,6 +133,10 @@ npm start
 
 - Tienda: http://localhost:4000
 - Panel: http://localhost:4000/admin
+
+Supabase te da Postgres, no un lugar donde correr esto. El servidor necesita
+un host donde el proceso quede vivo —Railway, Render, Fly, un VPS—, porque
+tiene que sostener la conexión `LISTEN` y los streams SSE abiertos.
 
 ## El panel
 
@@ -153,10 +178,10 @@ Así que hoy conviven dos despliegues:
 | Panel | no hay | `/admin` |
 
 Vercel corre funciones que arrancan y mueren con cada pedido, así que no puede
-sostener un `LISTEN` ni un stream SSE abierto. Para tener el panel hace falta
-un host donde el proceso quede corriendo: un VPS, Railway, Render, Fly. La
-tienda puede seguir en Vercel apuntando a esa API, o servirse del mismo
-proceso, que es lo que hace `npm start`.
+sostener un `LISTEN` ni un stream SSE abierto. Supabase tampoco: te da la base,
+no un proceso. El servidor va en un host donde quede corriendo —Railway,
+Render, Fly, un VPS—. La tienda puede seguir en Vercel apuntando a esa API, o
+servirse del mismo proceso, que es lo que hace `npm start`.
 
 ## Seguridad
 
@@ -177,15 +202,22 @@ proceso, que es lo que hace `npm start`.
 - El rol `rocketcards_app` no es dueño de nada: no puede borrar tablas ni
   cambiar el esquema, y sobre `auditoria` sólo puede insertar y leer, no
   reescribir el historial.
+- Todo fuera de `public`, así PostgREST no lo publica. Además el script le
+  revoca explícitamente los permisos a `anon` y `authenticated`, por si
+  alguien agrega el esquema a la lista de expuestos sin leer la advertencia.
 - `/admin` responde con `X-Robots-Tag: noindex, nofollow`.
 
 ## Qué queda afuera
 
 Lo probé con un servidor de prueba que habla el mismo contrato, pero **no pude
-correrlo contra un Postgres real**: en esta máquina no hay. Antes de ponerlo en
-producción conviene hacer el recorrido completo una vez —crear la base, la
-semilla, el usuario, y editar un producto con la tienda abierta en otra
-pestaña— que es justo donde saldría cualquier error de tipeo del SQL.
+correrlo contra Postgres**: en esta máquina no hay ni `psql` ni Docker. Antes
+de ponerlo en producción hay que hacer el recorrido completo una vez —esquema,
+semilla, usuario, y editar un producto con la tienda abierta en otra pestaña—,
+que es justo donde saldría cualquier error de tipeo del SQL.
+
+Lo primero que conviene comprobar es que el `LISTEN` ande con la cadena de
+conexión que elegiste: editá algo desde el panel y mirá si el log del servidor
+imprime `[db] catálogo v…`. Si no aparece, es el pooler en modo transacción.
 
 Tampoco hay todavía:
 

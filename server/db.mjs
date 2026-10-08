@@ -35,6 +35,14 @@ export const pool = new Pool(Object.assign({
   connectionTimeoutMillis: 8000,
 }, conexion));
 
+// Nuestras tablas viven en el esquema "rocketcards", no en "public": así
+// PostgREST no las publica. Lo ponemos acá y no en la cadena de conexión
+// porque el pooler de Supabase puede no pasar las opciones de arranque.
+const RUTA = 'SET search_path TO rocketcards, public';
+pool.on('connect', (cliente) => {
+  cliente.query(RUTA).catch((err) => console.error('[db] search_path:', err.message));
+});
+
 // Un error en una conexión ociosa del pool no debe tumbar el proceso.
 pool.on('error', (err) => console.error('[db] conexión ociosa:', err.message));
 
@@ -48,7 +56,7 @@ let cache = null;             // { version, cuerpo, etag, en }
 let cargando = null;          // promesa en curso, para no pedir lo mismo dos veces
 
 async function leerDeLaBase() {
-  const { rows } = await pool.query('SELECT rc_catalogo() AS c');
+  const { rows } = await pool.query('SELECT rocketcards.catalogo() AS c');
   const dato = rows[0].c;
   const cuerpo = JSON.stringify(dato);
   return {
@@ -122,6 +130,7 @@ async function escuchar() {
   });
 
   await cliente.connect();
+  await cliente.query(RUTA);
   await cliente.query('LISTEN ' + CANAL);
   reintento = REINTENTO_MIN;
   console.log('[db] escuchando ' + CANAL);
@@ -148,7 +157,7 @@ export async function iniciar() {
   await escuchar();
   // Sesiones vencidas, una vez por hora. No hace falta pg_cron.
   setInterval(() => {
-    pool.query('SELECT rc_limpiar_sesiones()')
+    pool.query('SELECT rocketcards.limpiar_sesiones()')
       .catch((err) => console.error('[db] limpieza:', err.message));
   }, 3600_000).unref();
 }
