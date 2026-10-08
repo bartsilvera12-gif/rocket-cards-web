@@ -1358,6 +1358,10 @@ class Component extends DCLogic {
       // amortiguadas; al soltar, salta de a una o vuelve a su lugar.
       carDown: (e) => {
         if (e.pointerType === 'mouse' && e.buttons !== 1) return;
+        // Las flechas y el botón de agregar están dentro de la zona de gesto.
+        // Si capturamos el puntero también sobre ellos, los eventos siguientes
+        // se redirigen a este div y el navegador no dispara el click del botón.
+        if (e.target.closest && e.target.closest('button')) return;
         this._car = { x0: e.clientX, y0: e.clientY, on: true, eje: '' };
         try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
       },
