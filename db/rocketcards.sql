@@ -67,6 +67,30 @@ ALTER TABLE IF EXISTS rocketcards.auditoria ADD COLUMN IF NOT EXISTS quien text;
 DROP TABLE IF EXISTS rocketcards.sesion;
 DROP TABLE IF EXISTS rocketcards.admin;
 
+-- "premium" era un dato muerto: estaba en la tabla y no se mostraba en
+-- ningún lado de la tienda. Pasa a llamarse "destacado", que sí se ve.
+DO $$
+DECLARE
+  tiene_premium   boolean;
+  tiene_destacado boolean;
+BEGIN
+  IF to_regclass('rocketcards.producto') IS NULL THEN RETURN; END IF;
+  SELECT
+    count(*) FILTER (WHERE column_name = 'premium')   > 0,
+    count(*) FILTER (WHERE column_name = 'destacado') > 0
+  INTO tiene_premium, tiene_destacado
+  FROM information_schema.columns
+  WHERE table_schema = 'rocketcards' AND table_name = 'producto';
+
+  IF tiene_premium AND NOT tiene_destacado THEN
+    ALTER TABLE rocketcards.producto RENAME COLUMN premium TO destacado;
+    RAISE NOTICE 'producto.premium pasó a llamarse destacado.';
+  ELSIF tiene_premium THEN
+    ALTER TABLE rocketcards.producto DROP COLUMN premium;
+  END IF;
+END
+$$;
+
 -- Las políticas viejas dejaban entrar al rol de aquel servidor. No hacen
 -- daño, pero una política de más es una cosa más que revisar.
 DO $$
@@ -196,7 +220,7 @@ CREATE TABLE IF NOT EXISTS producto (
   precio_anterior bigint      CHECK (precio_anterior IS NULL OR precio_anterior > precio),
   stock           integer     NOT NULL DEFAULT 0 CHECK (stock >= 0),
   etiqueta        text        CHECK (etiqueta IS NULL OR etiqueta <> ''),
-  premium         boolean     NOT NULL DEFAULT false,
+  destacado       boolean     NOT NULL DEFAULT false,
   nuevo_orden     integer,    -- posición en "Nuevos ingresos"; NULL = no sale ahí
   publicado       boolean     NOT NULL DEFAULT true,
   creado_en       timestamptz NOT NULL DEFAULT now(),
@@ -215,6 +239,8 @@ COMMENT ON COLUMN producto.precio_anterior IS
   'Precio tachado. Si está, se calcula el % de descuento.';
 COMMENT ON COLUMN producto.nuevo_orden IS
   'Posición en el carrusel "Nuevos ingresos". NULL = no aparece.';
+COMMENT ON COLUMN producto.destacado IS
+  'Lleva etiqueta DESTACADO y va primero en el catálogo.';
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- Auditoría
@@ -360,8 +386,8 @@ AS $$
                'id', p.id, 'name', p.nombre, 'set', p.coleccion,
                'cat', p.categoria, 'img', p.img, 'price', p.precio,
                'old', p.precio_anterior, 'stock', p.stock, 'tag', p.etiqueta,
-               'premium', CASE WHEN p.premium THEN true END
-             )) ORDER BY p.nombre)
+               'destacado', CASE WHEN p.destacado THEN true END
+             )) ORDER BY p.destacado DESC, p.nombre)
       FROM producto p
       WHERE p.publicado
     ), '[]'::jsonb),
@@ -480,6 +506,59 @@ CREATE POLICY version_lectura ON version FOR SELECT USING (true);
 DROP POLICY IF EXISTS auditoria_lectura ON auditoria;
 CREATE POLICY auditoria_lectura ON auditoria
   FOR SELECT TO authenticated USING (rocketcards.es_admin());
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Fotos de producto
+-- ─────────────────────────────────────────────────────────────────────────
+-- Un bucket para subir las fotos desde el panel, en vez de tener que meterlas
+-- al repo y volver a publicar el sitio.
+--
+-- Público de lectura: son fotos de productos en una tienda, las tiene que
+-- poder ver cualquiera sin pedir permiso. Subir, reemplazar y borrar, sólo el
+-- admin — las mismas reglas que el catálogo.
+--
+-- El límite de tamaño y la lista de tipos son del lado del servidor: el panel
+-- también valida, pero esa validación vive en el navegador y no cuenta.
+--
+-- Va envuelto en un IF porque el esquema storage es de Supabase: en un
+-- Postgres pelado este bloque no hace nada y el resto del script sirve igual.
+
+DO $$
+BEGIN
+  IF to_regclass('storage.buckets') IS NULL THEN
+    RAISE NOTICE 'Sin esquema storage: me salteo el bucket de fotos.';
+    RETURN;
+  END IF;
+
+  INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  VALUES ('rocketcards', 'rocketcards', true, 5242880,
+          ARRAY['image/webp', 'image/png', 'image/jpeg', 'image/avif'])
+  ON CONFLICT (id) DO UPDATE
+    SET public = true,
+        file_size_limit = EXCLUDED.file_size_limit,
+        allowed_mime_types = EXCLUDED.allowed_mime_types;
+
+  DROP POLICY IF EXISTS "rocketcards fotos lectura" ON storage.objects;
+  CREATE POLICY "rocketcards fotos lectura" ON storage.objects
+    FOR SELECT USING (bucket_id = 'rocketcards');
+
+  DROP POLICY IF EXISTS "rocketcards fotos subir" ON storage.objects;
+  CREATE POLICY "rocketcards fotos subir" ON storage.objects
+    FOR INSERT TO authenticated
+    WITH CHECK (bucket_id = 'rocketcards' AND rocketcards.es_admin());
+
+  DROP POLICY IF EXISTS "rocketcards fotos reemplazar" ON storage.objects;
+  CREATE POLICY "rocketcards fotos reemplazar" ON storage.objects
+    FOR UPDATE TO authenticated
+    USING (bucket_id = 'rocketcards' AND rocketcards.es_admin())
+    WITH CHECK (bucket_id = 'rocketcards' AND rocketcards.es_admin());
+
+  DROP POLICY IF EXISTS "rocketcards fotos borrar" ON storage.objects;
+  CREATE POLICY "rocketcards fotos borrar" ON storage.objects
+    FOR DELETE TO authenticated
+    USING (bucket_id = 'rocketcards' AND rocketcards.es_admin());
+END
+$$;
 
 COMMIT;
 

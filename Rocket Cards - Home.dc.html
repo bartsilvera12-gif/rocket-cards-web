@@ -851,7 +851,8 @@ const TAG_STYLE = {
   'OFERTA':       { bg:'#E30613', fg:'#ffffff' },
   'PREVENTA':     { bg:'#C9A227', fg:'#050505' },
   'ÚLTIMAS UNIDADES': { bg:'#C9A227', fg:'#050505' },
-  'AGOTADO':      { bg:'#1f1f1f', fg:'#A7A7A7' }
+  'AGOTADO':      { bg:'#1f1f1f', fg:'#A7A7A7' },
+  'DESTACADO':    { bg:'#C9A227', fg:'#050505' }
 };
 
 const PRIVACIDAD = [
@@ -1081,12 +1082,19 @@ class Component extends DCLogic {
 
   decorate(p) {
     const si = this.stockInfo(p);
-    const ts = TAG_STYLE[p.tag] || TAG_STYLE['NUEVO'];
+    // Qué etiqueta gana cuando hay más de una razón para poner una.
+    // Sin stock manda siempre: es lo único que le cambia la decisión al que
+    // está mirando. Después, lo que el panel marcó como destacado.
+    const tag = p.stock === 0 ? (p.tag || 'AGOTADO')
+              : p.destacado   ? 'DESTACADO'
+              : p.tag;
+    const ts = TAG_STYLE[tag] || TAG_STYLE['NUEVO'];
     return Object.assign({}, p, {
+      tag,
       priceLabel: this.fmt(p.price),
       oldLabel: p.old ? this.fmt(p.old) : '',
       hasOld: !!p.old,
-      hasTag: !!p.tag,
+      hasTag: !!tag,
       tagBg: ts.bg, tagFg: ts.fg,
       stockLabel: si.label, stockColor: si.color,
       discount: p.old ? '-' + Math.round((1 - p.price / p.old) * 100) + '%' : '',

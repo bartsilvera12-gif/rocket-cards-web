@@ -108,7 +108,7 @@ El panel sale del mismo deploy que la tienda:
 
 | Pestaña | Qué hace |
 |---|---|
-| **Productos** | Alta, baja y edición. El precio, el stock y el interruptor de visible se guardan al salir del campo. |
+| **Productos** | Alta, baja y edición. El precio, el stock y el interruptor de visible se guardan al salir del campo. Las fotos se suben desde el mismo formulario. |
 | **Nuevos ingresos** | El orden del carrusel de la portada, hasta 12 productos. |
 | **Categorías** | Nombre, bajada y orden. La clave sale en la URL y no se cambia desde acá. |
 | **Historial** | Quién cambió qué y cuándo, con el antes y el después de cada campo. |
@@ -123,6 +123,38 @@ Arriba a la derecha:
 
 Si dos personas tienen el panel abierto, los cambios de una aparecen en la
 pantalla de la otra sin recargar. Y en la tienda también.
+
+### Fotos
+
+Se suben desde el formulario del producto, a un bucket de Supabase Storage
+(`rocketcards`). No hace falta meterlas al repo ni volver a publicar el sitio.
+
+Antes de subir, el navegador **la achica a 1000px de lado y la pasa a WebP**.
+Las fotos salen del teléfono con 4000px y 4 MB; subirlas tal cual es
+exactamente el problema que ya arreglamos una vez a mano con
+`scripts/optimize-images.py`, y no conviene que vuelva a entrar por la puerta
+del panel. Si el navegador no sabe escribir WebP, sube el original.
+
+El nombre lleva un timestamp, así reemplazar una foto no pisa la anterior:
+quien tenga la página abierta sigue viendo su copia en caché hasta que
+recargue.
+
+Las rutas viejas de `assets/` siguen funcionando — el campo acepta las dos
+cosas. Lo que **no** acepta es una URL de otro sitio: si no, el panel sería
+una forma de incrustar contenido de terceros en la tienda. Leer el bucket
+puede cualquiera (son fotos de productos); subir, reemplazar y borrar, sólo
+el admin.
+
+### Destacado
+
+El interruptor **Destacado** pone una etiqueta dorada en la tarjeta y manda
+el producto al principio del catálogo.
+
+Si el producto está sin stock gana **AGOTADO**: es lo único que le cambia la
+decisión a quien está mirando.
+
+(Esto reemplaza al campo `premium`, que estaba en los datos y no se mostraba
+en ningún lado. El script lo renombra solo.)
 
 ### Reordenar el carrusel
 
@@ -162,8 +194,7 @@ en vez de quedarse mudo.
 
 Tampoco hay todavía:
 
-- Subida de imágenes desde el panel: las fotos se siguen subiendo a `assets/`
-  con el repo, y en el panel se escribe la ruta. (Supabase Storage sería el
-  paso siguiente.)
+- Borrar del bucket la foto vieja cuando se reemplaza: por ahora queda
+  ocupando lugar. No molesta a nadie, pero con el tiempo se acumula.
 - Pedidos del lado del servidor: el carrito sigue siendo del navegador y el
   cierre es por WhatsApp.
