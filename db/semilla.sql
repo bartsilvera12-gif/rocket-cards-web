@@ -15,7 +15,7 @@ SET LOCAL search_path TO rocketcards;
 
 INSERT INTO categoria (key, nombre, kicker, nota, nota_menu, accent, img, orden) VALUES
   ('sellados', 'Sellados y coleccionables', 'Producto sellado', 'Bundle · Collections · Premium', 'Booster Box · Bundle · Collections', '#E30613', '/assets/catalogo/prismatic-figure-collection.webp', 1),
-  ('sobres', 'Sobres', 'Unidad suelta', 'Sellados de origen', 'Sellados de origen', '#F5F5F5', '/assets/catalogo/pitch-black-pack.webp', 2),
+  ('sobres', 'Sobres', 'Booster packs', 'Sellados de origen', 'Sellados de origen', '#F5F5F5', '/assets/catalogo/pitch-black-pack.webp', 2),
   ('etb', 'ETB', 'Elite Trainer Box', 'Set completo + accesorios', 'Elite Trainer Box', '#C9A227', '/assets/catalogo/koraidon-etb.webp', 3),
   ('singles', 'Singles', 'Carta suelta', 'Cartas individuales', 'Cartas individuales', '#FF1A27', '/assets/cards/pikachu-ex.webp', 4)
 ON CONFLICT (key) DO UPDATE SET
