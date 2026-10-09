@@ -182,9 +182,66 @@ npm start
 - Tienda: http://localhost:4000
 - Panel: http://localhost:4000/admin
 
-Supabase te da Postgres, no un lugar donde correr esto. El servidor necesita
-un host donde el proceso quede vivo —Railway, Render, Fly, un VPS—, porque
-tiene que sostener la conexión `LISTEN` y los streams SSE abiertos.
+## Subirlo a producción
+
+**El panel no puede vivir en Vercel.** Si entrás a `tu-sitio.vercel.app/admin`
+te aparece la tienda, no el panel: el archivo ni siquiera se sube (`admin/`
+está en `.vercelignore`) y, aunque se subiera, el panel necesita `/api/...`,
+que necesita un proceso vivo sosteniendo la conexión `LISTEN` contra Postgres
+y los streams SSE. Vercel arranca y mata una función por pedido. Supabase
+tampoco sirve: te da la base, no un lugar donde correr esto.
+
+Hace falta un host donde el proceso quede corriendo. Cualquiera de estos:
+
+### Railway o Render (lo más rápido)
+
+Conectás el repo de GitHub y configurás:
+
+| | |
+|---|---|
+| Build | `npm run build` |
+| Start | `npm start` |
+| Health check | `/api/salud` |
+
+Variables de entorno: `DATABASE_URL` (la de sesión, puerto 5432),
+`ADMIN_PERMITIDOS`, y **`DETRAS_DE_TLS=1`** —estos hosts terminan HTTPS
+adelante, y sin eso la cookie de sesión no se marca como `Secure`—. `PORT` lo
+pone el host solo, no lo toques.
+
+### Fly, Cloud Run o un VPS con Docker
+
+Hay un `Dockerfile` en la raíz, listo para usar:
+
+```bash
+docker build -t rocketcards .
+docker run -p 4000:4000 --env-file .env rocketcards
+```
+
+### Después de desplegar
+
+La tienda y el panel salen del mismo proceso, así que lo más simple es apuntar
+el dominio ahí y dejar de usar el deploy de Vercel:
+
+- Tienda: `https://tu-dominio/`
+- Panel: `https://tu-dominio/admin`
+
+Si preferís dejar la tienda en Vercel y sólo el panel en el otro host, la
+tienda de Vercel va a seguir mostrando el catálogo escrito en la página, no el
+de la base: para que lea la API haría falta CORS y una URL absoluta, que hoy
+no están.
+
+El `npm start` corre el build antes de arrancar (`prestart`), así que nunca
+levanta sin `dist/`.
+
+Lo primero que conviene mirar en el log al levantar:
+
+```
+[db] escuchando rocketcards
+[db] catálogo v1
+```
+
+Si el segundo no vuelve a aparecer cuando editás algo desde el panel, es el
+pooler en modo transacción: cambiá la cadena a la de sesión (puerto 5432).
 
 ## El panel
 

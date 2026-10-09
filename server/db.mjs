@@ -21,8 +21,16 @@ const ESPERA_AVISO = 120;     // ms que agrupa avisos seguidos en una sola recar
 const REINTENTO_MIN = 500;
 const REINTENTO_MAX = 15000;
 
+// Salimos acá en vez de lanzar: esto se evalúa al importar el módulo, antes
+// de que index.mjs pueda atajar nada, y un volcado de pila no le dice a nadie
+// qué tiene que hacer.
 if (!process.env.DATABASE_URL) {
-  throw new Error('Falta DATABASE_URL (ver .env.ejemplo)');
+  console.error('Falta DATABASE_URL.');
+  console.error('');
+  console.error('  cp .env.ejemplo .env     y completá la cadena de conexión');
+  console.error('');
+  console.error('En un host (Railway, Render, Fly) va como variable de entorno.');
+  process.exit(1);
 }
 
 /**
