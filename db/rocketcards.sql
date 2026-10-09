@@ -422,10 +422,9 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA rocketcards
 ALTER DEFAULT PRIVILEGES IN SCHEMA rocketcards
   GRANT USAGE, SELECT ON SEQUENCES TO rocketcards_app;
 
--- Cinturón y tiradores. El esquema no está expuesto por PostgREST, así que
--- anon y authenticated no deberían poder llegar igual; esto lo deja escrito
--- por si alguien agrega "rocketcards" a la lista de esquemas expuestos sin
--- leer el encabezado de este archivo.
+-- Primera barrera: anon y authenticated no tienen ningún privilegio acá.
+-- Aunque el esquema esté en la lista de expuestos de PostgREST, sin USAGE
+-- sobre el esquema la API responde "permission denied" y no se ve nada.
 DO $$
 BEGIN
   IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon') THEN
@@ -438,6 +437,33 @@ BEGIN
     REVOKE ALL ON ALL TABLES IN SCHEMA rocketcards FROM authenticated;
     REVOKE ALL ON ALL FUNCTIONS IN SCHEMA rocketcards FROM authenticated;
   END IF;
+END
+$$;
+
+-- Segunda barrera: RLS en todas las tablas, con una sola política que deja
+-- entrar a rocketcards_app y a nadie más.
+--
+-- Los permisos de arriba alcanzan hoy. Esto es para mañana: si alguien algún
+-- día corre un "GRANT ALL ... TO anon" —a mano, o copiando una receta de
+-- internet para poder leer el catálogo desde supabase-js— los permisos dejan
+-- de frenar nada y RLS sigue en pie. Sin política, ningún rol que no sea el
+-- dueño de la tabla ve una sola fila.
+--
+-- El dueño (postgres) no pasa por RLS: por eso el panel de Supabase y las
+-- migraciones siguen funcionando igual.
+
+DO $$
+DECLARE
+  t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['producto', 'categoria', 'admin', 'sesion', 'auditoria', 'version']
+  LOOP
+    EXECUTE format('ALTER TABLE rocketcards.%I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('DROP POLICY IF EXISTS app_total ON rocketcards.%I', t);
+    EXECUTE format(
+      'CREATE POLICY app_total ON rocketcards.%I FOR ALL TO rocketcards_app USING (true) WITH CHECK (true)',
+      t);
+  END LOOP;
 END
 $$;
 

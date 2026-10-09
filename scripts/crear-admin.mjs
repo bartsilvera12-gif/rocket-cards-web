@@ -9,7 +9,7 @@
 // Si el usuario ya existe, le cambia la contraseña.
 
 import { createInterface } from 'node:readline';
-import { hashear } from '../server/auth.mjs';
+import { hashear, permitido, PERMITIDOS } from '../server/auth.mjs';
 import { consultar, cerrar } from '../server/db.mjs';
 
 const args = process.argv.slice(2);
@@ -18,9 +18,17 @@ const esDueno = args.includes('--dueno');
 const iNombre = args.indexOf('--nombre');
 const nombre = iNombre >= 0 ? (args[iNombre + 1] || '') : '';
 
-if (!usuario || !/^[a-z0-9._-]{3,40}$/.test(usuario)) {
+if (!usuario || !/^[a-z0-9._+@-]{3,120}$/.test(usuario)) {
   console.error('Uso: node scripts/crear-admin.mjs <usuario> [--dueno] [--nombre "Karen"]');
-  console.error('El usuario va en minúsculas: letras, números, punto, guion o guion bajo.');
+  console.error('El usuario va en minúsculas. Puede ser un email.');
+  process.exit(1);
+}
+
+// Crear a alguien que después no va a poder entrar es sólo confusión.
+if (!permitido(usuario)) {
+  console.error('"' + usuario + '" no está en ADMIN_PERMITIDOS, así que no podría entrar al panel.');
+  console.error('Hoy la lista es: ' + [...PERMITIDOS].join(', '));
+  console.error('Agregalo en el .env y volvé a intentar.');
   process.exit(1);
 }
 

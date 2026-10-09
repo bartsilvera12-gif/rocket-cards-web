@@ -207,9 +207,11 @@ async function login(req, res, cuerpo, seguro) {
   const a = rows[0];
   // Verificamos igual con un hash de descarte cuando el usuario no existe,
   // para que "usuario inexistente" y "contraseña incorrecta" tarden lo mismo.
+  // Por la misma razón el que no está en la lista blanca pasa por acá en vez
+  // de salir antes: si no, se notaría la diferencia en el tiempo de respuesta.
   const ok = await auth.verificar(clave, a ? a.hash : 'scrypt$16384$8$1$00$00');
 
-  if (!a || !ok) {
+  if (!a || !ok || !auth.permitido(usuario)) {
     auth.anotarFallo(llave);
     throw new ErrorHttp(401, 'Usuario o contraseña incorrectos');
   }
@@ -372,8 +374,16 @@ async function listarUsuarios(res) {
 }
 
 async function crearUsuario(cuerpo, res) {
-  const usuario = texto(cuerpo.usuario || '', 'usuario', 3, 40).toLowerCase();
-  if (!/^[a-z0-9._-]+$/.test(usuario)) throw malPedido('El usuario admite letras, números, punto, guion y guion bajo');
+  const usuario = texto(cuerpo.usuario || '', 'usuario', 3, 120).toLowerCase();
+  if (!/^[a-z0-9._+@-]+$/.test(usuario)) {
+    throw malPedido('El usuario admite letras, números, arroba, punto, más, guion y guion bajo');
+  }
+  // Crear a alguien que después no va a poder entrar es sólo confusión.
+  if (!auth.permitido(usuario)) {
+    throw new ErrorHttp(403,
+      'Ese usuario no está en ADMIN_PERMITIDOS, así que no podría entrar. ' +
+      'Agregalo ahí primero (hoy: ' + [...auth.PERMITIDOS].join(', ') + ').');
+  }
   const rol = cuerpo.rol === 'dueno' ? 'dueno' : 'editor';
   const nombre = cuerpo.nombre ? texto(cuerpo.nombre, 'nombre', 1, 120) : '';
   let hash;

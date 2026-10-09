@@ -15,6 +15,26 @@ const COOKIE = 'rc_admin';
 const DURACION_H = 12;
 const RENOVAR_SI_QUEDA_MENOS_DE_H = 6;
 
+// ── Quién puede entrar al panel ──────────────────────────────────────────
+//
+// Una lista blanca, aparte de la tabla admin. Que exista una fila en la base
+// no alcanza: el usuario tiene que estar acá también. Así, si alguien llega a
+// insertar un admin en la tabla, igual no entra.
+//
+// Se revisa en el login y también al validar cada sesión, así sacar a alguien
+// de la lista lo echa en el acto en vez de esperar a que venza su cookie.
+
+export const PERMITIDOS = new Set(
+  (process.env.ADMIN_PERMITIDOS || 'admin@rocketcards.com')
+    .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+);
+
+if (!PERMITIDOS.size) {
+  throw new Error('ADMIN_PERMITIDOS quedó vacío: así no entra nadie al panel');
+}
+
+export const permitido = (usuario) => PERMITIDOS.has(String(usuario || '').trim().toLowerCase());
+
 // ── Contraseñas ──────────────────────────────────────────────────────────
 
 export async function hashear(clave) {
@@ -99,6 +119,11 @@ export async function adminDe(id) {
   );
   if (!rows.length) return null;
   const a = rows[0];
+  // Sacar a alguien de la lista lo echa ya, sin esperar a que venza su cookie.
+  if (!permitido(a.usuario)) {
+    await consultar('DELETE FROM sesion WHERE id = $1', [id]).catch(() => {});
+    return null;
+  }
   const quedan = (new Date(a.expira_en) - Date.now()) / 3600_000;
   if (quedan < RENOVAR_SI_QUEDA_MENOS_DE_H) {
     await consultar(

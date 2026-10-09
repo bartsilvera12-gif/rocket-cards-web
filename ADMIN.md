@@ -72,9 +72,34 @@ contraseña y identificadores de sesión, y en `public` serían legibles con la
 clave anónima del proyecto aunque nosotros nunca usemos la API REST. Como
 PostgREST directamente no ve el esquema, no hace falta RLS para taparlo.
 
-Si algún día querés leer `producto` desde `supabase-js`, **no agregues
-`rocketcards` a los esquemas expuestos**: hacé una vista en `public` con los
-campos públicos y ponele RLS.
+### Si el esquema quedó expuesto en PostgREST
+
+Exponerlo no abre nada por sí solo: `anon` y `authenticated` no tienen ni
+`USAGE` sobre el esquema, así que la API responde `permission denied`.
+Comprobalo:
+
+```sql
+select has_schema_privilege('anon','rocketcards','USAGE')          as anon_usa,
+       has_schema_privilege('authenticated','rocketcards','USAGE') as auth_usa;
+
+select grantee, table_name, privilege_type
+  from information_schema.role_table_grants
+ where table_schema = 'rocketcards' and grantee in ('anon','authenticated');
+```
+
+Lo sano es `false, false` y cero filas. Si sale otra cosa, volvé a correr
+`db/rocketcards.sql`: revoca esos permisos.
+
+Encima de eso hay RLS en las seis tablas, con una sola política que deja
+entrar a `rocketcards_app`. Es para el día que alguien corra un
+`GRANT ALL … TO anon` copiando una receta de internet: los permisos dejarían
+de frenar, RLS no.
+
+Aun así, **si no lo necesitás, sacalo de los esquemas expuestos**
+(Settings → API → Exposed schemas). Nada de lo nuestro usa PostgREST. Y si
+alguna vez querés leer `producto` desde `supabase-js`, hacé una vista en
+`public` con los campos públicos y ponele RLS, en vez de exponer el esquema
+entero.
 
 ### 2. Ponerle contraseña al rol
 
@@ -130,7 +155,7 @@ certificado desde Settings → Database → SSL y apuntá `DB_SSL_CA` ahí.
 ### 5. Crear el primer usuario
 
 ```bash
-npm run admin:crear -- karen --dueno --nombre "Karen"
+npm run admin:crear -- admin@rocketcards.com --dueno --nombre "Rocket Cards"
 ```
 
 Pide la contraseña por teclado y no la muestra mientras la escribís. No se
@@ -139,6 +164,13 @@ shell y en la lista de procesos de la máquina.
 
 El rol `dueno` puede todo, incluso ver y crear usuarios. `editor` sólo toca el
 catálogo.
+
+**Sólo entra quien esté en `ADMIN_PERMITIDOS`** (por omisión,
+`admin@rocketcards.com`). Es una lista blanca aparte de la tabla: que exista
+la fila en la base no alcanza. Se revisa en el login y también al validar cada
+sesión, así sacar a alguien de la lista lo echa en el acto en vez de esperar a
+que venza su cookie. El script de arriba se niega a crear un usuario que no
+esté en la lista, para no dejarte una cuenta que después no entra.
 
 ### 6. Levantar
 
@@ -218,6 +250,8 @@ servirse del mismo proceso, que es lo que hace `npm start`.
 - El rol `rocketcards_app` no es dueño de nada: no puede borrar tablas ni
   cambiar el esquema, y sobre `auditoria` sólo puede insertar y leer, no
   reescribir el historial.
+- Al panel sólo entra quien esté en `ADMIN_PERMITIDOS`, además de tener fila
+  en la tabla `admin`.
 - Todo fuera de `public`, así PostgREST no lo publica. Además el script le
   revoca explícitamente los permisos a `anon` y `authenticated`, por si
   alguien agrega el esquema a la lista de expuestos sin leer la advertencia.
