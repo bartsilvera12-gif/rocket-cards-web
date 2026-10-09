@@ -152,6 +152,38 @@ configurar nada: `node-postgres` no cifra solo aunque la cadena diga
 conectar aparece `self-signed certificate in certificate chain`, bajá el
 certificado desde Settings → Database → SSL y apuntá `DB_SSL_CA` ahí.
 
+### 4b. Comprobar que la conexión sirve
+
+```bash
+npm run db:probar
+```
+
+Revisa en orden: que conecte, que vaya cifrada, que el esquema exista, que
+`catalogo()` responda, que haya un usuario del panel, y —la que importa— que
+**LISTEN/NOTIFY funcione**. Con el pooler en modo transacción todo lo demás
+pasa igual y sólo falla esa, que es justo la que hace que la tienda se entere
+de los cambios.
+
+Nunca muestra la contraseña: la cadena sale con la clave tapada.
+
+#### Supabase propio (self-hosted)
+
+Si Supabase corre en tu servidor y lo publicás por un dominio detrás de
+Cloudflare, **el puerto de Postgres no se alcanza desde afuera**: Cloudflare
+proxea HTTP y HTTPS, no TCP cualquiera. La API REST responde, la base no.
+
+Lo más simple es correr este servidor **en la misma máquina que Supabase**, y
+apuntar a la base por la red interna:
+
+```
+DATABASE_URL=postgresql://rocketcards_app:CLAVE@localhost:5432/postgres
+```
+
+o, si va en el mismo `docker compose` que Supabase, por el nombre del servicio
+(`@db:5432`). Si en cambio el servidor va en otro lado, necesitás un nombre
+que llegue directo a la base —un registro DNS sin proxear, con el firewall
+abierto sólo para la IP de ese servidor— o un túnel.
+
 ### 5. Crear el primer usuario
 
 ```bash

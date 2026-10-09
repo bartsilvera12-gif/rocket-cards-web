@@ -9,7 +9,8 @@
     "prestart": "node scripts/build.mjs",
     "start": "node --env-file-if-exists=.env server/index.mjs",
     "admin:crear": "node --env-file-if-exists=.env scripts/crear-admin.mjs",
-    "db:semilla": "node scripts/exportar-semilla.mjs"
+    "db:semilla": "node scripts/exportar-semilla.mjs",
+    "db:probar": "node --env-file-if-exists=.env scripts/probar-base.mjs"
   },
   "dependencies": {
     "pg": "8.13.1"
