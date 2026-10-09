@@ -1,0 +1,1743 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="/support.js"></script>
+<script type="module" src="/reveal.js"></script>
+<!-- Catálogo en vivo desde Supabase. Si estos dos no cargan, la página
+     funciona igual con el catálogo escrito más abajo. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.10/dist/umd/supabase.js" defer></script>
+<script src="/rocketcards-config.js" defer></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rocket Cards — Pokémon TCG, singles, sellados y accesorios</title>
+<meta name="description" content="Rocket Cards: tienda especializada en cartas Pokémon TCG, singles, productos sellados y accesorios para coleccionistas en Paraguay." />
+<link rel="icon" href="/favicon.ico" sizes="32x32" />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<link rel="manifest" href="/site.webmanifest" />
+<meta name="theme-color" content="#050505" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800;900&family=Poppins:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #050505; }
+  body { font-family: 'Poppins', system-ui, sans-serif; color: #F5F5F5; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  a { color: #F5F5F5; text-decoration: none; transition: color .18s ease; }
+  a:hover { color: #FF1A27; }
+  button { font-family: inherit; }
+  input, select { font-family: inherit; }
+  ::selection { background: #E30613; color: #fff; }
+  ::-webkit-scrollbar { height: 8px; width: 10px; }
+  ::-webkit-scrollbar-track { background: #0D0D0D; }
+  ::-webkit-scrollbar-thumb { background: #242424; border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: #E30613; }
+  /* ── Responsive ──────────────────────────────────────────────── */
+  /* El buscador no puede comprimirse hasta desaparecer: por debajo de
+     620px baja a su propia fila en vez de quedar en 4px de ancho. */
+  #dc-root [data-hdr-search] { flex: 1 1 190px; min-width: 190px; }
+  #dc-root [data-hdr-searchbtn] { display: none; }
+  @media (max-width: 620px) {
+    /* El campo de búsqueda se colapsa en una lupa: ocupaba una fila entera
+       del header para algo que casi nadie usa al entrar. Al tocarla baja
+       a su propia fila, a ancho completo. */
+    #dc-root [data-hdr-searchbtn] { display: grid; }
+    #dc-root [data-hdr-search] { order: 3; flex: 1 1 100%; min-width: 0; }
+    #dc-root [data-hdr-search][data-open="0"] { display: none; }
+    /* Carrito y menú contra el borde derecho, no pegados al logo. */
+    #dc-root [data-hdr-logo] { margin-right: auto; }
+  }
+  /* Las cartas del hero se tocan para traerlas al frente, así que no deben
+     comportarse como texto: sin resaltado azul del navegador ni selección. */
+  #dc-root [data-rot] {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none; user-select: none;
+  }
+  #dc-root [data-rot] img { -webkit-user-drag: none; pointer-events: none; }
+  /* Los dos botones del hero, lado a lado también en el teléfono. */
+  @media (max-width: 480px) {
+    #dc-root [data-hero-cta] { flex-wrap: nowrap; gap: 8px; }
+    #dc-root [data-hero-cta] a {
+      padding: 12px 14px !important;
+      font-size: 12.5px !important;
+      letter-spacing: .07em !important;
+    }
+  }
+  /* Área táctil: los enlaces de lista medían 20px de alto. */
+  footer a { display: inline-block; padding: 6px 0; }
+  footer [style*="flex-direction:column"] { gap: 1px !important; }
+  /* En pantallas chicas el pie pasa a dos columnas antes que a cuatro. */
+  /* A 768px el auto-fit daba 3 columnas y dejaba una huérfana abajo. */
+  @media (max-width: 900px) {
+    #dc-root footer [style*="repeat(auto-fit"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  }
+  @media (max-width: 420px) {
+    #dc-root footer [style*="repeat(auto-fit"] { grid-template-columns: minmax(0, 1fr) !important; }
+  }
+
+  @keyframes rc-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+  @keyframes rc-fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes rc-slide-in { from { transform: translateX(100%); } to { transform: none; } }
+  @keyframes rc-toast { 0% { opacity: 0; transform: translateY(14px); } 12% { opacity: 1; transform: none; } 88% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(14px); } }
+  @keyframes rc-shimmer { from { background-position: -420px 0; } to { background-position: 420px 0; } }
+  @keyframes rc-pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+  @keyframes rc-grid { from { background-position: 0 0, 0 0; } to { background-position: 64px 64px, 64px 64px; } }
+  @keyframes rc-sweep { 0% { transform: translate3d(-12%, -6%, 0) scale(1); } 50% { transform: translate3d(10%, 6%, 0) scale(1.12); } 100% { transform: translate3d(-12%, -6%, 0) scale(1); } }
+  @keyframes rc-sweep-b { 0% { transform: translate3d(14%, 8%, 0) scale(1.08); } 50% { transform: translate3d(-8%, -4%, 0) scale(1); } 100% { transform: translate3d(14%, 8%, 0) scale(1.08); } }
+  @keyframes rc-scanline { from { transform: translateY(-120%); } to { transform: translateY(820%); } }
+  @keyframes rc-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  @keyframes rc-deal { from { opacity: 0; transform: translateY(70px) rotate(0deg); } }
+</style>
+</helmet>
+
+<div style="background:#050505;min-height:100vh">
+
+  <header style="position:sticky;top:0;z-index:60;isolation:isolate;background:rgba(5,5,5,.94);backdrop-filter:blur(14px);border-bottom:1px solid #1a1a1a">
+    <div style="max-width:1400px;margin:0 auto;padding:12px clamp(14px,3vw,32px);display:flex;flex-wrap:wrap;align-items:center;gap:clamp(10px,2vw,28px) clamp(12px,2vw,28px)">
+
+      <a href="#top" data-hdr-logo="" style="display:flex;align-items:center;gap:10px;flex:0 0 auto">
+        <img src="/assets/rocket-logo.webp" alt="Rocket Cards" width="44" height="44" fetchpriority="high" decoding="async" style="width:44px;height:44px;display:block" />
+        <span style="display:flex;flex-direction:column;line-height:.92">
+          <span style="font-family:'Saira Condensed',sans-serif;font-weight:900;font-size:19px;letter-spacing:.01em;font-style:italic">ROCKET</span>
+          <span style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:.42em;color:#E30613">CARDS</span>
+        </span>
+      </a>
+
+      <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+        <nav style="display:flex;align-items:center;gap:clamp(12px,1.6vw,26px);flex:0 0 auto">
+          <a href="#top" onClick="{{ goHome }}" style="font-family:'Saira Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:.1em;text-transform:uppercase">Inicio</a>
+          <div onMouseEnter="{{ openCatMenu }}" onMouseLeave="{{ closeCatMenu }}" style="position:relative;padding:14px 0;margin:-14px 0">
+            <a href="#top" onClick="{{ openCatalog }}" style="display:flex;align-items:center;gap:7px;font-family:'Saira Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:{{ catMenuColor }}">
+              Catálogo
+              <svg width="9" height="6" viewBox="0 0 9 6" fill="none" aria-hidden="true"><path d="M1 1.4 4.5 4.6 8 1.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+            </a>
+
+          </div>
+          <a href="#contacto" onClick="{{ goContacto }}" style="font-family:'Saira Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:.1em;text-transform:uppercase">Contacto</a>
+        </nav>
+      </sc-if>
+
+      <div data-hdr-search="" data-open="{{ mSearchOpen }}" style="position:relative">
+        <div style="display:flex;align-items:center;gap:10px;background:#101010;border:1px solid #1f1f1f;border-radius:3px;padding:0 12px;height:44px;transition:border-color .2s ease" style-focus="border-color:#E30613">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" style="flex:0 0 auto"><circle cx="7" cy="7" r="5" stroke="#A7A7A7" stroke-width="1.8"></circle><line x1="10.8" y1="10.8" x2="15" y2="15" stroke="#A7A7A7" stroke-width="1.8" stroke-linecap="round"></line></svg>
+          <input value="{{ q }}" onInput="{{ onSearch }}" onFocus="{{ onSearchFocus }}" placeholder="Buscar carta, Pokémon, colección, N° o SKU…" aria-label="Buscar productos" style="flex:1;min-width:0;background:transparent;border:0;outline:none;color:#F5F5F5;font-size:14px;font-weight:500;height:100%" />
+          <sc-if value="{{ hasQuery }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ clearSearch }}" aria-label="Limpiar búsqueda" style="background:transparent;border:0;color:#A7A7A7;cursor:pointer;font-size:18px;line-height:1;padding:4px">×</button>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{ searchOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;top:52px;left:0;right:0;background:#0D0D0D;border:1px solid #1f1f1f;border-radius:3px;box-shadow:0 24px 60px rgba(0,0,0,.8);overflow:hidden;animation:rc-fade .16s ease;z-index:70">
+            <sc-if value="{{ searching }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:14px">
+                <sc-for list="{{ skeletons }}" as="s" hint-placeholder-count="3">
+                  <div style="display:flex;gap:12px;align-items:center;padding:8px 0">
+                    <div style="width:44px;height:60px;background:linear-gradient(90deg,#121212 0,#1c1c1c 40%,#121212 80%);background-size:420px 100%;animation:rc-shimmer 1.1s linear infinite;border-radius:2px"></div>
+                    <div style="flex:1;display:flex;flex-direction:column;gap:7px">
+                      <div style="height:11px;width:62%;background:#161616;border-radius:2px"></div>
+                      <div style="height:9px;width:38%;background:#141414;border-radius:2px"></div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ showResults }}" hint-placeholder-val="{{ false }}">
+              <div>
+                <sc-for list="{{ results }}" as="r" hint-placeholder-count="4">
+                  <a href="#top" onClick="{{ r.open }}" style="display:flex;gap:12px;align-items:center;padding:11px 14px;border-bottom:1px solid #151515" style-hover="background:#141414">
+                    <img src="{{ r.img }}" alt="{{ r.name }}" loading="lazy" decoding="async" style="width:52px;height:52px;flex:0 0 auto;object-fit:contain;border:1px solid #1d1d1d;background:#0A0A0A;padding:3px" />
+                    <div style="flex:1;min-width:0">
+                      <div style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</div>
+                      <div style="font-size:12px;color:#A7A7A7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.set }}</div>
+                    </div>
+                    <div style="text-align:right;flex:0 0 auto">
+                      <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:16px">{{ r.priceLabel }}</div>
+                      <div style="font-size:11px;color:#A7A7A7">{{ r.stockLabel }}</div>
+                    </div>
+                  </a>
+                </sc-for>
+                <a href="#top" onClick="{{ openCatalog }}" style="display:block;padding:13px 14px;text-align:center;font-family:'Saira Condensed',sans-serif;font-weight:800;letter-spacing:.14em;text-transform:uppercase;font-size:13px;color:#E30613">Ver todos los resultados</a>
+              </div>
+            </sc-if>
+            <sc-if value="{{ noResults }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:34px 20px;text-align:center">
+                <div style="font-family:'Saira Condensed',sans-serif;font-size:19px;font-weight:800;text-transform:uppercase;letter-spacing:.06em">Sin resultados</div>
+                <div style="font-size:13px;color:#A7A7A7;margin-top:6px">No encontramos nada para “{{ q }}”. Probá con el nombre del Pokémon o la colección.</div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+      </div>
+
+      <div data-hdr-actions="" style="display:flex;align-items:center;gap:8px;flex:0 0 auto">
+        <button onClick="{{ toggleSearch }}" data-hdr-searchbtn="" aria-label="Buscar" aria-expanded="{{ mSearchExpanded }}" style="width:44px;height:44px;background:#101010;border:1px solid #1f1f1f;cursor:pointer;border-radius:3px;color:#F5F5F5;place-items:center;transition:border-color .18s ease" style-hover="border-color:#E30613">
+          <svg width="17" height="17" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.8"></circle><line x1="10.8" y1="10.8" x2="15" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line></svg>
+        </button>
+        <button onClick="{{ openCart }}" aria-label="Abrir carrito" style="position:relative;display:flex;align-items:center;gap:9px;background:#101010;border:1px solid #1f1f1f;color:#F5F5F5;height:44px;padding:0 14px;cursor:pointer;border-radius:3px;transition:border-color .2s ease,background .2s ease" style-hover="border-color:#E30613;background:#151515">
+          <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden="true" style="display:block"><path d="M5.2 5.2V4a3.3 3.3 0 0 1 6.6 0v1.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path><rect x="2.6" y="5.2" width="11.8" height="9.6" rx="1" stroke="currentColor" stroke-width="1.6"></rect></svg>
+          <span style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:15px;letter-spacing:.06em">{{ cartCount }}</span>
+        </button>
+        <sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ toggleMenu }}" aria-label="Menú" style="width:44px;height:44px;background:#101010;border:1px solid #1f1f1f;cursor:pointer;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+            <span style="width:17px;height:2px;background:#F5F5F5;display:block"></span>
+            <span style="width:17px;height:2px;background:#F5F5F5;display:block"></span>
+            <span style="width:11px;height:2px;background:#E30613;display:block;align-self:flex-start;margin-left:13px"></span>
+          </button>
+        </sc-if>
+      </div>
+    </div>
+
+
+    <sc-if value="{{ catMenuOpen }}" hint-placeholder-val="{{ false }}">
+      <div onMouseEnter="{{ openCatMenu }}" onMouseLeave="{{ closeCatMenu }}" style="position:absolute;top:100%;left:0;right:0;border-top:1px solid #1a1a1a;border-bottom:1px solid #1a1a1a;background:rgba(10,10,10,.98);backdrop-filter:blur(14px);box-shadow:0 28px 60px rgba(0,0,0,.7);z-index:80;animation:rc-fade .16s ease">
+        <div style="max-width:1400px;margin:0 auto;padding:clamp(26px,3vw,44px) clamp(14px,3vw,32px);display:grid;grid-template-columns:minmax(200px,1fr) minmax(180px,.8fr) minmax(300px,1.5fr);gap:clamp(24px,3vw,56px);align-items:start">
+          <div>
+            <div style="font-family:'Poppins',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:.26em;text-transform:uppercase;color:#C9A227;margin-bottom:18px">Categorías</div>
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <sc-for list="{{ megaCats }}" as="cat" hint-placeholder-count="3">
+                <a href="#top" onClick="{{ cat.go }}" onMouseEnter="{{ cat.hover }}" style="font-family:'Saira Condensed',sans-serif;font-weight:700;text-transform:uppercase;font-size:clamp(19px,1.6vw,24px);letter-spacing:.03em;line-height:1.35;color:{{ cat.color }};transition:color .16s ease,transform .16s ease" style-hover="color:#FF1A27;transform:translateX(4px)">{{ cat.name }}</a>
+              </sc-for>
+            </div>
+          </div>
+          <div>
+            <div style="font-family:'Poppins',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:.26em;text-transform:uppercase;color:#C9A227;margin-bottom:18px">Más</div>
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <a href="#nuevos" onClick="{{ goNuevos }}" style="font-size:14px;color:#A7A7A7;padding:7px 0;display:inline-block">Nuevos ingresos</a>
+              <a href="#contacto" onClick="{{ goContacto }}" style="font-size:14px;color:#A7A7A7;padding:7px 0;display:inline-block">Pedidos especiales</a>
+            </div>
+          </div>
+          <a href="#top" onClick="{{ openCatalog }}" style="position:relative;display:block;min-height:clamp(180px,16vw,240px);overflow:hidden;border:1px solid #1f1f1f">
+            <span style="position:absolute;inset:0;background-color:#0C0C0C;background-image:{{ megaImageCss }};background-size:cover;background-position:center"></span>
+            <span style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(5,5,5,.9) 0%,rgba(5,5,5,.15) 70%)"></span>
+            <span style="position:absolute;left:clamp(16px,1.6vw,24px);bottom:clamp(16px,1.6vw,24px);font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:14px;letter-spacing:.2em;text-transform:uppercase;color:#F5F5F5;border-bottom:1px solid #E30613;padding-bottom:4px">Ver todo el catálogo</span>
+          </a>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+      <nav style="position:absolute;top:100%;left:0;right:0;z-index:70;border-top:1px solid #1a1a1a;background:#0D0D0D;box-shadow:0 28px 60px rgba(0,0,0,.72);max-height:calc(100vh - 100%);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px clamp(14px,3vw,32px) 18px;display:flex;flex-direction:column;animation:rc-fade .18s ease">
+        <a href="#top" onClick="{{ goHome }}" style="padding:13px 0;border-bottom:1px solid #151515;font-family:'Saira Condensed',sans-serif;font-size:17px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Inicio</a>
+        <a href="#top" onClick="{{ openCatalog }}" style="padding:13px 0;border-bottom:1px solid #151515;font-family:'Saira Condensed',sans-serif;font-size:17px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Catálogo completo</a>
+        <sc-for list="{{ catFeatured }}" as="cat" hint-placeholder-count="3">
+          <a href="#top" onClick="{{ cat.go }}" style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid #151515">
+            <span style="width:44px;height:44px;flex:0 0 auto;border:1px solid #1f1f1f;background-color:#0A0A0A;background-image:{{ cat.imgCss }};background-size:contain;background-position:center;background-repeat:no-repeat;display:block"></span>
+            <span style="flex:1;min-width:0">
+              <span style="display:block;font-family:'Saira Condensed',sans-serif;font-size:16px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;line-height:1.15">{{ cat.name }}</span>
+              <span style="display:block;font-size:11.5px;color:#A7A7A7;margin-top:2px">{{ cat.countLabel }}</span>
+            </span>
+          </a>
+        </sc-for>
+        <a href="#contacto" onClick="{{ goContacto }}" style="padding:13px 0;border-bottom:1px solid #151515;font-family:'Saira Condensed',sans-serif;font-size:17px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Contacto</a>
+      </nav>
+    </sc-if>
+  </header>
+
+  <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+  <!-- HERO -->
+  <section id="top" style="padding:clamp(10px,1.6vw,20px) clamp(10px,1.6vw,20px) 0;background:#050505">
+    <div style="position:relative;overflow:hidden;border-radius:clamp(14px,1.8vw,26px);background:#0A0A0A;border:1px solid #1a1a1a;min-height:clamp(430px,58vh,760px);display:flex;flex-direction:column">
+      <div style="position:absolute;inset:0;overflow:hidden;pointer-events:none">
+        <div style="position:absolute;inset:-20%;background:radial-gradient(circle at 30% 30%,rgba(227,6,19,.17) 0%,rgba(227,6,19,0) 58%);animation:rc-sweep 22s ease-in-out infinite;will-change:transform"></div>
+        <div style="position:absolute;inset:-20%;background:radial-gradient(circle at 70% 60%,rgba(201,162,39,.11) 0%,rgba(201,162,39,0) 55%);animation:rc-sweep-b 28s ease-in-out infinite;will-change:transform"></div>
+        <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:64px 64px;animation:rc-grid 7s linear infinite;will-change:background-position"></div>
+        <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 42%,rgba(10,10,10,0) 30%,rgba(10,10,10,.75) 100%)"></div>
+        <div style="position:absolute;left:0;right:0;top:0;height:12%;background:linear-gradient(180deg,rgba(227,6,19,0),rgba(227,6,19,.07),rgba(227,6,19,0));animation:rc-scanline 11s linear infinite;will-change:transform"></div>
+      </div>
+
+      <div style="position:relative;z-index:3;padding:clamp(18px,2.2vw,30px) clamp(18px,5vw,40px) 0;display:flex;flex-direction:column;align-items:center;text-align:center;gap:clamp(8px,.9vw,11px)">
+        <h1 style="margin:0;font-family:'Saira Condensed',sans-serif;font-weight:900;text-transform:uppercase;font-size:clamp(26px,3.6vw,46px);line-height:.98;max-width:18ch;animation:rc-rise .8s cubic-bezier(.2,.7,.2,1) .18s backwards">
+          Hacé crecer tu<br /><span style="font-style:italic;color:#E30613">colección</span>.
+        </h1>
+        <p style="margin:clamp(8px,1.2vw,14px) 0 0;max-width:470px;position:relative;z-index:4;font-size:clamp(12.5px,1.2vw,14.5px);line-height:1.6;color:#A7A7A7;text-wrap:pretty;animation:rc-rise .8s cubic-bezier(.2,.7,.2,1) .26s backwards">
+          Productos sellados, sobres y Elite Trainer Box originales para verdaderos coleccionistas.
+        </p>
+        <div data-hero-cta="" style="display:flex;flex-wrap:wrap;gap:11px;justify-content:center;animation:rc-rise .8s cubic-bezier(.2,.7,.2,1) .34s backwards">
+          <a href="#top" onClick="{{ openCatalog }}" style="background:#E30613;color:#fff;font-family:'Saira Condensed',sans-serif;font-weight:800;letter-spacing:.14em;text-transform:uppercase;font-size:14px;padding:13px 26px;border-radius:999px;white-space:nowrap;transition:background .18s ease,transform .18s ease" style-hover="background:#FF1A27;color:#fff;transform:translateY(-2px)">Explorar cartas →</a>
+          <a href="#nuevos" style="border:1px solid rgba(201,162,39,.55);color:#C9A227;font-family:'Saira Condensed',sans-serif;font-weight:800;letter-spacing:.14em;text-transform:uppercase;font-size:14px;padding:13px 26px;border-radius:999px;white-space:nowrap;transition:border-color .18s ease,background .18s ease,color .18s ease" style-hover="border-color:#C9A227;background:#17120a;color:#E8C659">Nuevos ingresos</a>
+        </div>
+      </div>
+
+      <div style="position:relative;flex:1;min-height:clamp(300px,41vw,560px);margin-top:clamp(6px,1vw,14px)">
+        <div style="position:absolute;left:0;right:0;bottom:0;height:clamp(60px,8vw,110px);background:linear-gradient(180deg,rgba(10,10,10,0),#0A0A0A 85%);z-index:4;pointer-events:none"></div>
+
+        <div style="position:absolute;left:0;right:0;bottom:clamp(26px,4.5vw,64px);display:flex;align-items:flex-end;justify-content:center;z-index:3">
+          <sc-for list="{{ heroCards }}" as="c" hint-placeholder-count="5">
+            <div onClick="{{ heroTap }}" onMouseEnter="{{ heroEnter }}" onMouseLeave="{{ heroLeave }}" data-rot="{{ c.rot }}" data-lift="{{ c.lift }}" data-z="{{ c.z }}" style="width:{{ c.w }};flex:0 0 auto;margin:0 clamp(-30px,-2.2vw,-26px);aspect-ratio:2.5/3.5;border-radius:7px;overflow:hidden;pointer-events:auto;cursor:pointer;box-shadow:0 26px 52px rgba(0,0,0,.92);transform:rotate({{ c.rot }}) translateY({{ c.lift }});z-index:{{ c.z }};transition:transform .34s cubic-bezier(.2,.7,.2,1),box-shadow .34s ease;animation:rc-deal .9s cubic-bezier(.2,.7,.2,1) backwards;animation-delay:{{ c.delay }}">
+              <img src="{{ c.src }}" alt="{{ c.alt }}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block" />
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CATEGORÍAS -->
+  <section id="categorias" style="max-width:1400px;margin:0 auto;padding:clamp(52px,7vw,96px) clamp(16px,3vw,32px)">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:clamp(20px,3vw,34px)">
+      <div>
+        <div style="font-family:'Poppins',sans-serif;font-weight:600;font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:#C9A227;margin-bottom:8px">01 — Explorar</div>
+        <h2 style="margin:0;font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;font-size:clamp(28px,4vw,46px);line-height:1;letter-spacing:.01em">Categorías</h2>
+      </div>
+      <a href="#top" onClick="{{ openCatalog }}" style="font-family:'Saira Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#A7A7A7;padding:10px 0;display:inline-block">Ver catálogo completo →</a>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,268px),1fr));gap:clamp(10px,1.2vw,16px)">
+      <sc-for list="{{ catFeatured }}" as="cat" hint-placeholder-count="3">
+        <a href="#top" onClick="{{ cat.go }}" onMouseEnter="{{ cardEnter }}" onMouseMove="{{ cardMove }}" onMouseLeave="{{ cardLeave }}" style-after="content:'';position:absolute;inset:0;padding:1.5px;background:radial-gradient(var(--glow-radius,240px) circle at var(--glow-x,50%) var(--glow-y,50%),rgba(227,6,19,calc(var(--glow-intensity,0) * 0.95)) 0%,rgba(227,6,19,calc(var(--glow-intensity,0) * 0.45)) 32%,transparent 62%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none;border-radius:inherit;z-index:3;transition:opacity .3s ease" style="position:relative;display:flex;flex-direction:column;justify-content:flex-end;min-height:clamp(230px,26vw,320px);border:1px solid #1c1c1c;background:#0D0D0D;overflow:hidden;transition:border-color .22s ease" style-hover="color:#F5F5F5">
+          <div data-img="" role="img" aria-label="{{ cat.name }}" style="position:absolute;inset:0;background-color:#0C0C0C;background-image:{{ cat.imgCss }};background-size:cover;background-position:center 28%;filter:brightness(.58) contrast(1.06) saturate(.92);transition:transform .5s cubic-bezier(.2,.7,.2,1)"></div>
+          <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,5,5,.3) 0%,rgba(5,5,5,.62) 42%,rgba(5,5,5,.95) 78%,#050505 100%)"></div>
+          <div style="position:relative;padding:clamp(18px,2.2vw,26px)">
+            <div style="display:flex;align-items:center;gap:9px;margin-bottom:9px">
+              <span style="width:20px;height:2px;background:{{ cat.accent }};display:block"></span>
+              <span style="font-family:'Poppins',sans-serif;font-weight:600;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:{{ cat.accent }}">{{ cat.kicker }}</span>
+            </div>
+            <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;font-size:clamp(24px,3vw,34px);line-height:1;letter-spacing:.01em">{{ cat.name }}</div>
+            <div style="display:flex;align-items:baseline;gap:10px;margin-top:8px">
+              <span style="font-size:12.5px;color:#A7A7A7">{{ cat.countLabel }}</span>
+              <span style="font-size:12.5px;color:#A7A7A7">·</span>
+              <span style="font-size:12.5px;color:#A7A7A7">{{ cat.note }}</span>
+            </div>
+          </div>
+        </a>
+      </sc-for>
+    </div>
+
+  </section>
+
+  <!-- NUEVOS INGRESOS -->
+  <section id="nuevos" style="background:#0D0D0D;border-top:1px solid rgba(201,162,39,.14);border-bottom:1px solid #141414;overflow:hidden">
+    <div style="max-width:1400px;margin:0 auto;padding:clamp(52px,7vw,96px) clamp(16px,3vw,32px) clamp(64px,8vw,110px)">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:clamp(24px,3.4vw,40px)">
+        <div>
+          <div style="font-family:'Poppins',sans-serif;font-weight:600;font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:#C9A227;margin-bottom:8px">02 — Recién llegado</div>
+          <h2 style="margin:0;font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;font-size:clamp(28px,4vw,46px);line-height:1">Nuevos ingresos</h2>
+        </div>
+        <a href="#top" onClick="{{ openCatalog }}" style="font-family:'Saira Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#A7A7A7;padding:10px 0;display:inline-block">Ver todo →</a>
+      </div>
+
+      <div onPointerDown="{{ carDown }}" onPointerMove="{{ carMove }}" onPointerUp="{{ carUp }}" onPointerCancel="{{ carUp }}" onLostPointerCapture="{{ carUp }}" style="position:relative;width:clamp(280px,min(64vmin,88vw),620px);height:clamp(420px,86vmin,760px);margin:0 auto;perspective:1200px;transform-style:preserve-3d;touch-action:pan-y;-webkit-tap-highlight-color:transparent">
+        <ul data-car="" style="position:absolute;inset:0;margin:0;padding:0;list-style:none">
+          <sc-for list="{{ carSlides }}" as="s" hint-placeholder-count="4">
+            <li onClick="{{ s.select }}" onMouseMove="{{ s.move }}" onMouseLeave="{{ s.leave }}" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;text-align:center;cursor:pointer;transform:{{ s.liTransform }};opacity:{{ s.liOpacity }};z-index:{{ s.liZ }};pointer-events:{{ s.liPE }};transform-origin:bottom;transition:transform .55s cubic-bezier(.4,0,.2,1),opacity .55s ease">
+              <div data-par="" style="flex:1;align-self:stretch;position:relative;min-height:0;background:transparent;border:0;overflow:hidden;transition:transform .15s ease-out">
+                <div role="img" aria-label="{{ s.name }}" style="position:absolute;inset:0;background-image:{{ s.imgCss }};background-size:contain;background-position:center;background-repeat:no-repeat;margin:0;opacity:{{ s.imgOpacity }};transition:opacity .6s ease"></div>
+              </div>
+              <div style="flex:0 0 auto;align-self:stretch;z-index:2;padding:clamp(10px,1.3vw,14px) clamp(12px,1.6vw,20px) clamp(12px,1.6vw,16px);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:7px;opacity:{{ s.textOpacity }};visibility:{{ s.textVis }};transition:opacity .5s ease">
+                <span style="font-family:'Poppins',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;color:#C9A227">{{ s.set }}</span>
+                <h3 style="margin:0;font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;font-size:clamp(15px,1.7vw,21px);line-height:1.1;max-width:24ch;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ s.name }}</h3>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#6e6e6e">Ver detalle del producto →</span>
+                <span style="font-family:'Saira Condensed',sans-serif;font-weight:900;font-size:clamp(19px,2vw,24px)">{{ s.priceLabel }}</span>
+                <button onClick="{{ s.add }}" style="background:#E30613;border:0;color:#fff;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:13px;letter-spacing:.14em;text-transform:uppercase;padding:10px 22px;border-radius:999px;cursor:pointer;transition:background .18s ease" style-hover="background:#FF1A27">Agregar al carrito</button>
+              </div>
+            </li>
+          </sc-for>
+        </ul>
+
+        <div style="position:absolute;top:calc(100% + 18px);left:0;right:0;display:flex;align-items:center;justify-content:center;gap:12px">
+          <button onClick="{{ carPrev }}" aria-label="Anterior" style="width:42px;height:42px;border-radius:50%;background:#121212;border:1px solid #242424;color:#F5F5F5;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .2s ease,transform .2s ease" style-hover="border-color:#E30613;transform:translateY(-2px)">
+            <svg width="17" height="12" viewBox="0 0 17 12" fill="none" aria-hidden="true" style="transform:rotate(180deg)"><path d="M1 6h14M11 1.5 15.5 6 11 10.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </button>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;color:#6e6e6e;min-width:52px;text-align:center">{{ carCounter }}</span>
+          <button onClick="{{ carNext }}" aria-label="Siguiente" style="width:42px;height:42px;border-radius:50%;background:#121212;border:1px solid #242424;color:#F5F5F5;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .2s ease,transform .2s ease" style-hover="border-color:#E30613;transform:translateY(-2px)">
+            <svg width="17" height="12" viewBox="0 0 17 12" fill="none" aria-hidden="true"><path d="M1 6h14M11 1.5 15.5 6 11 10.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SOBRES -->
+  <section id="sobres" style="max-width:1400px;margin:0 auto;padding:clamp(52px,7vw,96px) clamp(16px,3vw,32px)">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:clamp(20px,3vw,34px)">
+      <div>
+        <div style="font-family:'Poppins',sans-serif;font-weight:600;font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:#C9A227;margin-bottom:8px">03 — Booster packs</div>
+        <h2 style="margin:0;font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;font-size:clamp(28px,4vw,46px);line-height:1">Sobres</h2>
+      </div>
+      <span style="font-size:13px;color:#A7A7A7;max-width:320px;text-wrap:pretty">Sellados de origen. Ideal para probar suerte sin ir a la caja completa.</span>
+    </div>
+    <div data-rail-wrap="" style="position:relative">
+      <div data-rail="" style="display:flex;gap:clamp(10px,1.4vw,18px);overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:14px">
+        <sc-for list="{{ sobres }}" as="p" hint-placeholder-count="3">
+          <div onClick="{{ p.open }}" onMouseEnter="{{ cardEnter }}" onMouseMove="{{ cardMove }}" onMouseLeave="{{ cardLeave }}" style-after="content:'';position:absolute;inset:0;padding:1.5px;background:radial-gradient(var(--glow-radius,240px) circle at var(--glow-x,50%) var(--glow-y,50%),rgba(227,6,19,calc(var(--glow-intensity,0) * 0.95)) 0%,rgba(227,6,19,calc(var(--glow-intensity,0) * 0.45)) 32%,transparent 62%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none;border-radius:inherit;z-index:3;transition:opacity .3s ease" style="cursor:pointer;position:relative;flex:0 0 auto;width:clamp(186px,21vw,248px);scroll-snap-align:start;background:#121212;border:1px solid #1c1c1c;transition:border-color .22s ease;display:flex;flex-direction:column">
+            <div style="position:relative;aspect-ratio:1/1;overflow:hidden;background:#0E0E0E">
+              <img data-img="" src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:10px;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
+              <sc-if value="{{ p.hasTag }}" hint-placeholder-val="{{ false }}">
+                <span style="position:absolute;top:10px;left:10px;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding:5px 9px;background:{{ p.tagBg }};color:{{ p.tagFg }}">{{ p.tag }}</span>
+              </sc-if>
+              <div data-actions="" style="position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:6px;opacity:0;transform:translateY(8px);transition:opacity .22s ease,transform .22s ease">
+                <button onClick="{{ p.add }}" style="flex:1;background:{{ p.btnBg }};border:0;color:{{ p.btnFg }};font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:10px 6px;cursor:{{ p.cursor }};border-radius:2px">{{ p.btnLabel }}</button>
+                <a href="{{ p.waLink }}" aria-label="Consultar por WhatsApp" style="background:rgba(5,5,5,.9);border:1px solid #2a2a2a;color:#F5F5F5;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:10px;border-radius:2px;display:flex;align-items:center">WA</a>
+              </div>
+            </div>
+            <div style="padding:13px 13px 15px;display:flex;flex-direction:column;gap:5px;flex:1">
+              <div style="font-size:13.5px;font-weight:700;line-height:1.35">{{ p.name }}</div>
+              <div style="font-size:11.5px;color:#A7A7A7">{{ p.set }}</div>
+              <div style="display:flex;align-items:baseline;gap:8px;margin-top:auto;padding-top:10px">
+                <span style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:19px">{{ p.priceLabel }}</span>
+              </div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:{{ p.stockColor }}">{{ p.stockLabel }}</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <div data-rail-nav="" style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:6px">
+        <button onClick="{{ railPrev }}" aria-label="Anterior" style="width:40px;height:40px;border-radius:50%;background:#121212;border:1px solid #242424;color:#F5F5F5;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .2s ease,transform .2s ease,opacity .2s ease" style-hover="border-color:#E30613;transform:translateY(-2px)">
+          <svg width="16" height="11" viewBox="0 0 17 12" fill="none" aria-hidden="true" style="transform:rotate(180deg)"><path d="M1 6h14M11 1.5 15.5 6 11 10.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </button>
+        <button onClick="{{ railNext }}" aria-label="Siguiente" style="width:40px;height:40px;border-radius:50%;background:#121212;border:1px solid #242424;color:#F5F5F5;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .2s ease,transform .2s ease,opacity .2s ease" style-hover="border-color:#E30613;transform:translateY(-2px)">
+          <svg width="16" height="11" viewBox="0 0 17 12" fill="none" aria-hidden="true"><path d="M1 6h14M11 1.5 15.5 6 11 10.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- SELLADOS Y COLECCIONABLES -->
+  <section id="sellados" style="background:#0D0D0D;border-top:1px solid rgba(201,162,39,.14);border-bottom:1px solid #141414">
+    <div style="max-width:1400px;margin:0 auto;padding:clamp(52px,7vw,96px) clamp(16px,3vw,32px)">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:clamp(20px,3vw,34px)">
+        <div>
+          <div style="font-family:'Poppins',sans-serif;font-weight:600;font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:#C9A227;margin-bottom:8px">04 — Producto sellado</div>
+          <h2 style="margin:0;font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;font-size:clamp(28px,4vw,46px);line-height:1">Sellados y coleccionables</h2>
+        </div>
+        <a href="#top" onClick="{{ openCatalog }}" style="font-family:'Saira Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#A7A7A7;padding:10px 0;display:inline-block">Ver todo →</a>
+      </div>
+
+      <div data-rail-wrap="" style="position:relative">
+        <div data-rail="" style="display:flex;gap:clamp(10px,1.4vw,18px);overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:14px">
+          <sc-for list="{{ sellados }}" as="p" hint-placeholder-count="4">
+            <div onClick="{{ p.open }}" onMouseEnter="{{ cardEnter }}" onMouseMove="{{ cardMove }}" onMouseLeave="{{ cardLeave }}" style-after="content:'';position:absolute;inset:0;padding:1.5px;background:radial-gradient(var(--glow-radius,240px) circle at var(--glow-x,50%) var(--glow-y,50%),rgba(227,6,19,calc(var(--glow-intensity,0) * 0.95)) 0%,rgba(227,6,19,calc(var(--glow-intensity,0) * 0.45)) 32%,transparent 62%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none;border-radius:inherit;z-index:3;transition:opacity .3s ease" style="cursor:pointer;position:relative;flex:0 0 auto;width:clamp(186px,21vw,248px);scroll-snap-align:start;background:#121212;border:1px solid #1c1c1c;transition:border-color .22s ease;display:flex;flex-direction:column">
+              <div style="position:relative;aspect-ratio:1/1;overflow:hidden;background:#0E0E0E">
+                <img data-img="" src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:10px;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
+                <sc-if value="{{ p.hasTag }}" hint-placeholder-val="{{ false }}">
+                  <span style="position:absolute;top:10px;left:10px;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding:5px 9px;background:{{ p.tagBg }};color:{{ p.tagFg }}">{{ p.tag }}</span>
+                </sc-if>
+                <div data-actions="" style="position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:6px;opacity:0;transform:translateY(8px);transition:opacity .22s ease,transform .22s ease">
+                  <button onClick="{{ p.add }}" style="flex:1;background:{{ p.btnBg }};border:0;color:{{ p.btnFg }};font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:10px 6px;cursor:{{ p.cursor }};border-radius:2px">{{ p.btnLabel }}</button>
+                </div>
+              </div>
+              <div style="padding:13px 13px 15px;display:flex;flex-direction:column;gap:5px;flex:1">
+                <div style="font-size:13.5px;font-weight:700;line-height:1.35">{{ p.name }}</div>
+                <div style="font-size:11.5px;color:#A7A7A7">{{ p.set }}</div>
+                <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:19px;margin-top:auto;padding-top:10px">{{ p.priceLabel }}</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:{{ p.stockColor }}">{{ p.stockLabel }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div data-rail-nav="" style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:6px">
+          <button onClick="{{ railPrev }}" aria-label="Anterior" style="width:40px;height:40px;border-radius:50%;background:#121212;border:1px solid #242424;color:#F5F5F5;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .2s ease,transform .2s ease" style-hover="border-color:#E30613;transform:translateY(-2px)">
+            <svg width="16" height="11" viewBox="0 0 17 12" fill="none" aria-hidden="true" style="transform:rotate(180deg)"><path d="M1 6h14M11 1.5 15.5 6 11 10.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </button>
+          <button onClick="{{ railNext }}" aria-label="Siguiente" style="width:40px;height:40px;border-radius:50%;background:#121212;border:1px solid #242424;color:#F5F5F5;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .2s ease,transform .2s ease" style-hover="border-color:#E30613;transform:translateY(-2px)">
+            <svg width="16" height="11" viewBox="0 0 17 12" fill="none" aria-hidden="true"><path d="M1 6h14M11 1.5 15.5 6 11 10.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ETB -->
+  <section id="etb" style="max-width:1400px;margin:0 auto;padding:clamp(52px,7vw,96px) clamp(16px,3vw,32px)">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:clamp(20px,3vw,34px)">
+      <div>
+        <div style="font-family:'Poppins',sans-serif;font-weight:600;font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:#C9A227;margin-bottom:8px">05 — Elite Trainer Box</div>
+        <h2 style="margin:0;font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;font-size:clamp(28px,4vw,46px);line-height:1">ETB</h2>
+      </div>
+      <span style="font-size:13px;color:#A7A7A7;max-width:340px;text-wrap:pretty">Caja completa con sobres, fundas, dados y accesorios del set.</span>
+    </div>
+    <div data-rail-wrap="" style="position:relative">
+      <div data-rail="" style="display:flex;gap:clamp(10px,1.4vw,18px);overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:14px">
+        <sc-for list="{{ etbs }}" as="p" hint-placeholder-count="5">
+          <div onClick="{{ p.open }}" onMouseEnter="{{ cardEnter }}" onMouseMove="{{ cardMove }}" onMouseLeave="{{ cardLeave }}" style-after="content:'';position:absolute;inset:0;padding:1.5px;background:radial-gradient(var(--glow-radius,240px) circle at var(--glow-x,50%) var(--glow-y,50%),rgba(227,6,19,calc(var(--glow-intensity,0) * 0.95)) 0%,rgba(227,6,19,calc(var(--glow-intensity,0) * 0.45)) 32%,transparent 62%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none;border-radius:inherit;z-index:3;transition:opacity .3s ease" style="cursor:pointer;position:relative;flex:0 0 auto;width:clamp(186px,21vw,248px);scroll-snap-align:start;background:#121212;border:1px solid #1c1c1c;transition:border-color .22s ease;display:flex;flex-direction:column">
+            <div style="position:relative;aspect-ratio:1/1;overflow:hidden;background:#0E0E0E">
+              <img data-img="" src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:10px;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
+              <sc-if value="{{ p.hasTag }}" hint-placeholder-val="{{ false }}">
+                <span style="position:absolute;top:10px;left:10px;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding:5px 9px;background:{{ p.tagBg }};color:{{ p.tagFg }}">{{ p.tag }}</span>
+              </sc-if>
+              <div data-actions="" style="position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:6px;opacity:0;transform:translateY(8px);transition:opacity .22s ease,transform .22s ease">
+                <button onClick="{{ p.add }}" style="flex:1;background:{{ p.btnBg }};border:0;color:{{ p.btnFg }};font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:10px 6px;cursor:{{ p.cursor }};border-radius:2px">{{ p.btnLabel }}</button>
+                <a href="{{ p.waLink }}" aria-label="Consultar por WhatsApp" style="background:rgba(5,5,5,.9);border:1px solid #2a2a2a;color:#F5F5F5;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:10px;border-radius:2px;display:flex;align-items:center">WA</a>
+              </div>
+            </div>
+            <div style="padding:13px 13px 15px;display:flex;flex-direction:column;gap:5px;flex:1">
+              <div style="font-size:13.5px;font-weight:700;line-height:1.35">{{ p.name }}</div>
+              <div style="font-size:11.5px;color:#A7A7A7">{{ p.set }}</div>
+              <div style="display:flex;align-items:baseline;gap:8px;margin-top:auto;padding-top:10px">
+                <span style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:19px">{{ p.priceLabel }}</span>
+              </div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:{{ p.stockColor }}">{{ p.stockLabel }}</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <div data-rail-nav="" style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:6px">
+        <button onClick="{{ railPrev }}" aria-label="Anterior" style="width:40px;height:40px;border-radius:50%;background:#121212;border:1px solid #242424;color:#F5F5F5;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .2s ease,transform .2s ease,opacity .2s ease" style-hover="border-color:#E30613;transform:translateY(-2px)">
+          <svg width="16" height="11" viewBox="0 0 17 12" fill="none" aria-hidden="true" style="transform:rotate(180deg)"><path d="M1 6h14M11 1.5 15.5 6 11 10.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </button>
+        <button onClick="{{ railNext }}" aria-label="Siguiente" style="width:40px;height:40px;border-radius:50%;background:#121212;border:1px solid #242424;color:#F5F5F5;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .2s ease,transform .2s ease,opacity .2s ease" style-hover="border-color:#E30613;transform:translateY(-2px)">
+          <svg width="16" height="11" viewBox="0 0 17 12" fill="none" aria-hidden="true"><path d="M1 6h14M11 1.5 15.5 6 11 10.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHATSAPP CTA -->
+  <section id="contacto" style="border-top:1px solid rgba(201,162,39,.14);background:#050505">
+    <div style="max-width:1400px;margin:0 auto;padding:clamp(48px,6vw,84px) clamp(16px,3vw,32px);display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:24px">
+      <div>
+        <h2 style="margin:0 0 8px;font-family:'Saira Condensed',sans-serif;font-weight:900;font-style:italic;text-transform:uppercase;font-size:clamp(26px,3.6vw,42px);line-height:1">¿Buscás una carta puntual?</h2>
+        <p style="margin:0;color:#A7A7A7;font-size:14.5px;max-width:520px;line-height:1.6">Escribinos y la buscamos por vos. Respondemos pedidos especiales y compras de colecciones completas.</p>
+      </div>
+      <a href="{{ waGeneralLink }}" style="background:#E30613;color:#fff;font-family:'Saira Condensed',sans-serif;font-weight:800;letter-spacing:.14em;text-transform:uppercase;font-size:15px;padding:17px 34px;border-radius:2px" style-hover="background:#FF1A27;color:#fff">Escribir por WhatsApp</a>
+    </div>
+  </section>
+
+  </sc-if>
+
+  <!-- CATÁLOGO -->
+  <sc-if value="{{ isCatalog }}" hint-placeholder-val="{{ false }}">
+  <section id="catalogo" style="max-width:1400px;margin:0 auto;padding:clamp(26px,3.4vw,44px) clamp(16px,3vw,32px) clamp(52px,7vw,90px)">
+    <div style="display:flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#6e6e6e;margin-bottom:18px">
+      <a href="#top" onClick="{{ goHome }}" style="color:#A7A7A7">Inicio</a><span>/</span><span style="color:#F5F5F5">Catálogo</span>
+    </div>
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:clamp(20px,2.6vw,32px)">
+      <h1 style="margin:0;font-family:'Saira Condensed',sans-serif;font-weight:900;text-transform:uppercase;font-size:clamp(30px,4.6vw,58px);line-height:1">Catálogo completo</h1>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#A7A7A7;letter-spacing:.08em">{{ catalogCount }} productos</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:clamp(18px,2.4vw,34px);align-items:start">
+      <aside style="display:flex;flex-direction:column;gap:22px;max-width:320px">
+        <div>
+          <div style="font-family:'Poppins',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:#C9A227;margin-bottom:12px">Categoría</div>
+          <div style="display:flex;flex-direction:column;gap:1px;background:#1a1a1a;border:1px solid #1a1a1a">
+            <sc-for list="{{ filterCats }}" as="fc" hint-placeholder-count="4">
+              <button onClick="{{ fc.toggle }}" style="background:{{ fc.bg }};border:0;color:{{ fc.color }};text-align:left;padding:11px 13px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:14.5px;letter-spacing:.06em;text-transform:uppercase;transition:background .18s ease">
+                <span>{{ fc.label }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.06em;opacity:.7">{{ fc.count }}</span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+        <div>
+          <div style="font-family:'Poppins',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:#C9A227;margin-bottom:12px">Disponibilidad</div>
+          <button onClick="{{ toggleAvailable }}" style="background:#0A0A0A;border:1px solid #1f1f1f;color:#F5F5F5;cursor:pointer;padding:11px 13px;display:flex;align-items:center;gap:11px;width:100%;text-align:left">
+            <span style="width:16px;height:16px;flex:0 0 auto;border:1px solid {{ availBorder }};background:{{ availBg }};display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;line-height:1">{{ availMark }}</span>
+            <span style="font-size:13px">Mostrar solo productos disponibles</span>
+          </button>
+        </div>
+        <div>
+          <div style="font-family:'Poppins',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:#C9A227;margin-bottom:12px">Ordenar</div>
+          <div style="display:flex;flex-direction:column;gap:1px;background:#1a1a1a;border:1px solid #1a1a1a">
+            <sc-for list="{{ sortOptions }}" as="so" hint-placeholder-count="4">
+              <button onClick="{{ so.pick }}" style="background:{{ so.bg }};border:0;color:{{ so.color }};text-align:left;padding:10px 13px;cursor:pointer;font-size:13px;transition:background .18s ease">{{ so.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+        <button onClick="{{ clearFilters }}" style="background:transparent;border:1px solid #242424;color:#A7A7A7;cursor:pointer;padding:11px;font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:12.5px;letter-spacing:.16em;text-transform:uppercase" style-hover="border-color:#E30613;color:#FF1A27">Limpiar filtros</button>
+      </aside>
+
+      <div style="grid-column:span 3;min-width:0">
+        <sc-if value="{{ catalogEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="border:1px dashed #242424;background:#0A0A0A;padding:clamp(32px,5vw,60px);text-align:center">
+            <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;font-size:21px;letter-spacing:.05em">Sin resultados</div>
+            <p style="margin:8px 0 0;color:#A7A7A7;font-size:13.5px">Ningún producto coincide con los filtros seleccionados.</p>
+          </div>
+        </sc-if>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr));gap:clamp(10px,1.4vw,16px)">
+          <sc-for list="{{ catalogProducts }}" as="p" hint-placeholder-count="8">
+            <div onClick="{{ p.open }}" onMouseEnter="{{ cardEnter }}" onMouseMove="{{ cardMove }}" onMouseLeave="{{ cardLeave }}" style-after="content:'';position:absolute;inset:0;padding:1.5px;background:radial-gradient(var(--glow-radius,240px) circle at var(--glow-x,50%) var(--glow-y,50%),rgba(227,6,19,calc(var(--glow-intensity,0) * 0.95)) 0%,rgba(227,6,19,calc(var(--glow-intensity,0) * 0.45)) 32%,transparent 62%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none;border-radius:inherit;z-index:3;transition:opacity .3s ease" style="cursor:pointer;position:relative;background:#121212;border:1px solid #1c1c1c;transition:border-color .22s ease;display:flex;flex-direction:column">
+              <div style="position:relative;aspect-ratio:1/1;overflow:hidden;background:#0E0E0E">
+                <img data-img="" src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:10px;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
+                <sc-if value="{{ p.hasTag }}" hint-placeholder-val="{{ false }}">
+                  <span style="position:absolute;top:10px;left:10px;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding:5px 9px;background:{{ p.tagBg }};color:{{ p.tagFg }}">{{ p.tag }}</span>
+                </sc-if>
+                <div data-actions="" style="position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:6px;opacity:0;transform:translateY(8px);transition:opacity .22s ease,transform .22s ease">
+                  <button onClick="{{ p.add }}" style="flex:1;background:{{ p.btnBg }};border:0;color:{{ p.btnFg }};font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:10px 6px;cursor:{{ p.cursor }};border-radius:2px">{{ p.btnLabel }}</button>
+                </div>
+              </div>
+              <div style="padding:13px 13px 15px;display:flex;flex-direction:column;gap:5px;flex:1">
+                <div style="font-size:13.5px;font-weight:700;line-height:1.35">{{ p.name }}</div>
+                <div style="font-size:11.5px;color:#A7A7A7">{{ p.set }}</div>
+                <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:19px;margin-top:auto;padding-top:10px">{{ p.priceLabel }}</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:{{ p.stockColor }}">{{ p.stockLabel }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </section>
+  </sc-if>
+
+  <!-- FICHA DE PRODUCTO -->
+  <sc-if value="{{ isProduct }}" hint-placeholder-val="{{ false }}">
+  <section style="max-width:1400px;margin:0 auto;padding:clamp(26px,3.4vw,44px) clamp(16px,3vw,32px) clamp(52px,7vw,90px)">
+    <div style="display:flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#6e6e6e;margin-bottom:22px;flex-wrap:wrap">
+      <a href="#top" onClick="{{ goHome }}" style="color:#A7A7A7">Inicio</a><span>/</span>
+      <a href="#top" onClick="{{ openCatalog }}" style="color:#A7A7A7">Catálogo</a><span>/</span>
+      <span style="color:#F5F5F5">{{ prod.shortName }}</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:clamp(22px,3vw,52px);align-items:start">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="position:relative;aspect-ratio:1/1;background:#0A0A0A;border:1px solid #1f1f1f;overflow:hidden">
+          <div role="img" aria-label="{{ prod.name }}" style="position:absolute;inset:0;background-image:{{ prodFotoCss }};background-size:contain;background-position:center;background-repeat:no-repeat;margin:clamp(16px,2.6vw,40px)"></div>
+          <sc-if value="{{ prod.hasTag }}" hint-placeholder-val="{{ false }}">
+            <span style="position:absolute;top:12px;left:12px;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;padding:6px 10px;background:{{ prod.tagBg }};color:{{ prod.tagFg }}">{{ prod.tag }}</span>
+          </sc-if>
+        </div>
+        <sc-if value="{{ prodVariasFotos }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <sc-for list="{{ prodFotos }}" as="f" hint-placeholder-count="3">
+              <button type="button" onClick="{{ f.ver }}" aria-label="{{ f.etiqueta }}" style="width:74px;height:74px;padding:0;border:1px solid {{ f.borde }};background:#0A0A0A;background-image:{{ f.css }};background-size:contain;background-position:center;background-repeat:no-repeat;cursor:pointer;-webkit-tap-highlight-color:transparent"></button>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+        <span style="font-family:'Poppins',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:#C9A227">{{ prod.set }}</span>
+        <h1 style="margin:0;font-family:'Saira Condensed',sans-serif;font-weight:900;text-transform:uppercase;font-size:clamp(26px,3.6vw,46px);line-height:1.02">{{ prod.name }}</h1>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#6e6e6e">SKU {{ prod.id }}</div>
+        <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:4px 0">
+          <span style="font-family:'Saira Condensed',sans-serif;font-weight:900;font-size:clamp(30px,3.6vw,44px);line-height:1">{{ prod.priceLabel }}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:{{ prod.stockColor }}">{{ prod.stockLabel }}</span>
+        </div>
+
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+          <div style="display:flex;align-items:center;border:1px solid #242424">
+            <button onClick="{{ qtyDec }}" aria-label="Menos" style="background:transparent;border:0;color:#F5F5F5;width:44px;height:48px;cursor:pointer;font-size:18px">−</button>
+            <span style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:17px;min-width:34px;text-align:center">{{ qty }}</span>
+            <button onClick="{{ qtyInc }}" aria-label="Más" style="background:transparent;border:0;color:{{ qtyIncColor }};width:44px;height:48px;cursor:pointer;font-size:18px">+</button>
+          </div>
+          <button onClick="{{ prod.addQty }}" style="flex:1;min-width:200px;background:{{ prod.btnBg }};border:0;color:{{ prod.btnFg }};font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:15px;letter-spacing:.14em;text-transform:uppercase;padding:16px 24px;cursor:{{ prod.cursor }};border-radius:2px">{{ prod.btnLabel }}</button>
+        </div>
+        <button onClick="{{ prod.buyNow }}" style="background:transparent;border:1px solid #2a2a2a;color:#F5F5F5;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:15px;letter-spacing:.14em;text-transform:uppercase;padding:16px 24px;cursor:pointer;border-radius:2px" style-hover="border-color:#F5F5F5;background:#101010">Comprar ahora</button>
+        <a href="{{ prod.waLink }}" style="display:flex;align-items:center;justify-content:center;gap:9px;border:1px solid #1f1f1f;background:#0D0D0D;padding:14px;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:13.5px;letter-spacing:.12em;text-transform:uppercase" style-hover="border-color:#C9A227;color:#C9A227">
+          <span style="width:7px;height:7px;border-radius:50%;background:#C9A227;display:block"></span>Consultar por WhatsApp
+        </a>
+
+        <div style="display:flex;flex-direction:column;gap:1px;background:#1a1a1a;border:1px solid #1a1a1a;margin-top:6px">
+          <sc-for list="{{ prodAttrs }}" as="at" hint-placeholder-count="4">
+            <div style="background:#0A0A0A;display:flex;justify-content:space-between;gap:16px;padding:11px 14px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#6e6e6e;text-transform:uppercase">{{ at.k }}</span>
+              <span style="font-size:12.5px;font-weight:600;text-align:right">{{ at.v }}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="margin-top:6px">
+          <div style="font-family:'Poppins',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:#C9A227;margin-bottom:9px">Descripción</div>
+          <p style="margin:0;color:#A7A7A7;font-size:13.5px;line-height:1.7;text-wrap:pretty">{{ prod.desc }}</p>
+        </div>
+        <div>
+          <div style="font-family:'Poppins',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:#C9A227;margin-bottom:9px">Opciones de entrega</div>
+          <div style="display:flex;flex-direction:column;gap:7px;color:#A7A7A7;font-size:13px">
+            <span>Retiro en Asunción — coordinado por WhatsApp.</span>
+            <span>Delivery en Gran Asunción — Gs. 35.000.</span>
+            <span>Envío al interior — según courier, se cotiza al confirmar.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:clamp(44px,6vw,80px)">
+      <h2 style="margin:0 0 20px;font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;font-size:clamp(22px,3vw,34px);line-height:1">Productos relacionados</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr));gap:clamp(10px,1.4vw,16px)">
+        <sc-for list="{{ related }}" as="p" hint-placeholder-count="4">
+          <div onClick="{{ p.open }}" onMouseEnter="{{ cardEnter }}" onMouseMove="{{ cardMove }}" onMouseLeave="{{ cardLeave }}" style-after="content:'';position:absolute;inset:0;padding:1.5px;background:radial-gradient(var(--glow-radius,240px) circle at var(--glow-x,50%) var(--glow-y,50%),rgba(227,6,19,calc(var(--glow-intensity,0) * 0.95)) 0%,rgba(227,6,19,calc(var(--glow-intensity,0) * 0.45)) 32%,transparent 62%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none;border-radius:inherit;z-index:3;transition:opacity .3s ease" style="cursor:pointer;position:relative;background:#121212;border:1px solid #1c1c1c;transition:border-color .22s ease;display:flex;flex-direction:column">
+            <div style="position:relative;aspect-ratio:1/1;overflow:hidden;background:#0E0E0E">
+              <img data-img="" src="{{ p.img }}" alt="{{ p.name }}" loading="lazy" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:10px;transition:transform .45s cubic-bezier(.2,.7,.2,1)" />
+            </div>
+            <div style="padding:12px;display:flex;flex-direction:column;gap:4px">
+              <div style="font-size:13px;font-weight:700;line-height:1.35">{{ p.name }}</div>
+              <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:17px;margin-top:4px">{{ p.priceLabel }}</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+  </sc-if>
+
+  <!-- LEGALES -->
+  <sc-if value="{{ isLegal }}" hint-placeholder-val="{{ false }}">
+  <section style="max-width:900px;margin:0 auto;padding:clamp(26px,3.4vw,44px) clamp(16px,3vw,32px) clamp(52px,7vw,90px)">
+    <div style="display:flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#6e6e6e;margin-bottom:20px">
+      <a href="#top" onClick="{{ goHome }}" style="color:#A7A7A7">Inicio</a><span>/</span><span style="color:#F5F5F5">{{ legalTitle }}</span>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:clamp(22px,3vw,34px);flex-wrap:wrap">
+      <button onClick="{{ pickPrivacidad }}" style="background:{{ tabPrivBg }};border:1px solid {{ tabPrivBorder }};color:{{ tabPrivColor }};font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;padding:11px 20px;cursor:pointer">Política de privacidad</button>
+      <button onClick="{{ pickTerminos }}" style="background:{{ tabTermBg }};border:1px solid {{ tabTermBorder }};color:{{ tabTermColor }};font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;padding:11px 20px;cursor:pointer">Términos y condiciones</button>
+    </div>
+    <h1 style="margin:0 0 10px;font-family:'Saira Condensed',sans-serif;font-weight:900;text-transform:uppercase;font-size:clamp(30px,4.4vw,54px);line-height:1">{{ legalTitle }}</h1>
+    <p style="margin:0 0 clamp(26px,3.4vw,42px);font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#6e6e6e">Última actualización: [PENDIENTE — definir fecha]</p>
+
+    <div style="display:flex;flex-direction:column;gap:clamp(22px,2.8vw,34px)">
+      <sc-for list="{{ legalBlocks }}" as="bl" hint-placeholder-count="6">
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:baseline;gap:12px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;color:#E30613;flex:0 0 auto">{{ bl.n }}</span>
+            <h2 style="margin:0;font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;font-size:clamp(18px,2.2vw,25px);line-height:1.1;letter-spacing:.03em">{{ bl.t }}</h2>
+          </div>
+          <p style="margin:0;padding-left:clamp(0px,2.2vw,34px);color:#A7A7A7;font-size:14px;line-height:1.75;text-wrap:pretty">{{ bl.d }}</p>
+        </div>
+      </sc-for>
+      <div style="border:1px dashed #242424;background:#0A0A0A;padding:clamp(18px,2.4vw,26px);display:flex;flex-direction:column;gap:8px">
+        <span style="font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;font-size:15px;letter-spacing:.06em;color:#C9A227">Datos legales pendientes</span>
+        <span style="color:#A7A7A7;font-size:13.5px;line-height:1.7">Razón social: [PENDIENTE] · RUC: [PENDIENTE] · Domicilio: [PENDIENTE] · Email de contacto: [PENDIENTE] · Teléfono: [PENDIENTE]. Completar con la información que provea Rocket Cards antes de publicar.</span>
+      </div>
+    </div>
+  </section>
+  </sc-if>
+
+  <!-- VOLVER ARRIBA -->
+  <a href="#top" onClick="{{ goTop }}" onMouseEnter="{{ topBandEnter }}" onMouseLeave="{{ topBandLeave }}" style="position:relative;display:block;overflow:hidden;background:#0A0A0A;border-top:1px solid rgba(201,162,39,.14);padding:clamp(34px,4.6vw,58px) clamp(16px,3vw,32px)" style-hover="color:#F5F5F5">
+    <span data-glow="" style="position:absolute;left:50%;bottom:-120px;width:min(760px,120%);height:240px;transform:translateX(-50%);background:radial-gradient(ellipse at 50% 100%,rgba(227,6,19,.26) 0%,rgba(227,6,19,0) 70%);opacity:.55;transition:opacity .3s ease;pointer-events:none"></span>
+    <span style="position:relative;max-width:1400px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap">
+      <span style="display:flex;align-items:center;gap:14px;min-width:0">
+        <img src="/assets/rocket-logo.webp" alt="" aria-hidden="true" style="width:38px;height:38px;display:block;opacity:.9" />
+        <span style="display:flex;flex-direction:column;gap:3px;min-width:0">
+          <span style="font-family:'Saira Condensed',sans-serif;font-weight:900;font-style:italic;text-transform:uppercase;font-size:clamp(20px,2.6vw,30px);line-height:1">Volvé al inicio</span>
+          <span style="font-size:12.5px;color:#A7A7A7">Seguí explorando sellados, sobres y ETB</span>
+        </span>
+      </span>
+      <span style="display:flex;align-items:center;gap:12px;flex:0 0 auto">
+        <span style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:13px;letter-spacing:.2em;text-transform:uppercase">Regresar al inicio</span>
+        <span data-arrow="" style="width:44px;height:44px;border-radius:50%;border:1px solid #2a2a2a;background:#0D0D0D;display:flex;align-items:center;justify-content:center;color:#E30613;font-size:17px;line-height:1;transition:transform .3s cubic-bezier(.2,.7,.2,1),border-color .3s ease">↑</span>
+      </span>
+    </span>
+  </a>
+
+  <!-- FOOTER -->
+  <footer style="background:#0A0A0A;border-top:1px solid rgba(201,162,39,.22)">
+    <div style="max-width:1400px;margin:0 auto;padding:clamp(44px,6vw,76px) clamp(16px,3vw,32px);display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:clamp(26px,3vw,44px)">
+      <div style="grid-column:span 1;min-width:200px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+          <img src="/assets/rocket-logo.webp" alt="Rocket Cards" style="width:40px;height:40px;display:block" />
+          <span style="display:flex;flex-direction:column;line-height:.92">
+            <span style="font-family:'Saira Condensed',sans-serif;font-weight:900;font-size:17px;font-style:italic">ROCKET</span>
+            <span style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:10px;letter-spacing:.4em;color:#E30613">CARDS</span>
+          </span>
+        </div>
+        <p style="margin:0;color:#A7A7A7;font-size:13px;line-height:1.65;max-width:280px;text-wrap:pretty">{{ descripcionPie }}</p>
+      </div>
+      <sc-for list="{{ footerCols }}" as="col" hint-placeholder-count="4">
+        <div>
+          <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:#C9A227;margin-bottom:14px">{{ col.title }}</div>
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <sc-for list="{{ col.links }}" as="lk" hint-placeholder-count="5">
+              <a href="{{ lk.href }}" onClick="{{ lk.go }}" style="font-size:13.5px;color:#A7A7A7">{{ lk.label }}</a>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="border-top:1px solid #151515">
+      <div style="max-width:1400px;margin:0 auto;padding:20px clamp(16px,3vw,32px);display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+        <span style="font-size:12.5px;color:#6e6e6e">© Rocket Cards — Todos los derechos reservados.</span>
+        <a href="#" style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#A7A7A7">
+          <span style="font-family:'IBM Plex Mono',monospace;letter-spacing:.1em;font-size:11px">Desarrollado por</span>
+          <span style="font-family:'Saira Condensed',sans-serif;font-weight:800;letter-spacing:.22em;font-size:14px;color:#F5F5F5">NEURA</span>
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- WHATSAPP FLOTANTE -->
+  <a href="{{ waGeneralLink }}" aria-label="Consultar por WhatsApp" style="position:fixed;right:18px;bottom:18px;z-index:55;opacity:{{ waOpacity }};transform:{{ waTransform }};pointer-events:{{ waPE }};transition:opacity .3s ease,transform .3s ease;display:flex;align-items:center;gap:9px;background:#0D0D0D;border:1px solid #2a2a2a;padding:11px 16px;border-radius:999px;box-shadow:0 14px 34px rgba(0,0,0,.6);transition:border-color .2s ease,transform .2s ease" style-hover="border-color:#E30613;transform:translateY(-2px);color:#F5F5F5">
+    <span style="width:8px;height:8px;border-radius:50%;background:#C9A227;display:block;animation:rc-pulse 2.2s ease-in-out infinite"></span>
+    <span style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:13px;letter-spacing:.12em;text-transform:uppercase">WhatsApp</span>
+  </a>
+
+  <!-- CARRITO DRAWER -->
+  <sc-if value="{{ cartOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;z-index:90;display:flex;justify-content:flex-end">
+      <div onClick="{{ closeCart }}" style="position:absolute;inset:0;background:rgba(0,0,0,.72);animation:rc-fade .2s ease"></div>
+      <aside style="position:relative;width:min(420px,100%);height:100%;background:#0A0A0A;border-left:1px solid #1f1f1f;display:flex;flex-direction:column;animation:rc-slide-in .28s cubic-bezier(.2,.7,.2,1)">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid #1a1a1a">
+          <span style="font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;font-size:19px;letter-spacing:.1em">Tu carrito <span style="color:#E30613">({{ cartCount }})</span></span>
+          <button onClick="{{ closeCart }}" aria-label="Cerrar carrito" style="background:transparent;border:1px solid #242424;color:#F5F5F5;width:34px;height:34px;cursor:pointer;border-radius:2px;font-size:17px;line-height:1">×</button>
+        </div>
+
+        <sc-if value="{{ cartEmpty }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:36px 28px;text-align:center">
+            <div style="width:58px;height:78px;border:1px dashed #2a2a2a;background:repeating-linear-gradient(135deg,#101010 0 8px,#0C0C0C 8px 16px)"></div>
+            <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;font-size:20px;letter-spacing:.06em">Carrito vacío</div>
+            <p style="margin:0;color:#A7A7A7;font-size:13.5px;line-height:1.6;max-width:260px">Todavía no agregaste nada. Empezá por los nuevos ingresos o buscá una carta puntual.</p>
+            <button onClick="{{ closeCart }}" style="margin-top:4px;background:#E30613;border:0;color:#fff;font-family:'Saira Condensed',sans-serif;font-weight:800;letter-spacing:.14em;text-transform:uppercase;font-size:13px;padding:13px 26px;cursor:pointer;border-radius:2px">Explorar productos</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ cartHasItems }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1;overflow-y:auto;padding:6px 20px">
+            <sc-for list="{{ cartItems }}" as="it" hint-placeholder-count="2">
+              <div style="display:flex;gap:13px;padding:16px 0;border-bottom:1px solid #151515">
+                <img src="{{ it.img }}" alt="{{ it.name }}" loading="lazy" decoding="async" style="width:62px;height:62px;flex:0 0 auto;object-fit:contain;border:1px solid #1d1d1d;background:#0A0A0A;padding:4px" />
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                  <div style="font-size:13.5px;font-weight:700;line-height:1.3">{{ it.name }}</div>
+                  <div style="font-size:11.5px;color:#A7A7A7">{{ it.set }}</div>
+                  <div style="display:flex;align-items:center;gap:10px;margin-top:7px">
+                    <div style="display:flex;align-items:center;border:1px solid #242424;border-radius:2px">
+                      <button onClick="{{ it.dec }}" aria-label="Quitar uno" style="background:transparent;border:0;color:#F5F5F5;width:28px;height:28px;cursor:pointer;font-size:15px">−</button>
+                      <span style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:14px;min-width:22px;text-align:center">{{ it.qty }}</span>
+                      <button onClick="{{ it.inc }}" aria-label="Agregar uno" style="background:transparent;border:0;color:{{ it.incColor }};width:28px;height:28px;cursor:pointer;font-size:15px">+</button>
+                    </div>
+                    <button onClick="{{ it.remove }}" style="background:transparent;border:0;color:#6e6e6e;font-size:11.5px;cursor:pointer;text-decoration:underline;padding:0">Eliminar</button>
+                  </div>
+                  <sc-if value="{{ it.atMax }}" hint-placeholder-val="{{ false }}">
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#C9A227;letter-spacing:.06em;margin-top:4px">Máximo disponible: {{ it.stock }}</div>
+                  </sc-if>
+                </div>
+                <div style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:16px;flex:0 0 auto">{{ it.lineLabel }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="border-top:1px solid #1a1a1a;padding:18px 20px;display:flex;flex-direction:column;gap:9px;background:#0D0D0D">
+            <div style="display:flex;justify-content:space-between;font-size:13.5px;color:#A7A7A7"><span>Subtotal</span><span style="color:#F5F5F5;font-weight:600">{{ subtotalLabel }}</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:13.5px;color:#A7A7A7"><span>Envío estimado</span><span style="color:#F5F5F5;font-weight:600">{{ shippingLabel }}</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;padding-top:10px;border-top:1px solid #1a1a1a;margin-top:4px">
+              <span style="font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.14em;font-size:15px">Total</span>
+              <span style="font-family:'Saira Condensed',sans-serif;font-weight:900;font-size:26px">{{ totalLabel }}</span>
+            </div>
+            <a href="{{ checkoutLink }}" target="_blank" rel="noopener" style="margin-top:8px;background:#E30613;color:#fff;text-align:center;font-family:'Saira Condensed',sans-serif;font-weight:800;letter-spacing:.14em;text-transform:uppercase;font-size:15px;padding:16px;border-radius:2px" style-hover="background:#FF1A27;color:#fff">Finalizar compra</a>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5a5a5a;text-align:center;letter-spacing:.06em">Stock validado antes de confirmar el pedido</span>
+          </div>
+        </sc-if>
+      </aside>
+    </div>
+  </sc-if>
+
+  <!-- TOAST -->
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:95;display:flex;align-items:center;gap:11px;background:#0D0D0D;border:1px solid #242424;border-left:3px solid #E30613;padding:13px 18px;border-radius:2px;box-shadow:0 18px 44px rgba(0,0,0,.7);animation:rc-toast 2.4s ease forwards;max-width:calc(100vw - 32px)">
+      <span style="font-size:13.5px;font-weight:600">{{ toast }}</span>
+      <button onClick="{{ openCart }}" style="background:transparent;border:0;color:#E30613;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;padding:0">Ver carrito</button>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+const CATALOG = [
+  { id:'FP-S1', name:'First Partner Illustration Collection — Series 1', set:'Pokémon TCG · Illustration Collection', cat:'sellados', img:'/assets/catalogo/first-partner-s1.webp', price:420000, stock:5, tag:'NUEVO' },
+  { id:'FP-S2', name:'First Partner Illustration Collection — Series 2', set:'Pokémon TCG · Illustration Collection', cat:'sellados', img:'/assets/catalogo/first-partner-s2.webp', price:300000, stock:6, tag:'NUEVO' },
+  { id:'FP-S3', name:'First Partner Illustration Collection — Series 3', set:'Pokémon TCG · Illustration Collection', cat:'sellados', img:'/assets/catalogo/first-partner-s3.webp', price:300000, stock:6, tag:'NUEVO' },
+  { id:'KO-COL', name:'Knock Out Collection', set:'Pokémon TCG · Collection', cat:'sellados', img:'/assets/catalogo/knock-out-collection.webp', price:300000, stock:4 },
+  { id:'ME-CR-BB', name:'Mega Evolution — Chaos Rising Booster Bundle', set:'Mega Evolution · 6 sobres', cat:'sellados', img:'/assets/catalogo/chaos-rising-bundle.webp', price:350000, stock:7 },
+  { id:'ME-CR-PK', name:'Mega Evolution — Chaos Rising Booster Pack', set:'Mega Evolution · 1 sobre', cat:'sobres', img:'/assets/catalogo/chaos-rising-pack.webp', price:60000, stock:36 },
+  { id:'ME-PO-PK', name:'Mega Evolution — Perfect Order Booster Pack', set:'Mega Evolution · 1 sobre', cat:'sobres', img:'/assets/catalogo/perfect-order-pack.webp', price:60000, stock:42 },
+  { id:'ME-PB-ETB', name:'Mega Evolution — Pitch Black Elite Trainer Box', set:'Mega Evolution · ETB', cat:'etb', img:'/assets/catalogo/pitch-black-etb.webp', price:650000, stock:3, tag:'NUEVO' },
+  { id:'ME-PB-BB', name:'Mega Evolution — Pitch Black Booster Bundle', set:'Mega Evolution · 6 sobres', cat:'sellados', img:'/assets/catalogo/pitch-black-bundle.webp', price:350000, stock:8 },
+  { id:'ME-PB-PK', name:'Mega Evolution — Pitch Black Booster Pack', set:'Mega Evolution · 1 sobre', cat:'sobres', img:'/assets/catalogo/pitch-black-pack.webp', price:65000, stock:30 },
+  { id:'ME-AH-TS', name:'Mega Evolution — Ascended Heroes Tech Sticker Collection', set:'Mega Evolution · Collection', cat:'sellados', img:'/assets/catalogo/ascended-heroes-sticker.webp', price:310000, stock:6 },
+  { id:'ME-PF-ETB', name:'Mega Evolution — Phantasmal Flames Elite Trainer Box', set:'Mega Evolution · ETB', cat:'etb', img:'/assets/catalogo/phantasmal-flames-etb.webp', price:1200000, stock:2 },
+  { id:'SV-BB-ETB', name:'Scarlet & Violet — Black Bolt Elite Trainer Box', set:'Scarlet & Violet · ETB', cat:'etb', img:'/assets/catalogo/black-bolt-etb.webp', price:1400000, stock:2 },
+  { id:'SV-DR-BB', name:'Scarlet & Violet — Destined Rivals Booster Bundle', set:'Scarlet & Violet · 6 sobres', cat:'sellados', img:'/assets/catalogo/destined-rivals-bundle.webp', price:600000, stock:0, tag:'AGOTADO' },
+  { id:'SV-KO-ETB', name:'Scarlet & Violet — Koraidon Elite Trainer Box', set:'Scarlet & Violet · ETB', cat:'etb', img:'/assets/catalogo/koraidon-etb.webp', price:1500000, stock:1 },
+  { id:'SV-DR-ETB', name:'Scarlet & Violet — Destined Rivals Elite Trainer Box', set:'Scarlet & Violet · ETB', cat:'etb', img:'/assets/catalogo/destined-rivals-etb.webp', price:1100000, stock:3 },
+  { id:'SV-PE-PFC', name:'Scarlet & Violet — Prismatic Evolutions Premium Figure Collection', set:'Prismatic Evolutions · Premium', cat:'sellados', img:'/assets/catalogo/prismatic-figure-collection.webp', price:1500000, stock:1, premium:true },
+  { id:'SV-PE-BB', name:'Prismatic Evolutions — Booster Bundle (ING)', set:'Prismatic Evolutions · 6 sobres', cat:'sellados', img:'/assets/catalogo/prismatic-bundle.webp', price:600000, stock:4 }
+];
+
+// Puente para pack-opening/: le da el catalogo real y las acciones de la tienda.
+// Es la unica superficie compartida entre la pagina y ese modulo.
+window.ROCKET_SHOP = Object.assign(window.ROCKET_SHOP || {}, { catalog: CATALOG });
+
+const TAG_STYLE = {
+  'NUEVO':        { bg:'#F5F5F5', fg:'#050505' },
+  'OFERTA':       { bg:'#E30613', fg:'#ffffff' },
+  'PREVENTA':     { bg:'#C9A227', fg:'#050505' },
+  'ÚLTIMAS UNIDADES': { bg:'#C9A227', fg:'#050505' },
+  'AGOTADO':      { bg:'#1f1f1f', fg:'#A7A7A7' },
+  'DESTACADO':    { bg:'#C9A227', fg:'#050505' }
+};
+
+const PRIVACIDAD = [
+  ['Información que recopilamos', 'Recopilamos los datos que vos nos proporcionás al navegar, crear una cuenta, realizar una compra o escribirnos: nombre y apellido, documento, teléfono, email, dirección de entrega y referencias. También registramos datos técnicos del dispositivo y de navegación necesarios para operar la tienda.'],
+  ['Datos proporcionados durante una compra', 'Para procesar un pedido necesitamos tus datos de contacto, la dirección o punto de retiro y el detalle del pedido. Estos datos se usan exclusivamente para preparar, entregar y respaldar la compra.'],
+  ['Uso de los datos personales', 'Usamos tus datos para procesar pedidos, coordinar entregas, responder consultas, gestionar stock y, si lo autorizás, enviarte avisos de nuevos ingresos o promociones. No vendemos ni cedemos tus datos a terceros con fines publicitarios.'],
+  ['Cookies', 'Utilizamos cookies y almacenamiento local del navegador para mantener tu carrito, recordar preferencias y medir el uso del sitio. Podés bloquearlas desde tu navegador, aunque algunas funciones (como el carrito) pueden dejar de funcionar correctamente.'],
+  ['Procesamiento de pedidos', 'Cada pedido genera un registro con los productos, montos, método de entrega y estado. Conservamos ese registro por el plazo necesario para cumplir obligaciones comerciales y contables.'],
+  ['Medios de pago', 'Los pagos se procesan por los medios definidos por el comercio. Rocket Cards no almacena datos completos de tarjetas. Cuando se integre una pasarela de pagos, el tratamiento de esos datos queda sujeto a la política del proveedor: [PENDIENTE — definir proveedor].'],
+  ['Servicios externos', 'Podemos usar servicios de terceros para hosting, analítica, mensajería y logística. Cada proveedor accede únicamente a los datos mínimos necesarios para prestar su servicio.'],
+  ['WhatsApp y redes sociales', 'Si nos escribís por WhatsApp o Instagram, la conversación se rige también por las políticas de esas plataformas. Usamos esos canales para atención, consultas de producto y coordinación de pedidos.'],
+  ['Seguridad de la información', 'Aplicamos medidas razonables para proteger tus datos contra accesos no autorizados, pérdida o alteración. Ningún sistema es infalible, por lo que no podemos garantizar seguridad absoluta.'],
+  ['Derechos del usuario', 'Podés solicitar acceso, rectificación o eliminación de tus datos personales, así como revocar el consentimiento para comunicaciones comerciales, escribiéndonos a [PENDIENTE — email de contacto].'],
+  ['Modificaciones de la política', 'Podemos actualizar esta política. La versión vigente siempre estará publicada en esta página con su fecha de última actualización.'],
+  ['Datos de contacto', 'Responsable del tratamiento: [PENDIENTE — razón social]. RUC: [PENDIENTE]. Domicilio: [PENDIENTE]. Email: [PENDIENTE]. Teléfono: [PENDIENTE].']
+];
+
+const TERMINOS = [
+  ['Aceptación de los términos', 'Al navegar y comprar en Rocket Cards aceptás estos términos y condiciones. Si no estás de acuerdo con alguno de ellos, te pedimos no utilizar la tienda.'],
+  ['Productos y descripciones', 'Publicamos productos sellados originales con su descripción, colección y precio. Las fotografías son del producto real o de su empaque oficial; pueden existir mínimas variaciones de lote o versión de impresión.'],
+  ['Precios y disponibilidad', 'Los precios están expresados en guaraníes (Gs.) e incluyen los impuestos aplicables. Pueden cambiar sin aviso previo. La disponibilidad depende del stock real y se valida antes de confirmar el pedido.'],
+  ['Pedidos y confirmación', 'Un pedido queda confirmado cuando validamos stock y método de pago. Si un producto se agota entre el pedido y la confirmación, te avisamos y podés elegir reemplazo, nota de crédito o devolución.'],
+  ['Medios de pago', 'Aceptamos los medios de pago definidos por el comercio: [PENDIENTE — listar medios]. Cuando se integre una pasarela de pagos en línea, se informará en el checkout.'],
+  ['Entregas y envíos', 'Ofrecemos retiro coordinado y envío. Los plazos son estimados y dependen del courier. El riesgo de pérdida se transfiere al momento de la entrega al comprador o al transportista designado por el comprador.'],
+  ['Cambios y devoluciones', 'Aceptamos cambios por producto incorrecto o con daño de fábrica, informado dentro de [PENDIENTE — plazo] desde la recepción y con el producto sin abrir. No se aceptan devoluciones por el contenido aleatorio de sobres o cajas sellados.'],
+  ['Preventas', 'En preventas el pago reserva unidad y la entrega se realiza cuando el distribuidor libera el producto. Las fechas de lanzamiento pueden ser modificadas por el fabricante.'],
+  ['Uso del sitio', 'No está permitido usar la tienda para fines ilícitos, extraer datos de forma automatizada ni interferir con su funcionamiento.'],
+  ['Propiedad intelectual', 'Pokémon y las marcas asociadas pertenecen a sus respectivos titulares. Rocket Cards es un comercio independiente, no afiliado ni patrocinado por The Pokémon Company.'],
+  ['Limitación de responsabilidad', 'Nuestra responsabilidad se limita al valor del producto adquirido. No respondemos por daños indirectos derivados del uso de la tienda.'],
+  ['Jurisdicción y contacto', 'Estos términos se rigen por las leyes de la República del Paraguay. Para cualquier reclamo: [PENDIENTE — email y teléfono de contacto].']
+];
+
+const CATEGORIAS = [
+  { key: 'sellados', name: 'Sellados y coleccionables', kicker: 'Producto sellado',
+    note: 'Bundle · Collections · Premium', notaMenu: 'Booster Box · Bundle · Collections',
+    accent: '#E30613', img: '/assets/catalogo/prismatic-figure-collection.webp' },
+  { key: 'sobres', name: 'Sobres', kicker: 'Booster packs',
+    note: 'Sellados de origen', notaMenu: 'Sellados de origen',
+    accent: '#F5F5F5', img: '/assets/catalogo/pitch-black-pack.webp' },
+  { key: 'etb', name: 'ETB', kicker: 'Elite Trainer Box',
+    note: 'Set completo + accesorios', notaMenu: 'Elite Trainer Box',
+    accent: '#C9A227', img: '/assets/catalogo/koraidon-etb.webp' },
+  // Cartas sueltas. Arranca sin productos: se cargan en CATALOG con cat:'singles'.
+  { key: 'singles', name: 'Singles', kicker: 'Carta suelta',
+    note: 'Cartas individuales', notaMenu: 'Cartas individuales',
+    accent: '#FF1A27', img: '/assets/cards/pikachu-ex.webp' }
+];
+
+const CAT_IMG = CATEGORIAS.reduce((o, c) => { o[c.key] = c.img; return o; }, {});
+const CAT_KEYS = CATEGORIAS.map(c => c.key);
+const catCount = (key) => CATALOG.filter(p => p.cat === key).length;
+const catCountLabel = (n) => n > 0 ? n + ' productos' : 'Próximamente';
+
+const NEW_IDS = ['FP-S2','ME-PB-ETB','SV-PE-PFC','ME-AH-TS','SV-PE-BB','FP-S1'];
+
+/* La geometria del abanico de la portada: cinco lugares, de izquierda a
+   derecha. Esto NO se edita desde el panel a proposito — esta calibrado para
+   que las cinco cartas se superpongan bien en cualquier pantalla, y un numero
+   mal puesto rompe la portada sin forma obvia de volver atras. Desde el panel
+   se cambia la foto de cada lugar, no su posicion. */
+const HERO_GEO = [
+  { rot: '-16deg', lift: '52px',  delay: '.06s', w: 'clamp(122px,16.6vw,254px)', z: 1 },
+  { rot: '-7deg',  lift: '12px',  delay: '.14s', w: 'clamp(145px,18.4vw,282px)', z: 3 },
+  { rot: '0deg',   lift: '-26px', delay: '.3s',  w: 'clamp(170px,21.4vw,328px)', z: 6 },
+  { rot: '6deg',   lift: '10px',  delay: '.38s', w: 'clamp(145px,18.4vw,282px)', z: 3 },
+  { rot: '13deg',  lift: '34px',  delay: '.46s', w: 'clamp(126px,17.2vw,264px)', z: 2 }
+];
+
+/* Las fotos de esos cinco lugares, y los datos de contacto. Son los valores
+   de respaldo: si hay base, los reemplaza aplicarCatalogo(). */
+const PORTADA = [
+  { img: '/assets/cards/rayquaza-v.webp', alt: 'Rayquaza V · Evolving Skies 194/203' },
+  { img: '/assets/cards/leafeon-ex.webp', alt: 'Leafeon ex · Prismatic Evolutions 144/131' },
+  { img: '/assets/cards/pikachu-ex.webp', alt: 'Pikachu ex · Teracristal 238/191' },
+  { img: '/assets/cards/umbreon-ex.webp', alt: 'Umbreon ex · Prismatic Evolutions 161/131' },
+  { img: '/assets/cards/jirachi-ex.webp', alt: 'Jirachi ex · Pikachu 30 155/128' }
+];
+
+const CONFIG = {
+  whatsapp: '595981377541',
+  instagram: 'rocketcardspy',
+  descripcion: 'Tienda especializada en Pokémon TCG y coleccionismo. Producto sellado original y envíos a todo Paraguay.'
+};
+
+/** El numero tal cual lo escribe la gente: 0981 377 541 */
+function waLegible(n) {
+  const d = String(n || '').replace(/\D/g, '');
+  const local = d.startsWith('595') ? '0' + d.slice(3) : d;
+  return local.replace(/^(\d{4})(\d{3})(\d{3})$/, '$1 $2 $3') || local;
+}
+
+/**
+ * Reemplaza el catálogo escrito arriba por el que manda la base.
+ *
+ * Los arreglos se vacían y se vuelven a llenar en vez de reasignarse: hay
+ * closures y window.ROCKET_SHOP apuntando a estos mismos objetos, y si los
+ * cambiamos por otros nuevos se quedarían mirando los viejos.
+ *
+ * Devuelve false si el dato no sirve, y en ese caso la página sigue con el
+ * catálogo que ya tenía. Es lo que pasa en el sitio estático de Vercel, donde
+ * no hay API: nadie se entera de que faltó.
+ */
+function aplicarCatalogo(d) {
+  if (!d || !Array.isArray(d.productos) || !d.productos.length) return false;
+
+  CATALOG.length = 0;
+  CATALOG.push.apply(CATALOG, d.productos);
+
+  if (Array.isArray(d.categorias) && d.categorias.length) {
+    CATEGORIAS.length = 0;
+    CATEGORIAS.push.apply(CATEGORIAS, d.categorias);
+    CAT_KEYS.length = 0;
+    CAT_KEYS.push.apply(CAT_KEYS, CATEGORIAS.map(c => c.key));
+    Object.keys(CAT_IMG).forEach(k => { delete CAT_IMG[k]; });
+    CATEGORIAS.forEach(c => { CAT_IMG[c.key] = c.img; });
+  }
+
+  // Si la base no marcó ninguno, dejamos el carrusel como estaba antes que
+  // mostrarlo vacío.
+  if (Array.isArray(d.nuevos) && d.nuevos.length) {
+    NEW_IDS.length = 0;
+    NEW_IDS.push.apply(NEW_IDS, d.nuevos);
+  }
+
+  // Los ajustes se mezclan en vez de reemplazarse: si la base todavía no
+  // tiene una clave, sigue valiendo la de acá en vez de quedar vacía.
+  if (d.config && typeof d.config === 'object') Object.assign(CONFIG, d.config);
+
+  // La portada sólo si vienen los cinco lugares: con menos, el abanico
+  // quedaría incompleto y se vería peor que con las fotos viejas.
+  if (Array.isArray(d.portada) && d.portada.length === PORTADA.length) {
+    PORTADA.length = 0;
+    PORTADA.push.apply(PORTADA, d.portada);
+  }
+  return true;
+}
+
+class Component extends DCLogic {
+  state = {
+    q: '', searchOpen: false, searching: false, results: [], mSearchOpen: false,
+    cart: [], cartOpen: false, toast: '', menuOpen: false, catMenuOpen: false, catHover: 0, car: 0,
+    view: 'home', pid: null, qty: 1, foto: 0, fCats: [], fAvail: false, sort: 'recent', legalDoc: 'privacidad', waHidden: false,
+    w: typeof window !== 'undefined' ? window.innerWidth : 1440
+  };
+
+  componentDidMount() {
+    // Vista inicial segun la URL, y el boton atras del navegador.
+    const inicial = this.routeFrom(location.pathname);
+    if (inicial.view !== 'home') this.setState(inicial);
+    const ruta0 = Object.assign({}, this.state, inicial);
+    this._urlPath = this.pathOf(ruta0);
+    this._urlKey = ruta0.view + '|' + (ruta0.pid || '') + '|' + (ruta0.legalDoc || '');
+    this._lastView = ruta0.view;
+    history.replaceState({ rc: 1 }, '', this._urlPath);
+    this._onPop = () => {
+      this._fromPop = true;
+      this.setState(Object.assign(
+        { cartOpen: false, catMenuOpen: false, menuOpen: false, searchOpen: false, fCats: [] },
+        this.routeFrom(location.pathname)
+      ));
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener('popstate', this._onPop);
+    requestAnimationFrame(() => this.syncRails());
+    this.conectarCatalogo();
+
+    window.ROCKET_SHOP = Object.assign(window.ROCKET_SHOP || {}, {
+      catalog: CATALOG,
+      fmt: (n) => this.fmt(n),
+      addToCart: (id) => { const p = CATALOG.find(x => x.id === id); if (p) this.addToCart(p); },
+      openProduct: (id) => this.openProduct(id)
+    });
+    this._onResize = () => { this.setState({ w: window.innerWidth }); this.syncRails(); };
+    window.addEventListener('resize', this._onResize);
+    this._onScroll = () => {
+      const fo = document.querySelector('footer');
+      if (!fo) return;
+      const hide = fo.getBoundingClientRect().top < window.innerHeight - 40;
+      if (hide !== this.state.waHidden) this.setState({ waHidden: hide });
+    };
+    window.addEventListener('scroll', this._onScroll, { passive: true });
+    window.addEventListener('resize', this._onScroll, { passive: true });
+    window.addEventListener('load', this._onScroll);
+    this._waTimer = setInterval(this._onScroll, 500);
+    this._onScroll();
+    this._onDocClick = (e) => {
+      if (this.state.searchOpen && !e.target.closest('input')) this.setState({ searchOpen: false });
+    };
+    document.addEventListener('click', this._onDocClick);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('resize', this._onResize);
+    window.removeEventListener('scroll', this._onScroll);
+    window.removeEventListener('resize', this._onScroll);
+    window.removeEventListener('load', this._onScroll);
+    clearInterval(this._waTimer);
+    document.removeEventListener('click', this._onDocClick);
+    clearTimeout(this._searchTimer); clearTimeout(this._toastTimer); clearTimeout(this._catTimer);
+    window.removeEventListener('popstate', this._onPop);
+    if (this._canal && this._sb) { this._sb.removeChannel(this._canal); this._canal = null; }
+  }
+
+  /**
+   * Catálogo en vivo.
+   *
+   * El catálogo escrito en esta página es el que sirve al sitio estático. Si
+   * detrás hay servidor, lo pisa con el de la base y se queda escuchando: el
+   * panel de admin cambia un precio y esta pantalla lo muestra sin que nadie
+   * recargue nada.
+   *
+   * Es un stream abierto, no una consulta cada tantos segundos. Mientras el
+   * catálogo no cambie, el navegador no pide nada y la base no recibe ni una
+   * consulta, por más gente que esté mirando la tienda.
+   */
+  /**
+   * Catálogo en vivo.
+   *
+   * El catálogo escrito en esta página es el que se ve mientras llega el de
+   * la base, y el que queda si Supabase no contesta. Nadie ve una tienda
+   * vacía por un problema de red.
+   *
+   * No hay consultas cada tantos segundos: se lee una vez y después la
+   * pantalla queda suscrita por Realtime. Supabase avisa por websocket
+   * cuando una fila cambia y recién ahí volvemos a leer. Mil personas
+   * mirando la tienda con el catálogo quieto son cero consultas.
+   */
+  conectarCatalogo(reintento) {
+    const cfg = window.ROCKET_CONFIG;
+    // Los dos <script> de arriba van con defer, así que pueden no haber
+    // corrido todavía cuando React monta. Si no están, esperamos al load y
+    // probamos una vez más; si tampoco, es que no hay Supabase configurado.
+    if (!cfg || !cfg.url || !window.supabase) {
+      if (!reintento) window.addEventListener('load', () => this.conectarCatalogo(true), { once: true });
+      return;
+    }
+
+    // persistSession en false: la tienda no inicia sesión de nadie, y así no
+    // le escribe nada al localStorage del visitante.
+    this._sb = window.supabase.createClient(cfg.url, cfg.anonKey, {
+      db: { schema: cfg.schema || 'rocketcards' },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    this.traerCatalogo();
+
+    const alCambiar = () => this.traerCatalogo();
+    this._canal = this._sb.channel('tienda-rocketcards')
+      .on('postgres_changes', { event: '*', schema: cfg.schema, table: 'producto' }, alCambiar)
+      .on('postgres_changes', { event: '*', schema: cfg.schema, table: 'categoria' }, alCambiar)
+      .subscribe();
+  }
+
+  async traerCatalogo() {
+    try {
+      const { data, error } = await this._sb.rpc('catalogo');
+      if (error || !data) return;
+      if (aplicarCatalogo(data)) this.forceUpdate();
+    } catch (_) {
+      // Sin base, la página se queda con el catálogo que ya tenía.
+    }
+  }
+
+  fmt(n) { return 'Gs. ' + n.toLocaleString('es-PY'); }
+
+  stockInfo(p) {
+    const inCart = (this.state.cart.find(i => i.id === p.id) || {}).qty || 0;
+    const left = p.stock - inCart;
+    if (p.stock === 0) return { label: 'Agotado', color: '#6e6e6e' };
+    if (left <= 0) return { label: 'Sin stock disponible', color: '#C9A227' };
+    if (p.stock === 1) return { label: 'Última unidad', color: '#C9A227' };
+    if (p.stock === 2) return { label: 'Últimas 2 unidades', color: '#C9A227' };
+    return { label: p.stock + ' disponibles', color: '#7a7a7a' };
+  }
+
+  decorate(p) {
+    const si = this.stockInfo(p);
+    // Qué etiqueta gana cuando hay más de una razón para poner una.
+    // Sin stock manda siempre: es lo único que le cambia la decisión al que
+    // está mirando. Después, lo que el panel marcó como destacado.
+    const tag = p.stock === 0 ? (p.tag || 'AGOTADO')
+              : p.destacado   ? 'DESTACADO'
+              : p.tag;
+    const ts = TAG_STYLE[tag] || TAG_STYLE['NUEVO'];
+    return Object.assign({}, p, {
+      tag,
+      priceLabel: this.fmt(p.price),
+      oldLabel: p.old ? this.fmt(p.old) : '',
+      hasOld: !!p.old,
+      hasTag: !!tag,
+      tagBg: ts.bg, tagFg: ts.fg,
+      stockLabel: si.label, stockColor: si.color,
+      discount: p.old ? '-' + Math.round((1 - p.price / p.old) * 100) + '%' : '',
+      btnLabel: p.stock === 0 ? 'Agotado' : 'Agregar al carrito',
+      btnBg: p.stock === 0 ? '#1f1f1f' : '#E30613',
+      btnFg: p.stock === 0 ? '#A7A7A7' : '#ffffff',
+      cursor: p.stock === 0 ? 'not-allowed' : 'pointer',
+      waLink: 'https://wa.me/' + CONFIG.whatsapp + '?text=' + encodeURIComponent('Hola Rocket Cards, quiero consultar por ' + p.name + '.'),
+      add: (e) => { if (e) { e.preventDefault(); e.stopPropagation(); } this.addToCart(p); },
+      shortName: p.name.length > 42 ? p.name.slice(0, 42) + '…' : p.name,
+      imgCss: 'url("' + p.img + '")',
+      desc: 'Producto sellado original de ' + p.set.split(' · ')[0] + '. Se envía en su empaque de fábrica, sin abrir. Stock real verificado en depósito; el inventario se descuenta al confirmar el pedido.',
+      open: (e) => { if (e) { e.preventDefault(); e.stopPropagation(); } this.openProduct(p.id); },
+      addQty: () => { for (let i = 0; i < this.state.qty; i++) this.addToCart(p); },
+      buyNow: () => { for (let i = 0; i < this.state.qty; i++) this.addToCart(p); this.setState({ cartOpen: true, toast: '' }); }
+    });
+  }
+
+  /**
+   * Ajusta las flechas de cada carrusel: si todo entra en pantalla no hay
+   * nada que desplazar y se esconden, y en los extremos se apaga la que
+   * no lleva a ningun lado. Sin esto, "Sobres" (3 productos) mostraba dos
+   * flechas que no hacian nada en pantallas anchas.
+   */
+  syncRails() {
+    document.querySelectorAll('[data-rail-wrap]').forEach((wrap) => {
+      const rail = wrap.querySelector('[data-rail]');
+      const nav = wrap.querySelector('[data-rail-nav]');
+      if (!rail || !nav) return;
+      const max = rail.scrollWidth - rail.clientWidth;
+      if (max <= 2) { nav.style.display = 'none'; return; }
+      nav.style.display = 'flex';
+      const x = rail.scrollLeft;
+      const btns = nav.querySelectorAll('button');
+      const apagar = (b, off) => {
+        if (!b) return;
+        b.disabled = off;
+        b.style.opacity = off ? '.3' : '1';
+        b.style.cursor = off ? 'default' : 'pointer';
+      };
+      apagar(btns[0], x <= 2);
+      apagar(btns[1], x >= max - 2);
+      if (!rail.dataset.railBound) {
+        rail.dataset.railBound = '1';
+        rail.addEventListener('scroll', () => {
+          if (this._railRaf) return;
+          this._railRaf = requestAnimationFrame(() => { this._railRaf = 0; this.syncRails(); });
+        }, { passive: true });
+      }
+    });
+  }
+
+  /** Devuelve una carta del abanico a su posición de reposo. */
+  heroReset(el) {
+    el.dataset.picked = '0';
+    el.style.transform = 'rotate(' + el.dataset.rot + ') translateY(' + el.dataset.lift + ')';
+    el.style.zIndex = el.dataset.z;
+    el.style.boxShadow = '0 26px 52px rgba(0,0,0,.92)';
+  }
+
+  railScroll(e, dir) {
+    const wrap = e.currentTarget.closest('[data-rail-wrap]');
+    const rail = wrap && wrap.querySelector('[data-rail]');
+    if (!rail) return;
+    const step = Math.max(240, rail.clientWidth * 0.8) * dir;
+    const from = rail.scrollLeft;
+    const max = rail.scrollWidth - rail.clientWidth;
+    const to = Math.max(0, Math.min(max, from + step));
+    const t0 = performance.now();
+    const tick = (t) => {
+      const k = Math.min(1, (t - t0) / 420);
+      const e2 = 1 - Math.pow(1 - k, 3);
+      rail.scrollLeft = from + (to - from) * e2;
+      if (k < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  // Ojo: el runtime llama componentDidUpdate(prevProps) y NO pasa prevState,
+  // así que el estado anterior lo guardamos nosotros.
+  componentDidUpdate() {
+    this.syncUrl();
+    this.syncRails();
+    if (this._lastView !== this.state.view) {
+      this._lastView = this.state.view;
+      if (this._onScroll) { requestAnimationFrame(this._onScroll); setTimeout(this._onScroll, 120); }
+    }
+  }
+
+  // ── Ruteo ────────────────────────────────────────────────────────
+  // La app es una sola página, pero cada vista tiene su URL real:
+  //   /                         inicio
+  //   /catalogo                 catálogo completo
+  //   /catalogo/sellados|sobres|etb
+  //   /producto/<slug>          ficha de producto
+  //   /privacidad  /terminos
+  // El slug sale del nombre del producto; el id queda como respaldo para
+  // que un enlace viejo con /producto/ME-PB-ETB siga funcionando.
+
+  slugOf(p) {
+    return String((p && p.name) || '')
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  pathOf(st) {
+    if (st.view === 'product') {
+      const p = CATALOG.find(x => x.id === st.pid);
+      return p ? '/producto/' + this.slugOf(p) : '/';
+    }
+    if (st.view === 'catalog') {
+      const cats = st.fCats || [];
+      return '/catalogo' + (cats.length === 1 ? '/' + cats[0] : '');
+    }
+    if (st.view === 'legal') return st.legalDoc === 'terminos' ? '/terminos' : '/privacidad';
+    return '/';
+  }
+
+  routeFrom(path) {
+    let seg;
+    try { seg = decodeURIComponent(path || '/'); } catch (_) { seg = path || '/'; }
+    seg = seg.replace(/^\/+|\/+$/g, '').split('/');
+    const CATS = CAT_KEYS;
+    if (seg[0] === 'producto' && seg[1]) {
+      const key = seg[1].toLowerCase();
+      const p = CATALOG.find(x => this.slugOf(x) === key) || CATALOG.find(x => x.id.toLowerCase() === key);
+      // Producto inexistente: al catálogo, no a una ficha rota.
+      return p ? { view: 'product', pid: p.id, qty: 1 } : { view: 'catalog', fCats: [] };
+    }
+    if (seg[0] === 'catalogo') return { view: 'catalog', fCats: CATS.includes(seg[1]) ? [seg[1]] : [] };
+    if (seg[0] === 'terminos') return { view: 'legal', legalDoc: 'terminos' };
+    if (seg[0] === 'privacidad') return { view: 'legal', legalDoc: 'privacidad' };
+    return { view: 'home' };
+  }
+
+  /** Mantiene la barra de direcciones al día cuando cambia la vista. */
+  syncUrl() {
+    const st = this.state;
+    const key = st.view + '|' + (st.pid || '') + '|' + (st.legalDoc || '');
+    const next = this.pathOf(st);
+    const prevKey = this._urlKey, prevPath = this._urlPath;
+    this._urlKey = key; this._urlPath = next;
+    if (prevPath === undefined) return;                     // primer render
+    if (next === prevPath || next === location.pathname) return;
+    if (this._fromPop) { this._fromPop = false; return; }   // vino del botón atrás
+    // Cambiar de vista apila; filtrar dentro del catálogo reemplaza,
+    // para no llenar el historial con cada clic de filtro.
+    if (key !== prevKey) history.pushState({ rc: 1 }, '', next);
+    else history.replaceState({ rc: 1 }, '', next);
+  }
+
+  openLegal(doc) {
+    this.setState({ view: 'legal', legalDoc: doc, catMenuOpen: false, menuOpen: false });
+    window.scrollTo(0, 0);
+  }
+
+  openProduct(id) {
+    this.setState({ view: 'product', pid: id, qty: 1, foto: 0, catMenuOpen: false, menuOpen: false, searchOpen: false });
+    window.scrollTo(0, 0);
+  }
+  goSection(id) {
+    this.setState({ view: 'home', catMenuOpen: false, menuOpen: false }, () => {
+      let tries = 0;
+      const jump = () => {
+        const el = document.getElementById(id);
+        if (el) {
+          const y = el.getBoundingClientRect().top + (window.pageYOffset || document.documentElement.scrollTop || 0) - 70;
+          if (y > 0) { window.scrollTo(0, y); return; }
+        }
+        if (tries++ < 20) setTimeout(jump, 60);
+      };
+      setTimeout(jump, 40);
+    });
+  }
+
+  openCat(cat) {
+    this.setState({ view: 'catalog', fCats: cat ? [cat] : [], catMenuOpen: false, menuOpen: false });
+    window.scrollTo(0, 0);
+  }
+
+  addToCart(p) {
+    if (p.stock === 0) { this.flash('Producto agotado — avisanos por WhatsApp'); return; }
+    this.setState(s => {
+      const cart = s.cart.slice();
+      const i = cart.findIndex(x => x.id === p.id);
+      if (i >= 0) {
+        if (cart[i].qty >= p.stock) return { toast: p.stock === 1 ? 'Solo hay 1 unidad de ' + p.name : 'Solo hay ' + p.stock + ' unidades de ' + p.name };
+        cart[i] = Object.assign({}, cart[i], { qty: cart[i].qty + 1 });
+      } else cart.push({ id: p.id, qty: 1 });
+      return { cart, toast: p.name + ' agregado al carrito' };
+    }, () => this.armToast());
+  }
+  flash(msg) { this.setState({ toast: msg }, () => this.armToast()); }
+  armToast() { clearTimeout(this._toastTimer); this._toastTimer = setTimeout(() => this.setState({ toast: '' }), 2400); }
+
+  renderVals() {
+    const s = this.state;
+    const byId = id => CATALOG.find(p => p.id === id);
+    const pick = (f) => CATALOG.filter(f).map(p => this.decorate(p));
+
+    // Con el catálogo en vivo, un producto que está en el carrito puede
+    // desaparecer mientras el cliente mira (lo borraron u ocultaron desde el
+    // panel). Sin este filtro, p queda undefined y la página entera se cae.
+    const cartItems = s.cart.filter(ci => byId(ci.id)).map(ci => {
+      const p = byId(ci.id);
+      return Object.assign({}, p, {
+        qty: ci.qty,
+        lineLabel: this.fmt(p.price * ci.qty),
+        atMax: ci.qty >= p.stock,
+        incColor: ci.qty >= p.stock ? '#3a3a3a' : '#F5F5F5',
+        inc: () => this.addToCart(p),
+        dec: () => this.setState(st => ({ cart: st.cart.map(x => x.id === ci.id ? Object.assign({}, x, { qty: x.qty - 1 }) : x).filter(x => x.qty > 0) })),
+        remove: () => this.setState(st => ({ cart: st.cart.filter(x => x.id !== ci.id) }))
+      });
+    });
+    const subtotal = cartItems.reduce((a, i) => a + i.price * i.qty, 0);
+    let catalogList = CATALOG.filter(p => (s.fCats.length === 0 || s.fCats.indexOf(p.cat) >= 0) && (!s.fAvail || p.stock > 0));
+    if (s.sort === 'asc') catalogList = catalogList.slice().sort((a, b) => a.price - b.price);
+    else if (s.sort === 'desc') catalogList = catalogList.slice().sort((a, b) => b.price - a.price);
+    else if (s.sort === 'name') catalogList = catalogList.slice().sort((a, b) => a.name.localeCompare(b.name));
+    catalogList = catalogList.map(p => this.decorate(p));
+    const prodRaw = s.pid ? byId(s.pid) : null;
+
+    // Los ids del carrusel, sólo los que existen en el catálogo de ahora.
+    // Con el catálogo en vivo, un producto puede borrarse u ocultarse
+    // mientras su id sigue en la lista, y decorate(undefined) tiraba la
+    // página entera. Si no queda ninguno, mostramos los primeros del
+    // catálogo antes que un carrusel vacío.
+    const nuevos = (() => {
+      const vivos = NEW_IDS.filter(id => byId(id));
+      return vivos.length ? vivos : CATALOG.slice(0, 6).map(p => p.id);
+    })();
+    const car = nuevos.length ? (s.car || 0) % nuevos.length : 0;
+    const prodDec = prodRaw ? this.decorate(prodRaw) : null;
+    const shipping = subtotal === 0 ? 0 : (subtotal >= 500000 ? 0 : 35000);
+
+    // Galería de la ficha. "imagenes" trae todas las fotos en orden (la
+    // primera es la portada); un producto cargado antes de que existiera la
+    // galería sólo tiene "img".
+    const prodFotosRaw = prodRaw
+      ? (Array.isArray(prodRaw.imagenes) && prodRaw.imagenes.length ? prodRaw.imagenes : [prodRaw.img]).filter(Boolean)
+      : [];
+    const fotoIdx = Math.min(s.foto || 0, Math.max(prodFotosRaw.length - 1, 0));
+
+    // Finalizar compra: el pedido armado, listo para mandar por WhatsApp.
+    // Lleva el SKU de cada producto para identificarlo sin ambigüedad.
+    const pedido = cartItems.length ? [
+      'Hola Rocket Cards, quiero hacer este pedido:',
+      '',
+      ...cartItems.map(i => '• ' + i.qty + ' × ' + i.name + ' (' + i.id + ') — ' + this.fmt(i.price * i.qty)),
+      '',
+      'Subtotal: ' + this.fmt(subtotal),
+      'Envío estimado: ' + (shipping === 0 ? 'Gratis' : this.fmt(shipping)),
+      'Total: ' + this.fmt(subtotal + shipping)
+    ].join('\n') : '';
+
+    return {
+      isHome: s.view === 'home',
+      // Si la ficha abierta se borra u oculta desde el panel mientras alguien
+      // la mira, mostramos el catálogo en vez de una ficha sin producto.
+      isCatalog: s.view === 'catalog' || (s.view === 'product' && !prodDec),
+      isProduct: s.view === 'product' && !!prodDec,
+      isLegal: s.view === 'legal',
+      waOpacity: s.waHidden ? '0' : '1',
+      waTransform: s.waHidden ? 'translateY(22px) scale(.94)' : 'none',
+      waPE: s.waHidden ? 'none' : 'auto',
+      legalTitle: s.legalDoc === 'terminos' ? 'Términos y condiciones' : 'Política de privacidad',
+      pickPrivacidad: () => this.setState({ legalDoc: 'privacidad' }),
+      pickTerminos: () => this.setState({ legalDoc: 'terminos' }),
+      tabPrivBg: s.legalDoc === 'privacidad' ? '#E30613' : 'transparent',
+      tabPrivBorder: s.legalDoc === 'privacidad' ? '#E30613' : '#242424',
+      tabPrivColor: s.legalDoc === 'privacidad' ? '#ffffff' : '#A7A7A7',
+      tabTermBg: s.legalDoc === 'terminos' ? '#E30613' : 'transparent',
+      tabTermBorder: s.legalDoc === 'terminos' ? '#E30613' : '#242424',
+      tabTermColor: s.legalDoc === 'terminos' ? '#ffffff' : '#A7A7A7',
+      legalBlocks: (s.legalDoc === 'terminos' ? TERMINOS : PRIVACIDAD).map((b, i) => ({ n: (i + 1) < 10 ? '0' + (i + 1) : String(i + 1), t: b[0], d: b[1] })),
+      goHome: (e) => { if (e) e.preventDefault(); this.setState({ view: 'home', catMenuOpen: false, menuOpen: false }); window.scrollTo(0, 0); },
+      openCatalog: (e) => { if (e) e.preventDefault(); this.openCat(null); },
+      goNuevos: (e) => { if (e) e.preventDefault(); this.goSection('nuevos'); },
+      goContacto: (e) => { if (e) e.preventDefault(); this.goSection('contacto'); },
+      wide: s.w >= 1180,
+      narrow: s.w < 1180,
+      menuOpen: s.menuOpen && s.w < 1180,
+      toggleMenu: () => this.setState(st => ({ menuOpen: !st.menuOpen })),
+      catMenuOpen: s.catMenuOpen,
+      catMenuColor: s.catMenuOpen ? '#FF1A27' : '#F5F5F5',
+      // Entre el link del header y el panel hay un hueco (el padding inferior
+      // del header). Al cruzarlo salta mouseleave y el menú se cerraba antes
+      // de que el cursor llegara. El cierre espera un momento y cualquier
+      // mouseenter (link o panel) lo cancela.
+      openCatMenu: () => { clearTimeout(this._catTimer); this.setState({ catMenuOpen: true }); },
+      closeCatMenu: () => {
+        clearTimeout(this._catTimer);
+        this._catTimer = setTimeout(() => this.setState({ catMenuOpen: false, catHover: 0 }), 220);
+      },
+      megaCats: CATEGORIAS.map((c, i) => ({
+        name: c.name,
+        count: catCount(c.key),
+        countLabel: catCountLabel(catCount(c.key)),
+        note: c.notaMenu,
+        imgCss: 'url("' + c.img + '")',
+        color: s.catHover === i ? '#FF1A27' : '#F5F5F5',
+        hover: () => this.setState({ catHover: i }),
+        go: (e) => { if (e) e.preventDefault(); this.openCat(c.key); }
+      })),
+      megaImageCss: 'url("' + (CATEGORIAS[s.catHover || 0] || CATEGORIAS[0]).img + '")',
+
+      q: s.q,
+      hasQuery: s.q.length > 0,
+      searchOpen: s.searchOpen && s.q.trim().length > 0,
+      searching: s.searching,
+      showResults: !s.searching && s.results.length > 0,
+      noResults: !s.searching && s.q.trim().length > 0 && s.results.length === 0,
+      results: s.results.map(p => this.decorate(p)),
+      skeletons: [1, 2, 3],
+      onSearchFocus: () => this.setState({ searchOpen: true }),
+      // En el teléfono el buscador arranca colapsado en una lupa: el campo
+      // ocupaba una fila entera del header para algo que casi no se usa al
+      // entrar. Al abrirlo se enfoca solo, así el teclado aparece de una.
+      mSearchOpen: s.mSearchOpen ? '1' : '0',
+      mSearchExpanded: s.mSearchOpen ? 'true' : 'false',
+      toggleSearch: () => this.setState(st => ({ mSearchOpen: !st.mSearchOpen }), () => {
+        if (!this.state.mSearchOpen) return;
+        const i = document.querySelector('[data-hdr-search] input');
+        if (i) i.focus();
+      }),
+      clearSearch: (e) => { e.preventDefault(); this.setState({ q: '', results: [], searchOpen: false }); },
+      onSearch: (e) => {
+        const q = e.target.value;
+        this.setState({ q, searchOpen: true, searching: q.trim().length > 0 });
+        clearTimeout(this._searchTimer);
+        this._searchTimer = setTimeout(() => {
+          const t = q.trim().toLowerCase();
+          const r = t ? CATALOG.filter(p => (p.name + ' ' + p.set + ' ' + p.cat + ' ' + (p.meta || '') + ' ' + p.id).toLowerCase().includes(t)).slice(0, 6) : [];
+          this.setState({ results: r, searching: false });
+        }, 260);
+      },
+
+      heroCards: HERO_GEO.map((g, i) => Object.assign({}, g, {
+        src: (PORTADA[i] || {}).img || '',
+        alt: (PORTADA[i] || {}).alt || ''
+      })),
+      heroEnter: (e) => {
+        const el = e.currentTarget;
+        el.style.transform = 'rotate(0deg) translateY(calc(' + el.dataset.lift + ' - 34px)) scale(1.07)';
+        el.style.zIndex = '20';
+        el.style.boxShadow = '0 34px 70px rgba(0,0,0,.95), 0 0 0 1px rgba(227,6,19,.5)';
+      },
+      heroLeave: (e) => {
+        const el = e.currentTarget;
+        if (el.dataset.picked === '1') return;   // elegida: se queda adelante
+        this.heroReset(el);
+      },
+      heroTap: (e) => {
+        const el = e.currentTarget;
+        const yaEstaba = el.dataset.picked === '1';
+        for (const c of el.parentElement.children) {
+          c.dataset.picked = '0';
+          if (c !== el) this.heroReset(c);
+        }
+        if (yaEstaba) { this.heroReset(el); return; }
+        el.dataset.picked = '1';
+        el.style.transform = 'rotate(0deg) translateY(calc(' + el.dataset.lift + ' - 34px)) scale(1.07)';
+        el.style.zIndex = '20';
+        el.style.boxShadow = '0 34px 70px rgba(0,0,0,.95), 0 0 0 1px rgba(227,6,19,.5)';
+      },
+      goTop: (e) => { if (e) e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); },
+      topBandEnter: (e) => {
+        const a = e.currentTarget.querySelector('[data-arrow]'); if (a) { a.style.transform = 'translateY(-5px)'; a.style.borderColor = '#E30613'; }
+        const g = e.currentTarget.querySelector('[data-glow]'); if (g) g.style.opacity = '1';
+      },
+      topBandLeave: (e) => {
+        const a = e.currentTarget.querySelector('[data-arrow]'); if (a) { a.style.transform = 'none'; a.style.borderColor = '#2a2a2a'; }
+        const g = e.currentTarget.querySelector('[data-glow]'); if (g) g.style.opacity = '.55';
+      },
+      railPrev: (e) => this.railScroll(e, -1),
+      railNext: (e) => this.railScroll(e, 1),
+      trustAvatars: [1, 2, 3],
+      marquee: [1, 2],
+      quickLinks: ['Singles', 'Booster Boxes', 'ETB', 'Accesorios'],
+
+      catFeatured: CATEGORIAS.map(c => ({
+        name: c.name, cat: c.key, kicker: c.kicker, note: c.note, accent: c.accent,
+        count: catCount(c.key),
+        countLabel: catCountLabel(catCount(c.key)),
+        imgCss: 'url("' + c.img + '")',
+        go: (e) => { if (e) e.preventDefault(); this.openCat(c.key); }
+      })),
+      catRest: [
+        { n: '04', name: 'Sobres', count: 36 }, { n: '05', name: 'Booster Box', count: 18 },
+        { n: '06', name: 'Booster Bundle', count: 14 }, { n: '07', name: 'Elite Trainer Box', count: 21 },
+        { n: '08', name: 'Collection Boxes', count: 11 }, { n: '09', name: 'Tins', count: 9 },
+        { n: '10', name: 'Fundas / Sleeves', count: 23 }, { n: '11', name: 'Deck Boxes', count: 16 },
+        { n: '12', name: 'Playmats', count: 7 }, { n: '13', name: 'Binders', count: 12 },
+        { n: '14', name: 'Ofertas', count: 19 }, { n: '15', name: 'Preventas', count: 6 }
+      ],
+
+      carCounter: ('0' + (car + 1)).slice(-2) + ' / ' + ('0' + nuevos.length).slice(-2),
+      // Deslizar con el dedo. Un solo camino para dedo, mouse y lápiz con
+      // Pointer Events. Mientras se arrastra, las diapositivas acompañan
+      // amortiguadas; al soltar, salta de a una o vuelve a su lugar.
+      carDown: (e) => {
+        if (e.pointerType === 'mouse' && e.buttons !== 1) return;
+        // Las flechas y el botón de agregar están dentro de la zona de gesto.
+        // Si capturamos el puntero también sobre ellos, los eventos siguientes
+        // se redirigen a este div y el navegador no dispara el click del botón.
+        if (e.target.closest && e.target.closest('button')) return;
+        this._car = { x0: e.clientX, y0: e.clientY, on: true, eje: '' };
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+      },
+      carMove: (e) => {
+        const d = this._car;
+        if (!d || !d.on) return;
+        const dx = e.clientX - d.x0, dy = e.clientY - d.y0;
+        // Hasta no saber si el gesto es horizontal o vertical no se toca nada,
+        // para no robarle el scroll a la página.
+        if (!d.eje) {
+          if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+          d.eje = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+          if (d.eje === 'y') { d.on = false; return; }
+        }
+        d.dx = dx;
+        const ul = e.currentTarget.querySelector('[data-car]');
+        if (ul) { ul.style.transition = 'none'; ul.style.transform = 'translateX(' + (dx * 0.35).toFixed(1) + 'px)'; }
+        e.preventDefault();
+      },
+      carUp: (e) => {
+        const d = this._car;
+        if (!d || !d.on) { this._car = null; return; }
+        this._car = null;
+        const ul = e.currentTarget.querySelector('[data-car]');
+        if (ul) { ul.style.transition = 'transform .32s cubic-bezier(.2,.7,.2,1)'; ul.style.transform = ''; }
+        const dx = d.dx || 0;
+        if (Math.abs(dx) < 45) return;            // muy corto: vuelve solo
+        this._carSwipe = Date.now();              // que no dispare el click
+        const n = nuevos.length;
+        this.setState({ car: (car + (dx < 0 ? 1 : -1) + n) % n });
+      },
+      carPrev: () => this.setState({ car: (car - 1 + nuevos.length) % nuevos.length }),
+      carNext: () => this.setState({ car: (car + 1) % nuevos.length }),
+      carSlides: nuevos.map((id, i) => {
+        const p = this.decorate(byId(id));
+        const n = nuevos.length;
+        const off = ((i - car + n + Math.floor(n / 2)) % n) - Math.floor(n / 2);
+        const abs = Math.abs(off);
+        const isCur = off === 0;
+        return Object.assign({}, p, {
+          // Solo la diapositiva visible y sus dos vecinas. Las demas tienen
+          // opacidad 0, asi que descargarlas era peso puro: al avanzar, la
+          // siguiente entra en rango y se carga con un paso de anticipacion.
+          imgCss: abs > 1 ? 'none' : 'url("' + p.img + '")',
+          liTransform: 'translateX(' + (off * 74) + '%) scale(' + (isCur ? 1 : 0.84) + ') rotateX(' + (isCur ? 0 : 9) + 'deg)',
+          liOpacity: abs > 1 ? 0 : 1,
+          liZ: 10 - abs,
+          liPE: abs > 1 ? 'none' : 'auto',
+          imgOpacity: isCur ? 1 : 0.26,
+          veil: isCur ? 1 : 0,
+          textOpacity: isCur ? 1 : 0,
+          textVis: isCur ? 'visible' : 'hidden',
+          select: (e) => {
+            if (Date.now() - (this._carSwipe || 0) < 400) return;   // venía de un deslizamiento
+            if (isCur) { if (e) e.stopPropagation(); this.openProduct(id); } else this.setState({ car: i });
+          },
+          move: (e) => {
+            if (!isCur) return;
+            const el = e.currentTarget.querySelector('[data-par]');
+            if (!el) return;
+            const r = e.currentTarget.getBoundingClientRect();
+            el.style.transform = 'translate3d(' + ((e.clientX - (r.left + r.width / 2)) / 26) + 'px,' + ((e.clientY - (r.top + r.height / 2)) / 26) + 'px,0)';
+          },
+          leave: (e) => {
+            const el = e.currentTarget.querySelector('[data-par]');
+            if (el) el.style.transform = 'none';
+          }
+        });
+      }),
+      sobres: pick(p => p.cat === 'sobres'),
+      sellados: pick(p => p.cat === 'sellados'),
+      etbs: pick(p => p.cat === 'etb'),
+      rowEnter: (e) => { const el = e.currentTarget; el.style.background = '#121212'; const b = el.querySelector('[data-bar]'); if (b) b.style.transform = 'scaleY(1)'; },
+      rowLeave: (e) => { const el = e.currentTarget; el.style.background = '#0A0A0A'; const b = el.querySelector('[data-bar]'); if (b) b.style.transform = 'scaleY(0)'; },
+
+
+      igSlots: [1, 2, 3, 4, 5, 6],
+      waGeneralLink: 'https://wa.me/' + CONFIG.whatsapp + '?text=' + encodeURIComponent('Hola Rocket Cards, quiero hacer una consulta.'),
+      waNumero: waLegible(CONFIG.whatsapp),
+      igUsuario: '@' + CONFIG.instagram,
+      igLink: 'https://instagram.com/' + CONFIG.instagram,
+      descripcionPie: CONFIG.descripcion,
+
+      footerCols: ((cols) => cols.map(c => Object.assign({}, c, {
+        links: c.links.map(l => Object.assign({}, l, {
+          go: l.doc ? (e) => { e.preventDefault(); this.openLegal(l.doc); } : (l.href.charAt(0) === '#' && l.href.length > 1 ? (e) => { e.preventDefault(); this.goSection(l.href.slice(1)); } : null)
+        }))
+      })))([
+        { title: 'Tienda', links: [{ label: 'Sellados y coleccionables', href: '#sellados' }, { label: 'Sobres', href: '#sobres' }, { label: 'ETB', href: '#etb' }, { label: 'Nuevos ingresos', href: '#nuevos' }] },
+        { title: 'Legal', links: [{ label: 'Política de Privacidad', href: '#politica-de-privacidad', doc: 'privacidad' }, { label: 'Términos y condiciones', href: '#terminos-y-condiciones', doc: 'terminos' }] },
+        { title: 'Redes', links: [{ label: 'Instagram · @' + CONFIG.instagram, href: 'https://instagram.com/' + CONFIG.instagram }, { label: 'WhatsApp', href: 'https://wa.me/' + CONFIG.whatsapp }] }
+      ]),
+
+      catalogCount: catalogList.length,
+      catalogProducts: catalogList,
+      catalogEmpty: catalogList.length === 0,
+      filterCats: CATEGORIAS.map(c => ({ key: c.key, label: c.name })).map(c => {
+        const on = s.fCats.indexOf(c.key) >= 0;
+        return {
+          label: c.label,
+          count: catCount(c.key),
+          bg: on ? '#E30613' : '#0A0A0A',
+          color: on ? '#ffffff' : '#F5F5F5',
+          toggle: () => this.setState(st => ({ fCats: on ? st.fCats.filter(x => x !== c.key) : st.fCats.concat([c.key]) }))
+        };
+      }),
+      toggleAvailable: () => this.setState(st => ({ fAvail: !st.fAvail })),
+      availBg: s.fAvail ? '#E30613' : 'transparent',
+      availBorder: s.fAvail ? '#E30613' : '#2a2a2a',
+      availMark: s.fAvail ? '✓' : '',
+      sortOptions: [
+        { key: 'recent', label: 'Más recientes' },
+        { key: 'asc', label: 'Precio: menor a mayor' },
+        { key: 'desc', label: 'Precio: mayor a menor' },
+        { key: 'name', label: 'Nombre A–Z' }
+      ].map(o => ({
+        label: o.label,
+        bg: s.sort === o.key ? '#161616' : '#0A0A0A',
+        color: s.sort === o.key ? '#FF1A27' : '#A7A7A7',
+        pick: () => this.setState({ sort: o.key })
+      })),
+      clearFilters: () => this.setState({ fCats: [], fAvail: false, sort: 'recent' }),
+
+      prod: prodDec,
+      prodFotoCss: prodFotosRaw.length ? 'url("' + prodFotosRaw[fotoIdx] + '")' : 'none',
+      prodVariasFotos: prodFotosRaw.length > 1,
+      prodFotos: prodFotosRaw.map((url, i) => ({
+        css: 'url("' + url + '")',
+        borde: i === fotoIdx ? '#E30613' : '#242424',
+        etiqueta: 'Ver foto ' + (i + 1) + ' de ' + prodFotosRaw.length,
+        ver: () => this.setState({ foto: i })
+      })),
+      checkoutLink: 'https://wa.me/595981377541?text=' + encodeURIComponent(pedido),
+      prodAttrs: prodDec ? [
+        { k: 'Categoría', v: { sellados: 'Sellados y coleccionables', sobres: 'Sobres', etb: 'Elite Trainer Box' }[prodDec.cat] },
+        { k: 'Colección', v: prodDec.set.split(' · ')[0] },
+        { k: 'Idioma', v: 'Inglés' },
+        { k: 'Estado', v: 'Sellado de fábrica' },
+        { k: 'Stock', v: String(prodDec.stock) },
+        { k: 'SKU', v: prodDec.id }
+      ] : [],
+      related: prodDec ? CATALOG.filter(p => p.cat === prodDec.cat && p.id !== prodDec.id).slice(0, 4).map(p => this.decorate(p)) : [],
+      qty: s.qty,
+      qtyIncColor: prodDec && s.qty >= prodDec.stock ? '#3a3a3a' : '#F5F5F5',
+      qtyDec: () => this.setState(st => ({ qty: Math.max(1, st.qty - 1) })),
+      qtyInc: () => this.setState(st => ({ qty: prodDec ? Math.min(prodDec.stock || 1, st.qty + 1) : 1 })),
+
+      cartCount: s.cart.reduce((a, i) => a + i.qty, 0),
+      cartOpen: s.cartOpen,
+      cartEmpty: s.cartOpen && cartItems.length === 0,
+      cartHasItems: cartItems.length > 0,
+      cartItems,
+      subtotalLabel: this.fmt(subtotal),
+      shippingLabel: shipping === 0 ? (subtotal >= 500000 ? 'Gratis' : '—') : this.fmt(shipping),
+      totalLabel: this.fmt(subtotal + shipping),
+      openCart: (e) => { if (e) e.preventDefault(); this.setState({ cartOpen: true, toast: '' }); },
+      closeCart: () => this.setState({ cartOpen: false }),
+
+      toast: s.toast,
+
+      cardMove: (e) => {
+        const el = e.currentTarget;
+        const r = el.getBoundingClientRect();
+        el.style.setProperty('--glow-x', (((e.clientX - r.left) / r.width) * 100) + '%');
+        el.style.setProperty('--glow-y', (((e.clientY - r.top) / r.height) * 100) + '%');
+        el.style.setProperty('--glow-intensity', '1');
+      },
+      cardEnter: (e) => {
+        const el = e.currentTarget;
+        el.style.setProperty('--glow-intensity', '1');
+        const img = el.querySelector('[data-img]'); if (img) img.style.transform = 'scale(1.05)';
+        const act = el.querySelector('[data-actions]'); if (act) { act.style.opacity = '1'; act.style.transform = 'none'; }
+        el.style.borderColor = '#2e2e2e';
+      },
+      cardLeave: (e) => {
+        const el = e.currentTarget;
+        const img = el.querySelector('[data-img]'); if (img) img.style.transform = 'none';
+        const act = el.querySelector('[data-actions]'); if (act) { act.style.opacity = '0'; act.style.transform = 'translateY(8px)'; }
+        el.style.setProperty('--glow-intensity', '0');
+        el.style.borderColor = '#1c1c1c';
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

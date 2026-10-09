@@ -1,0 +1,1412 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Panel · Rocket Cards</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@700;800;900&family=Poppins:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.10/dist/umd/supabase.js"></script>
+<script src="/rocketcards-config.js"></script>
+<style>
+  :root {
+    --fondo: #050505; --panel: #0D0D0D; --panel2: #121212;
+    --linea: #1f1f1f; --linea2: #2a2a2a;
+    --texto: #F5F5F5; --suave: #A7A7A7; --tenue: #6e6e6e;
+    --rojo: #E30613; --oro: #C9A227; --verde: #3FB950;
+    --titulo: 'Saira Condensed', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--fondo); color: var(--texto);
+    font-family: 'Poppins', sans-serif; font-size: 14px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 { font-family: var(--titulo); text-transform: uppercase; margin: 0; line-height: 1; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  a { color: var(--oro); }
+
+  /* ── Estructura ── */
+  .barra {
+    position: sticky; top: 0; z-index: 20; display: flex; align-items: center;
+    gap: 16px; padding: 12px clamp(14px, 3vw, 28px);
+    background: rgba(5,5,5,.94); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--linea);
+  }
+  .marca { font-family: var(--titulo); font-weight: 900; font-size: 19px; letter-spacing: .04em; }
+  .marca em { color: var(--rojo); font-style: normal; }
+  .barra .crece { flex: 1; }
+
+  .pestanas { display: flex; gap: 2px; overflow-x: auto; padding: 0 clamp(14px, 3vw, 28px);
+              border-bottom: 1px solid var(--linea); background: var(--fondo);
+              position: sticky; top: 53px; z-index: 19; }
+  .pestanas button {
+    background: none; border: 0; border-bottom: 2px solid transparent; cursor: pointer;
+    padding: 12px 14px; font-family: var(--titulo); font-weight: 800; font-size: 13px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--suave); white-space: nowrap;
+  }
+  .pestanas button[aria-selected="true"] { color: var(--texto); border-bottom-color: var(--rojo); }
+  .pestanas button:hover { color: var(--texto); }
+
+  main { padding: clamp(16px, 3vw, 28px); max-width: 1500px; margin: 0 auto; }
+
+  /* ── Estado de la conexión ── */
+  .vivo { display: flex; align-items: center; gap: 7px; font-family: var(--mono);
+          font-size: 10.5px; letter-spacing: .1em; color: var(--tenue); white-space: nowrap; }
+  .punto { width: 7px; height: 7px; border-radius: 50%; background: var(--tenue); flex: 0 0 auto; }
+  .vivo[data-on="1"] .punto { background: var(--verde); box-shadow: 0 0 0 3px rgba(63,185,80,.16); }
+  .vivo[data-on="0"] .punto { background: var(--rojo); }
+
+  /* ── Controles ── */
+  /* Todos los campos menos los interruptores. Enumerar los type uno por uno
+     fue un error: el día que apareció un type=email quedó blanco con letra
+     blanca, invisible. */
+  input:not([type=checkbox]):not([type=radio]), select, textarea {
+    background: var(--panel); border: 1px solid var(--linea2); color: var(--texto);
+    padding: 9px 11px; border-radius: 3px; width: 100%; outline: 0;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--oro); }
+  input[type=number] { font-family: var(--mono); }
+  label { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .14em;
+          text-transform: uppercase; color: var(--suave); margin-bottom: 5px; }
+  .btn {
+    background: var(--rojo); border: 0; color: #fff; cursor: pointer;
+    font-family: var(--titulo); font-weight: 800; font-size: 12.5px; letter-spacing: .12em;
+    text-transform: uppercase; padding: 10px 18px; border-radius: 3px;
+  }
+  .btn.gris { background: var(--panel2); border: 1px solid var(--linea2); color: var(--texto); }
+  .btn.oro { background: var(--oro); color: #050505; }
+  .btn.chico { padding: 6px 11px; font-size: 11px; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn:hover:not(:disabled) { filter: brightness(1.12); }
+  .icono { background: none; border: 1px solid var(--linea2); color: var(--suave);
+           cursor: pointer; border-radius: 3px; padding: 5px 9px; font-size: 13px; line-height: 1; }
+  .icono:hover { color: var(--texto); border-color: var(--oro); }
+  .icono.peligro:hover { color: var(--rojo); border-color: var(--rojo); }
+  /* ── Galería de fotos del producto ── */
+  .galeria { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px; }
+  .foto-g { margin: 0; position: relative; border: 1px solid var(--linea2); border-radius: 4px; overflow: hidden; background: var(--panel2); }
+  .foto-g .foto-img { aspect-ratio: 1 / 1; background: #fff center / contain no-repeat; }
+  .foto-g .portada {
+    position: absolute; top: 6px; left: 6px; background: var(--oro); color: #050505;
+    font-family: var(--titulo); font-weight: 800; font-size: 9.5px; letter-spacing: .12em;
+    text-transform: uppercase; padding: 3px 6px; border-radius: 2px;
+  }
+  .foto-g .foto-acc { display: flex; justify-content: space-between; gap: 2px; padding: 5px; }
+  .foto-g .foto-acc .icono { padding: 4px 7px; font-size: 12px; }
+  .soltar {
+    margin-top: 10px; border: 1.5px dashed var(--linea2); border-radius: 4px; padding: 18px 14px;
+    text-align: center; color: var(--suave); cursor: pointer; display: grid; gap: 4px;
+    transition: border-color .15s, background .15s;
+  }
+  .soltar b { color: var(--texto); font-weight: 600; }
+  .soltar:hover, .soltar.encima { border-color: var(--oro); background: rgba(201,162,39,.08); }
+  .soltar.lleno { opacity: .45; pointer-events: none; }
+
+  /* La estrella encendida: el producto ya está en el carrusel de la portada. */
+  .icono.activo { color: var(--oro); border-color: var(--oro); background: rgba(201,162,39,.12); }
+  .icono:disabled { opacity: .4; cursor: wait; }
+
+  /* ── Tabla ── */
+  .caja { background: var(--panel); border: 1px solid var(--linea); border-radius: 4px; }
+  .herramientas { display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+                  padding: 12px; border-bottom: 1px solid var(--linea); }
+  .herramientas input[type=search] { max-width: 300px; }
+  .herramientas select { max-width: 190px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+       color: var(--suave); text-align: left; font-weight: 500; padding: 10px 12px;
+       border-bottom: 1px solid var(--linea); white-space: nowrap; }
+  td { padding: 9px 12px; border-bottom: 1px solid #141414; vertical-align: middle; }
+  tr:last-child td { border-bottom: 0; }
+  tr:hover td { background: #0F0F0F; }
+  .sku { font-family: var(--mono); font-size: 11px; color: var(--oro); }
+  .nom { font-weight: 600; font-size: 13px; }
+  .col { font-size: 11.5px; color: var(--suave); }
+  .foto { width: 46px; height: 46px; object-fit: contain; background: #Fff; border-radius: 3px;
+          border: 1px solid var(--linea2); }
+  .sinfoto { width: 46px; height: 46px; border-radius: 3px; border: 1px dashed var(--linea2);
+             display: grid; place-items: center; color: var(--tenue); font-size: 9px; }
+  .num { width: 108px; text-align: right; font-family: var(--mono); padding: 6px 8px; }
+  .acciones { display: flex; gap: 5px; justify-content: flex-end; }
+  .pildora { display: inline-block; font-family: var(--titulo); font-weight: 800; font-size: 9.5px;
+             letter-spacing: .14em; text-transform: uppercase; padding: 3px 7px; border-radius: 2px; }
+  .vacio { padding: 40px 16px; text-align: center; color: var(--suave); }
+
+  /* ── Interruptor ── */
+  .sw { position: relative; width: 38px; height: 21px; flex: 0 0 auto; }
+  .sw input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .sw span { position: absolute; inset: 0; background: #262626; border-radius: 11px; transition: background .18s; pointer-events: none; }
+  .sw span::after { content: ''; position: absolute; left: 3px; top: 3px; width: 15px; height: 15px;
+                    border-radius: 50%; background: var(--suave); transition: transform .18s, background .18s; }
+  .sw input:checked + span { background: rgba(63,185,80,.3); }
+  .sw input:checked + span::after { transform: translateX(17px); background: var(--verde); }
+
+  /* ── Modal ── */
+  .velo { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.72);
+          display: grid; place-items: center; padding: 16px; overflow: auto; }
+  .modal { background: var(--panel); border: 1px solid var(--linea2); border-radius: 5px;
+           width: min(680px, 100%); max-height: 92vh; overflow: auto;
+           box-shadow: 0 30px 80px rgba(0,0,0,.75); }
+  .modal header { display: flex; align-items: center; gap: 12px; padding: 16px 20px;
+                  border-bottom: 1px solid var(--linea); position: sticky; top: 0; background: var(--panel); }
+  .modal .cuerpo { padding: 20px; display: grid; gap: 14px;
+                   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  .modal .cuerpo .ancho { grid-column: 1 / -1; }
+  .modal footer { display: flex; gap: 10px; justify-content: flex-end; padding: 16px 20px;
+                  border-top: 1px solid var(--linea); position: sticky; bottom: 0; background: var(--panel); }
+
+  /* ── Login ── */
+  .entrada { min-height: 100dvh; display: grid; place-items: center; padding: 20px; }
+  /* Chrome pinta de blanco los campos que autocompleta y deja el texto
+     ilegible sobre nuestro fondo oscuro. Ese fondo no se puede cambiar con
+     background: hay que taparlo con una sombra interior enorme. La
+     transición absurda es para que no vuelva a pintarse al enfocar. */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-text-fill-color: var(--texto);
+    -webkit-box-shadow: 0 0 0 1000px var(--panel) inset;
+    box-shadow: 0 0 0 1000px var(--panel) inset;
+    caret-color: var(--texto);
+    transition: background-color 9999s ease-in-out 0s;
+  }
+  .entrada form { width: min(360px, 100%); display: grid; gap: 14px;
+                  background: var(--panel); border: 1px solid var(--linea); padding: 28px; border-radius: 5px; }
+
+  /* ── Avisos ── */
+  .aviso { padding: 10px 13px; border-radius: 3px; font-size: 13px; border-left: 3px solid; }
+  .aviso.mal { background: rgba(227,6,19,.1); border-color: var(--rojo); }
+  .aviso.bien { background: rgba(63,185,80,.1); border-color: var(--verde); }
+  #brindis { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 80;
+             display: grid; gap: 8px; justify-items: center; pointer-events: none; }
+  #brindis div { background: #0D0D0D; border: 1px solid var(--linea2); border-left: 3px solid var(--oro);
+                 padding: 11px 16px; font-size: 13px; box-shadow: 0 16px 40px rgba(0,0,0,.7);
+                 animation: subir .25s ease; }
+  @keyframes subir { from { opacity: 0; transform: translateY(10px); } }
+
+  .fila { display: flex; align-items: center; gap: 10px; }
+
+  /* Las cinco cartas de la portada, en el mismo orden que en la tienda. */
+  .abanico { display: grid; gap: 12px; padding: 12px;
+             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .abanico .carta { display: grid; gap: 7px; background: var(--panel2);
+                    border: 1px solid var(--linea); border-radius: 4px; padding: 10px; }
+  .abanico .pos { font-family: var(--mono); font-size: 10px; letter-spacing: .14em;
+                  text-transform: uppercase; color: var(--oro); }
+  /* Proporción de carta: 2.5 × 3.5 pulgadas, igual que en la tienda. */
+  .abanico .mini { aspect-ratio: 2.5/3.5; border-radius: 4px; border: 1px solid var(--linea2);
+                   background: #fff center/contain no-repeat; display: grid; place-items: center;
+                   color: var(--tenue); font-size: 10px; }
+  textarea { resize: vertical; min-height: 68px; line-height: 1.5; }
+  .ayuda { font-size: 11.5px; color: var(--tenue); margin-top: 4px; }
+  .orden { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
+  .orden li { display: flex; align-items: center; gap: 10px; background: var(--panel2);
+              border: 1px solid var(--linea); border-radius: 3px; padding: 8px 10px; }
+  .orden { list-style: none; margin: 0; }
+  .orden .pos { font-family: var(--titulo); font-weight: 900; font-style: italic; font-size: 18px;
+                color: var(--oro); min-width: 26px; }
+  @media (max-width: 760px) {
+    .ocultar-chico { display: none; }
+    main { padding: 12px; }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="brindis"></div>
+
+<script type="module">
+// ─────────────────────────────────────────────────────────────────────────
+// Panel de Rocket Cards
+//
+// Habla directo con Supabase por supabase-js: no hay servidor propio en el
+// medio. Lo que decide qué puede hacer cada uno es RLS, del lado de la base
+// (ver db/rocketcards.sql). El chequeo del email que hay acá abajo es sólo
+// para no mostrarle la pantalla a quien no corresponde: si alguien lo saltea
+// editando el JavaScript, igual no va a poder escribir una fila.
+//
+// Y nadie pregunta cada tantos segundos: la pantalla se suscribe por
+// Realtime y vuelve a leer sólo cuando una fila cambió de verdad.
+// ─────────────────────────────────────────────────────────────────────────
+
+const cfg = window.ROCKET_CONFIG || {};
+const listo = !!(cfg.url && cfg.anonKey && window.supabase);
+
+const sb = listo
+  ? window.supabase.createClient(cfg.url, cfg.anonKey, {
+      db: { schema: cfg.schema || 'rocketcards' },
+      auth: { persistSession: true, autoRefreshToken: true },
+    })
+  : null;
+
+const $ = (sel, raiz = document) => raiz.querySelector(sel);
+const app = $('#app');
+
+const esc = (s) => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+const gs = (n) => 'Gs. ' + Number(n || 0).toLocaleString('es-PY');
+const fecha = (s) => s ? new Date(s).toLocaleString('es-PY', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+
+function brindis(texto, mal) {
+  const d = document.createElement('div');
+  d.textContent = texto;
+  if (mal) d.style.borderLeftColor = 'var(--rojo)';
+  $('#brindis').append(d);
+  setTimeout(() => d.remove(), 3600);
+}
+
+/** Traduce los errores de PostgREST a algo que se entienda. */
+function motivo(err) {
+  if (!err) return 'Error desconocido';
+  const m = err.message || String(err);
+  if (err.code === '42501' || /row-level security|No autorizado/i.test(m)) {
+    return 'La base rechazó el cambio: esta cuenta no es el admin.';
+  }
+  if (err.code === '23505') {
+    return /nuevo_orden/.test(m)
+      ? 'Ya hay otro producto en esa posición de Nuevos ingresos'
+      : 'Ya existe un producto con ese SKU';
+  }
+  if (err.code === '23503') return 'Esa categoría no existe, o todavía tiene productos';
+  if (err.code === '23514') return 'Algún valor no cumple las reglas de la base';
+  if (err.code === 'PGRST205' || /schema cache/i.test(m)) {
+    return 'PostgREST no ve el esquema. Agregá "rocketcards" a Exposed schemas y corré: notify pgrst, \'reload schema\';';
+  }
+  if (/Failed to fetch|NetworkError/i.test(m)) return 'No llego a Supabase. ¿Está bien la URL en rocketcards-config.js?';
+  return m;
+}
+
+// ── Estado ───────────────────────────────────────────────────────────────
+
+const estado = {
+  sesion: null,
+  pestana: 'productos',
+  productos: [], categorias: [], ajustes: [], portada: [],
+  busqueda: '', filtroCat: '', soloOcultos: false,
+  version: null, conectado: false,
+  editando: null,
+  cambioPropio: 0,
+  pendiente: null,
+};
+
+// ── Realtime ─────────────────────────────────────────────────────────────
+
+let canal = null;
+function escuchar() {
+  if (canal) sb.removeChannel(canal);
+  const alCambiar = () => novedad();
+  canal = sb.channel('panel-rocketcards')
+    .on('postgres_changes', { event: '*', schema: cfg.schema, table: 'producto' }, alCambiar)
+    .on('postgres_changes', { event: '*', schema: cfg.schema, table: 'categoria' }, alCambiar)
+    .subscribe((st) => {
+      estado.conectado = st === 'SUBSCRIBED';
+      pintarEstado();
+    });
+}
+
+function novedad() {
+  // El eco de nuestro propio cambio: la respuesta ya actualizó la pantalla.
+  if (Date.now() - estado.cambioPropio < 2500) { leerVersion(); return; }
+  // Si estás escribiendo, repintar te sacaría el cursor del campo.
+  if (escribiendo()) { diferir(); return; }
+  aplicarNovedad().catch((e) => brindis(motivo(e), true));
+}
+
+const escribiendo = () => {
+  const a = document.activeElement;
+  return !!(a && a.closest && a.closest('#hoja, .modal') && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName));
+};
+
+let reloj = null;
+
+/**
+ * Guarda la novedad para después y vuelve a mirar cada tanto. El focusout es
+ * el camino normal; esto es la red para que un cursor olvidado en un input no
+ * deje la pantalla desactualizada para siempre.
+ */
+function diferir() {
+  estado.pendiente = true;
+  pintarEstado();
+  clearTimeout(reloj);
+  reloj = setTimeout(function revisar() {
+    if (!escribiendo()) return aplicarNovedad().catch((e) => brindis(motivo(e), true));
+    reloj = setTimeout(revisar, 1500);
+  }, 1500);
+}
+
+async function aplicarNovedad() {
+  clearTimeout(reloj);
+  estado.pendiente = null;
+  await cargar();
+  brindis('El catálogo cambió (v' + (estado.version ?? '—') + '). Actualicé la pantalla.');
+}
+
+document.addEventListener('focusout', () => {
+  if (!estado.pendiente) return;
+  // Margen para que el foco salte al campo siguiente sin repintar en el medio.
+  setTimeout(() => {
+    if (estado.pendiente && !escribiendo()) {
+      aplicarNovedad().catch((e) => brindis(motivo(e), true));
+    }
+  }, 150);
+});
+
+function pintarEstado() {
+  const el = $('#vivo');
+  if (!el) return;
+  el.dataset.on = estado.conectado ? '1' : '0';
+  el.lastElementChild.textContent = !estado.conectado
+    ? 'SIN CONEXIÓN'
+    : estado.pendiente
+      ? 'NOVEDAD'
+      : 'EN VIVO · v' + (estado.version ?? '—');
+}
+
+// ── Carga ────────────────────────────────────────────────────────────────
+
+async function leerVersion() {
+  const { data } = await sb.from('version').select('version').maybeSingle();
+  if (data) { estado.version = data.version; pintarEstado(); }
+}
+
+async function cargar() {
+  const [p, c] = await Promise.all([
+    sb.from('producto').select('*').order('nombre'),
+    sb.from('categoria').select('*').order('orden'),
+  ]);
+  if (p.error) throw p.error;
+  if (c.error) throw c.error;
+
+  const porCat = {};
+  p.data.forEach((x) => { porCat[x.categoria] = (porCat[x.categoria] || 0) + 1; });
+
+  estado.categorias = c.data.map((x) => Object.assign({}, x, { productos: porCat[x.key] || 0 }));
+  const nombreDe = Object.fromEntries(estado.categorias.map((x) => [x.key, x.nombre]));
+  estado.productos = p.data.map((x) => Object.assign({}, x, { categoria_nombre: nombreDe[x.categoria] }));
+
+  if (estado.pestana === 'config') {
+    const [aj, po] = await Promise.all([
+      sb.from('config').select('*').order('orden'),
+      sb.from('portada').select('*').order('orden'),
+    ]);
+    if (aj.error) throw aj.error;
+    if (po.error) throw po.error;
+    estado.ajustes = aj.data;
+    estado.portada = po.data;
+  }
+  await leerVersion();
+  pintar();
+}
+
+/** Marca que lo que viene por Realtime en seguida es eco nuestro. */
+const propio = () => { estado.cambioPropio = Date.now(); };
+
+// ── Entrar ───────────────────────────────────────────────────────────────
+
+function pintarEntrada(error) {
+  app.innerHTML = `
+    <div class="entrada">
+      <form id="f-login" autocomplete="on">
+        <div>
+          <div class="marca">ROCKET <em>CARDS</em></div>
+          <div class="ayuda">Panel de administración</div>
+        </div>
+        ${error ? `<div class="aviso mal">${esc(error)}</div>` : ''}
+        <div>
+          <label for="u">Email</label>
+          <input id="u" name="username" type="email" inputmode="email"
+                 autocomplete="username" autocapitalize="none" autocorrect="off"
+                 spellcheck="false" required autofocus
+                 placeholder="${esc(cfg.adminEmail || 'admin@rocketcards.com')}">
+        </div>
+        <div>
+          <label for="c">Contraseña</label>
+          <input id="c" name="password" type="password" autocomplete="current-password" required>
+        </div>
+        <button class="btn" type="submit" ${listo ? '' : 'disabled'}>Entrar</button>
+      </form>
+    </div>`;
+
+  $('#f-login').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const boton = $('#f-login button');
+    boton.disabled = true;
+    const { error: err } = await sb.auth.signInWithPassword({
+      email: $('#u').value.trim(), password: $('#c').value,
+    });
+    if (err) {
+      pintarEntrada(/Invalid login/i.test(err.message)
+        ? 'Email o contraseña incorrectos'
+        : motivo(err));
+      return;
+    }
+    arrancar();
+  });
+}
+
+// ── Pantalla principal ───────────────────────────────────────────────────
+
+const PESTANAS = [
+  ['productos', 'Productos'],
+  ['nuevos', 'Nuevos ingresos'],
+  ['categorias', 'Categorías'],
+  ['config', 'Configuración'],
+];
+
+function pintar() {
+  if (!estado.sesion) return pintarEntrada();
+
+  app.innerHTML = `
+    <div class="barra">
+      <div class="marca">ROCKET <em>CARDS</em></div>
+      <div class="crece"></div>
+      <div class="vivo" id="vivo" data-on="0"><i class="punto"></i><span>…</span></div>
+      <a href="/" target="_blank" rel="noopener" class="ocultar-chico"
+         style="font-size:12px;color:var(--suave);text-decoration:none">Ver tienda ↗</a>
+      <button class="icono" id="salir" title="Cerrar sesión">${esc(estado.sesion.user.email)} · salir</button>
+    </div>
+    <nav class="pestanas" role="tablist">
+      ${PESTANAS.map(([k, t]) => `
+        <button role="tab" data-ir="${k}" aria-selected="${estado.pestana === k}">${t}</button>`).join('')}
+    </nav>
+    <main id="hoja"></main>`;
+
+  $('#salir').addEventListener('click', async () => {
+    if (canal) sb.removeChannel(canal);
+    await sb.auth.signOut();
+    estado.sesion = null;
+    pintar();
+  });
+  app.querySelectorAll('[data-ir]').forEach((b) => b.addEventListener('click', async () => {
+    estado.pestana = b.dataset.ir;
+    pintar();
+    if (estado.pestana === 'config') await cargar().catch((e) => brindis(motivo(e), true));
+  }));
+
+  pintarEstado();
+  ({
+    productos: hojaProductos,
+    nuevos: hojaNuevos,
+    categorias: hojaCategorias,
+    config: hojaConfig,
+  })[estado.pestana]($('#hoja'));
+
+  if (estado.editando) pintarModal();
+}
+
+// ── Productos ────────────────────────────────────────────────────────────
+
+function filtrados() {
+  const q = estado.busqueda.trim().toLowerCase();
+  return estado.productos.filter((p) => {
+    if (estado.filtroCat && p.categoria !== estado.filtroCat) return false;
+    if (estado.soloOcultos && p.publicado) return false;
+    if (!q) return true;
+    return (p.id + ' ' + p.nombre + ' ' + p.coleccion).toLowerCase().includes(q);
+  });
+}
+
+function hojaProductos(hoja) {
+  const lista = filtrados();
+  hoja.innerHTML = `
+    <div class="caja">
+      <div class="herramientas">
+        <input type="search" id="q" placeholder="Buscar por nombre o SKU…" value="${esc(estado.busqueda)}">
+        <select id="fc">
+          <option value="">Todas las categorías</option>
+          ${estado.categorias.map((c) => `
+            <option value="${esc(c.key)}" ${estado.filtroCat === c.key ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}
+        </select>
+        <label class="fila" style="margin:0;text-transform:none;letter-spacing:0;font-family:inherit;font-size:12.5px;color:var(--suave)">
+          <input type="checkbox" id="oc" ${estado.soloOcultos ? 'checked' : ''} style="width:auto"> Sólo ocultos
+        </label>
+        <div style="flex:1"></div>
+        <span class="col">${lista.length} de ${estado.productos.length}</span>
+        <button class="btn" id="nuevo">+ Producto</button>
+      </div>
+      ${lista.length ? `
+      <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th></th><th>Producto</th><th class="ocultar-chico">Categoría</th>
+          <th style="text-align:right">Precio</th><th style="text-align:right">Stock</th>
+          <th>Visible</th><th></th>
+        </tr></thead>
+        <tbody>
+        ${lista.map((p) => `
+          <tr data-id="${esc(p.id)}">
+            <td>${p.img
+              ? `<img class="foto" src="${esc(p.img)}" alt="" loading="lazy">`
+              : `<div class="sinfoto">sin foto</div>`}</td>
+            <td>
+              <div class="nom">${esc(p.nombre)}</div>
+              <div class="sku">${esc(p.id)}${p.etiqueta ? ' · ' + esc(p.etiqueta) : ''}${p.nuevo_orden ? ' · nuevos #' + p.nuevo_orden : ''}</div>
+            </td>
+            <td class="ocultar-chico col">${esc(p.categoria_nombre || p.categoria)}</td>
+            <td style="text-align:right">
+              <input class="num" type="number" min="0" step="1000" value="${p.precio}" data-campo="precio">
+              ${p.precio_anterior ? `<div class="col" style="text-align:right">antes ${gs(p.precio_anterior)}</div>` : ''}
+            </td>
+            <td style="text-align:right">
+              <input class="num" style="width:76px" type="number" min="0" step="1" value="${p.stock}" data-campo="stock">
+            </td>
+            <td>
+              <label class="sw"><input type="checkbox" data-campo="publicado" ${p.publicado ? 'checked' : ''}><span></span></label>
+            </td>
+            <td><div class="acciones">
+              <button class="icono${p.nuevo_orden ? ' activo' : ''}" data-nuevos
+                      title="${p.nuevo_orden ? 'Sacar de Nuevos ingresos' : 'Mandar a Nuevos ingresos'}">★</button>
+              <button class="icono" data-editar title="Editar">✎</button>
+              <button class="icono peligro" data-borrar title="Borrar">✕</button>
+            </div></td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>` : `<div class="vacio">No hay productos que coincidan.</div>`}
+    </div>
+    <p class="ayuda">El precio y el stock se guardan al salir del campo. Cada cambio llega a la tienda al instante.</p>`;
+
+  $('#q').addEventListener('input', (e) => {
+    estado.busqueda = e.target.value;
+    const foco = document.activeElement === e.target;
+    hojaProductos(hoja);
+    if (foco) { const n = $('#q'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
+  });
+  $('#fc').addEventListener('change', (e) => { estado.filtroCat = e.target.value; hojaProductos(hoja); });
+  $('#oc').addEventListener('change', (e) => { estado.soloOcultos = e.target.checked; hojaProductos(hoja); });
+  $('#nuevo').addEventListener('click', () => { estado.editando = { nuevo: true }; pintarModal(); });
+
+  hoja.querySelectorAll('tbody tr').forEach((tr) => {
+    const id = tr.dataset.id;
+    const p = estado.productos.find((x) => x.id === id);
+
+    tr.querySelectorAll('input[data-campo]').forEach((campo) => {
+      const guardar = async () => {
+        const valor = campo.type === 'checkbox' ? campo.checked : Number(campo.value);
+        if (valor === p[campo.dataset.campo]) return;
+        campo.disabled = true;
+        propio();
+        const { data, error } = await sb.from('producto')
+          .update({ [campo.dataset.campo]: valor }).eq('id', id).select().maybeSingle();
+        campo.disabled = false;
+        if (error || !data) {
+          brindis(error ? motivo(error) : 'La base no aceptó el cambio', true);
+          if (campo.type === 'checkbox') campo.checked = p[campo.dataset.campo];
+          else campo.value = p[campo.dataset.campo];
+          return;
+        }
+        Object.assign(p, data);
+        brindis(p.nombre.slice(0, 34) + ': listo');
+      };
+      if (campo.type === 'checkbox') campo.addEventListener('change', guardar);
+      else {
+        campo.addEventListener('blur', guardar);
+        campo.addEventListener('keydown', (e) => { if (e.key === 'Enter') campo.blur(); });
+      }
+    });
+
+    // Mandar al carrusel de la portada desde acá, sin ir a la otra pestaña.
+    // Va por la misma función que la pestaña "Nuevos ingresos": adentro es
+    // una sola transacción, así el carrusel nunca queda a medias para quien
+    // esté mirando la tienda.
+    tr.querySelector('[data-nuevos]').addEventListener('click', async (e) => {
+      const enCarrusel = estado.productos
+        .filter((x) => x.nuevo_orden)
+        .sort((a, b) => a.nuevo_orden - b.nuevo_orden)
+        .map((x) => x.id);
+      const estaba = enCarrusel.includes(id);
+      const ids = estaba ? enCarrusel.filter((x) => x !== id) : [...enCarrusel, id];
+
+      if (!estaba && ids.length > 12) return brindis('El carrusel no lleva más de 12 productos', true);
+      if (!estaba && !p.publicado) {
+        return brindis('Primero hacelo visible: el carrusel sólo muestra productos publicados', true);
+      }
+
+      e.currentTarget.disabled = true;
+      propio();
+      const { error } = await sb.rpc('guardar_nuevos', { ids });
+      if (error) { e.currentTarget.disabled = false; return brindis(motivo(error), true); }
+      await cargar();
+      brindis(estaba ? 'Sacado de Nuevos ingresos' : 'Agregado a Nuevos ingresos (va último)');
+    });
+
+    tr.querySelector('[data-editar]').addEventListener('click', () => {
+      estado.editando = Object.assign({}, p);
+      pintarModal();
+    });
+    tr.querySelector('[data-borrar]').addEventListener('click', async () => {
+      const seguro = await confirmar('Borrar producto',
+        '«' + p.nombre + '»\n\nNo se puede deshacer. Si sólo querés sacarlo de la tienda, apagá «Visible» en vez de borrarlo.',
+        'Borrar');
+      if (!seguro) return;
+      propio();
+      const { error } = await sb.from('producto').delete().eq('id', id);
+      if (error) return brindis(motivo(error), true);
+      estado.productos = estado.productos.filter((x) => x.id !== id);
+      hojaProductos(hoja);
+      brindis('Borrado');
+    });
+  });
+}
+
+// ── Diálogos ─────────────────────────────────────────────────────────────
+
+/**
+ * Un diálogo propio, en vez de confirm() y prompt() del navegador.
+ *
+ * Los del navegador anuncian de qué dominio vienen —"rocket-cards-web.vercel.app
+ * dice"—, no se pueden peinar y bloquean la pestaña entera mientras están
+ * abiertos. Al lado del resto del panel parecen un error.
+ *
+ * Devuelve false si se cancela. Si no hay campos devuelve true; si los hay,
+ * un arreglo con lo que se escribió.
+ */
+function dialogo({ titulo, texto, campos = [], aceptar = 'Aceptar', alAbrir }) {
+  return new Promise((resolver) => {
+    const velo = document.createElement('div');
+    velo.className = 'velo';
+    velo.innerHTML = `
+      <form class="modal" style="width:min(460px,100%)">
+        <header>
+          <h2 style="font-size:17px">${esc(titulo)}</h2>
+          <div style="flex:1"></div>
+          <button type="button" class="icono" data-cerrar>✕</button>
+        </header>
+        <div class="cuerpo" style="grid-template-columns:minmax(0,1fr)">
+          ${texto ? `<p style="margin:0;color:var(--suave);font-size:13.5px;line-height:1.55;white-space:pre-line">${esc(texto)}</p>` : ''}
+          ${campos.map((c, i) => `
+            <div>
+              <label for="dlg${i}">${esc(c.etiqueta)}</label>
+              <input id="dlg${i}" type="text" value="${esc(c.valor || '')}"
+                     placeholder="${esc(c.ejemplo || '')}" ${c.opcional ? '' : 'required'}>
+              ${c.ayuda ? `<div class="ayuda">${esc(c.ayuda)}</div>` : ''}
+            </div>`).join('')}
+        </div>
+        <footer>
+          <button type="button" class="btn gris" data-cerrar>Cancelar</button>
+          <button type="submit" class="btn">${esc(aceptar)}</button>
+        </footer>
+      </form>`;
+    document.body.append(velo);
+
+    const salir = (valor) => {
+      document.removeEventListener('keydown', alTeclado);
+      velo.remove();
+      resolver(valor);
+    };
+    const alTeclado = (e) => { if (e.key === 'Escape') salir(false); };
+    document.addEventListener('keydown', alTeclado);
+
+    velo.addEventListener('click', (e) => { if (e.target === velo) salir(false); });
+    velo.querySelectorAll('[data-cerrar]').forEach((b) => b.addEventListener('click', () => salir(false)));
+    velo.querySelector('form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      salir(campos.length
+        ? [...velo.querySelectorAll('.cuerpo input')].map((i) => i.value.trim())
+        : true);
+    });
+
+    if (alAbrir) alAbrir(velo);
+    // El foco al primer campo, o al botón si es sólo una confirmación: así
+    // Enter y Escape hacen lo esperable sin tocar el mouse.
+    (velo.querySelector('.cuerpo input') || velo.querySelector('button[type=submit]')).focus();
+  });
+}
+
+const confirmar = (titulo, texto, aceptar) =>
+  dialogo({ titulo, texto, aceptar: aceptar || 'Confirmar' });
+
+// ── Fotos ────────────────────────────────────────────────────────────────
+
+const PREFIJO_BUCKET = (cfg.url || '') + '/storage/v1/object/public/' + (cfg.bucket || 'rocketcards') + '/';
+
+/** Una ruta del sitio, o una foto de nuestro bucket. Nada de afuera. */
+function imagenValida(v) {
+  if (!v) return true;
+  if (v.startsWith(PREFIJO_BUCKET)) return true;
+  return v.startsWith('/') && !v.startsWith('//') && !v.includes('..');
+}
+
+const MAX_FOTOS = 10;    // el mismo límite que pone la base (producto_imagenes_max)
+const LADO_MAX = 1000;   // el uso más grande en la página es el carrusel
+const CALIDAD = 0.85;
+
+/**
+ * Achica y pasa a WebP antes de subir.
+ *
+ * Las fotos salen del teléfono con 4000px y 4 MB. Subirlas tal cual hace que
+ * la tienda tarde en cargar, que es justo el problema que ya arreglamos una
+ * vez a mano con scripts/optimize-images.py. Mejor que no vuelva a entrar.
+ *
+ * Si el navegador no sabe escribir WebP, devuelve el archivo original: peor
+ * una foto pesada que ninguna.
+ */
+async function aWebp(archivo) {
+  const url = URL.createObjectURL(archivo);
+  try {
+    const img = await new Promise((listo, falla) => {
+      const i = new Image();
+      i.onload = () => listo(i);
+      i.onerror = () => falla(new Error('No pude leer esa imagen'));
+      i.src = url;
+    });
+    const escala = Math.min(1, LADO_MAX / Math.max(img.width, img.height));
+    const lienzo = document.createElement('canvas');
+    lienzo.width = Math.round(img.width * escala);
+    lienzo.height = Math.round(img.height * escala);
+    lienzo.getContext('2d').drawImage(img, 0, 0, lienzo.width, lienzo.height);
+    const blob = await new Promise((listo) => lienzo.toBlob(listo, 'image/webp', CALIDAD));
+    if (!blob || blob.type !== 'image/webp') return archivo;
+    return blob;
+  } catch (_) {
+    return archivo;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/** Sube la foto al bucket y devuelve su URL pública. */
+async function subirFoto(archivo, sku) {
+  if (!archivo.type.startsWith('image/')) throw new Error('Eso no es una imagen');
+  if (archivo.size > 15 * 1024 * 1024) throw new Error('La foto pesa más de 15 MB');
+
+  const optimizada = await aWebp(archivo);
+  const base = (sku || 'producto').toLowerCase().replace(/[^a-z0-9._-]+/g, '-').slice(0, 40);
+  // El timestamp evita pisar la foto anterior: si alguien tenía la página
+  // abierta, su copia en caché sigue sirviendo.
+  const nombre = 'productos/' + base + '-' + Date.now() +
+                 (optimizada.type === 'image/webp' ? '.webp' : '');
+
+  const { error } = await sb.storage.from(cfg.bucket || 'rocketcards')
+    .upload(nombre, optimizada, { contentType: optimizada.type, cacheControl: '604800', upsert: false });
+  if (error) throw error;
+
+  return sb.storage.from(cfg.bucket || 'rocketcards').getPublicUrl(nombre).data.publicUrl;
+}
+
+// ── Modal de producto ────────────────────────────────────────────────────
+
+function pintarModal() {
+  const p = estado.editando;
+  const esNuevo = !!p.nuevo;
+  const velo = document.createElement('div');
+  velo.className = 'velo';
+  velo.innerHTML = `
+    <form class="modal" id="f-prod">
+      <header>
+        <h2 style="font-size:18px">${esNuevo ? 'Nuevo producto' : 'Editar producto'}</h2>
+        <div style="flex:1"></div>
+        <button type="button" class="icono" id="cerrar">✕</button>
+      </header>
+      <div class="cuerpo">
+        <div id="err" class="ancho" style="display:none"></div>
+        <div>
+          <label for="m-id">SKU</label>
+          <input id="m-id" type="text" value="${esc(p.id || '')}" ${esNuevo ? 'required' : 'disabled'}>
+          <div class="ayuda">${esNuevo ? 'Se muestra en el buscador. Ej: SV-PIKA-238' : 'No se puede cambiar.'}</div>
+        </div>
+        <div>
+          <label for="m-cat">Categoría</label>
+          <select id="m-cat" required>
+            ${estado.categorias.map((c) => `
+              <option value="${esc(c.key)}" ${p.categoria === c.key ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="ancho">
+          <label for="m-nom">Nombre</label>
+          <input id="m-nom" type="text" value="${esc(p.nombre || '')}" required>
+        </div>
+        <div class="ancho">
+          <label for="m-col">Colección</label>
+          <input id="m-col" type="text" value="${esc(p.coleccion || '')}" placeholder="Mega Evolution · ETB">
+        </div>
+        <div class="ancho">
+          <label>Fotos <span class="ayuda" style="margin:0;text-transform:none;letter-spacing:0">— la primera es la portada · hasta ${MAX_FOTOS}</span></label>
+          <div id="m-galeria" class="galeria"></div>
+          <div id="m-soltar" class="soltar" tabindex="0" role="button" aria-label="Agregar fotos desde la computadora">
+            <input type="file" id="m-file" multiple accept="image/png,image/jpeg,image/webp,image/avif" style="display:none">
+            <b>Arrastrá fotos acá</b> o tocá para elegirlas de la compu
+            <span class="ayuda" id="m-estado" style="margin:0"></span>
+          </div>
+          <div class="fila" style="margin-top:8px">
+            <input id="m-ruta" type="text" placeholder="o pegá una ruta del sitio: /assets/catalogo/foto.webp">
+            <button type="button" class="btn gris chico" id="m-agregar-ruta">Agregar</button>
+          </div>
+          <div class="ayuda">Cada foto se achica y se convierte a WebP antes de subir, así la tienda no se pone lenta.</div>
+        </div>
+        <div>
+          <label for="m-precio">Precio (Gs.)</label>
+          <input id="m-precio" type="number" min="0" step="1000" value="${p.precio ?? ''}" required>
+        </div>
+        <div>
+          <label for="m-antes">Precio anterior</label>
+          <input id="m-antes" type="number" min="0" step="1000" value="${p.precio_anterior ?? ''}" placeholder="vacío = sin oferta">
+        </div>
+        <div>
+          <label for="m-stock">Stock</label>
+          <input id="m-stock" type="number" min="0" step="1" value="${p.stock ?? 0}">
+        </div>
+        <div>
+          <label for="m-tag">Etiqueta</label>
+          <select id="m-tag">
+            ${['', 'NUEVO', 'OFERTA', 'PREVENTA', 'ÚLTIMAS UNIDADES', 'AGOTADO'].map((t) => `
+              <option value="${esc(t)}" ${(p.etiqueta || '') === t ? 'selected' : ''}>${t || '— sin etiqueta —'}</option>`).join('')}
+          </select>
+        </div>
+        <label class="fila ancho" style="text-transform:none;letter-spacing:0;font-family:inherit;font-size:13px;color:var(--texto)">
+          <span class="sw"><input type="checkbox" id="m-pub" ${p.publicado !== false ? 'checked' : ''}><span></span></span>
+          Visible en la tienda
+        </label>
+        <label class="fila ancho" style="text-transform:none;letter-spacing:0;font-family:inherit;font-size:13px;color:var(--texto)">
+          <span class="sw"><input type="checkbox" id="m-dest" ${p.destacado ? 'checked' : ''}><span></span></span>
+          Destacado <span class="ayuda" style="margin:0">— lleva etiqueta dorada y va primero en el catálogo</span>
+        </label>
+      </div>
+      <footer>
+        <button type="button" class="btn gris" id="cancelar">Cancelar</button>
+        <button type="submit" class="btn">${esNuevo ? 'Crear' : 'Guardar'}</button>
+      </footer>
+    </form>`;
+  document.body.append(velo);
+
+  // ── Galería ──
+  // La lista ordenada de fotos vive acá hasta que se guarda. Un producto
+  // anterior a la galería sólo tiene "img": arranca con esa.
+  let fotos = (Array.isArray(p.imagenes) && p.imagenes.length) ? p.imagenes.slice() : (p.img ? [p.img] : []);
+  let subiendo = 0;
+  const galeria = $('#m-galeria', velo);
+  const soltar = $('#m-soltar', velo);
+  const estadoFoto = $('#m-estado', velo);
+
+  const pintarGaleria = () => {
+    galeria.innerHTML = fotos.length ? fotos.map((url, i) => `
+      <figure class="foto-g" data-i="${i}">
+        <div class="foto-img" style="background-image:url('${esc(url).replace(/'/g, '%27')}')"></div>
+        ${i === 0 ? '<span class="portada">Portada</span>' : ''}
+        <div class="foto-acc">
+          <button type="button" class="icono" data-izq title="Mover a la izquierda" ${i === 0 ? 'disabled' : ''}>←</button>
+          ${i > 0 ? '<button type="button" class="icono" data-portada title="Usar de portada">★</button>' : ''}
+          <button type="button" class="icono" data-der title="Mover a la derecha" ${i === fotos.length - 1 ? 'disabled' : ''}>→</button>
+          <button type="button" class="icono peligro" data-quitar title="Quitar">✕</button>
+        </div>
+      </figure>`).join('') : '<div class="vacio" style="padding:14px;grid-column:1/-1">Sin fotos todavía.</div>';
+
+    galeria.querySelectorAll('.foto-g').forEach((fig) => {
+      const i = Number(fig.dataset.i);
+      const mover = (a, b) => { [fotos[a], fotos[b]] = [fotos[b], fotos[a]]; pintarGaleria(); };
+      fig.querySelector('[data-izq]').addEventListener('click', () => mover(i, i - 1));
+      fig.querySelector('[data-der]').addEventListener('click', () => mover(i, i + 1));
+      const portada = fig.querySelector('[data-portada]');
+      if (portada) portada.addEventListener('click', () => { fotos.unshift(fotos.splice(i, 1)[0]); pintarGaleria(); });
+      fig.querySelector('[data-quitar]').addEventListener('click', () => { fotos.splice(i, 1); pintarGaleria(); });
+    });
+    soltar.classList.toggle('lleno', fotos.length >= MAX_FOTOS);
+  };
+  pintarGaleria();
+
+  /** Sube varias fotos de a una, en el orden en que se eligieron. */
+  async function agregarArchivos(lista) {
+    const imagenes = [...lista].filter((a) => a.type.startsWith('image/'));
+    const descartadas = lista.length - imagenes.length;
+    const lugar = MAX_FOTOS - fotos.length;
+    if (lugar <= 0) return brindis('Ya hay ' + MAX_FOTOS + ' fotos: quitá alguna para agregar otra', true);
+    const tanda = imagenes.slice(0, lugar);
+    if (!tanda.length) return brindis('Eso no es una imagen. Se aceptan JPG, PNG, WebP y AVIF.', true);
+
+    const sku = $('#m-id', velo).value || p.id;
+    subiendo++;
+    let hechas = 0, fallas = 0;
+    for (const archivo of tanda) {
+      estadoFoto.textContent = 'Subiendo ' + (hechas + fallas + 1) + ' de ' + tanda.length + '…';
+      try {
+        fotos.push(await subirFoto(archivo, sku));
+        hechas++;
+        pintarGaleria();
+      } catch (err) {
+        fallas++;
+        brindis(archivo.name + ': ' + motivo(err), true);
+      }
+    }
+    subiendo--;
+    const avisos = [];
+    if (hechas) avisos.push(hechas === 1 ? '1 foto lista' : hechas + ' fotos listas');
+    if (imagenes.length > tanda.length) avisos.push((imagenes.length - tanda.length) + ' no entraron (máximo ' + MAX_FOTOS + ')');
+    if (descartadas) avisos.push(descartadas + ' no eran imágenes');
+    estadoFoto.textContent = avisos.length ? avisos.join(' · ') + (hechas ? '. Acordate de guardar.' : '') : '';
+  }
+
+  const archivoInput = $('#m-file', velo);
+  soltar.addEventListener('click', (e) => { if (e.target !== archivoInput) archivoInput.click(); });
+  soltar.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); archivoInput.click(); } });
+  archivoInput.addEventListener('change', async () => {
+    const lista = archivoInput.files;
+    if (lista && lista.length) await agregarArchivos(lista);
+    archivoInput.value = '';
+  });
+
+  // Arrastrar y soltar desde la compu. dragover tiene que cancelarse en cada
+  // evento, o el navegador abre la foto en la pestaña en vez de soltarla acá.
+  ['dragenter', 'dragover'].forEach((t) => soltar.addEventListener(t, (e) => {
+    e.preventDefault();
+    soltar.classList.add('encima');
+  }));
+  ['dragleave', 'dragend'].forEach((t) => soltar.addEventListener(t, () => soltar.classList.remove('encima')));
+  soltar.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    soltar.classList.remove('encima');
+    if (e.dataTransfer && e.dataTransfer.files.length) await agregarArchivos(e.dataTransfer.files);
+  });
+
+  $('#m-agregar-ruta', velo).addEventListener('click', () => {
+    const campo = $('#m-ruta', velo);
+    const v = campo.value.trim();
+    if (!v) return;
+    if (!imagenValida(v)) return brindis('Tiene que ser una ruta del sitio (como /assets/catalogo/foto.webp) o una foto subida acá', true);
+    if (fotos.length >= MAX_FOTOS) return brindis('Ya hay ' + MAX_FOTOS + ' fotos', true);
+    fotos.push(v);
+    campo.value = '';
+    pintarGaleria();
+  });
+
+  const cerrar = () => { velo.remove(); estado.editando = null; };
+  velo.addEventListener('click', (e) => { if (e.target === velo) cerrar(); });
+  $('#cerrar', velo).addEventListener('click', cerrar);
+  $('#cancelar', velo).addEventListener('click', cerrar);
+  document.addEventListener('keydown', function escapar(e) {
+    if (e.key === 'Escape' && document.body.contains(velo)) { cerrar(); document.removeEventListener('keydown', escapar); }
+  });
+
+  $('#f-prod', velo).addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const err = $('#err', velo);
+    const boton = velo.querySelector('button[type=submit]');
+    const antes = $('#m-antes', velo).value;
+    if (subiendo) {
+      err.className = 'aviso mal ancho';
+      err.textContent = 'Esperá a que terminen de subir las fotos.';
+      err.style.display = '';
+      return;
+    }
+
+    // Una ruta del sitio, o una foto de nuestro bucket. Una URL que apunte
+    // a otro lado convertiría el panel en una forma de incrustar contenido
+    // de terceros en la tienda.
+    if (!fotos.every(imagenValida)) {
+      err.className = 'aviso mal ancho';
+      err.textContent = 'Las fotos tienen que estar subidas acá, o ser rutas del sitio como /assets/catalogo/foto.webp';
+      err.style.display = '';
+      return;
+    }
+    // La portada se copia a "img": el resto de la tienda (tarjetas,
+    // carruseles, carrito) sigue leyendo ese campo.
+    const img = fotos[0] || '';
+
+    const datos = {
+      nombre: $('#m-nom', velo).value.trim(),
+      coleccion: $('#m-col', velo).value.trim(),
+      categoria: $('#m-cat', velo).value,
+      img,
+      imagenes: fotos,
+      precio: Number($('#m-precio', velo).value),
+      precio_anterior: antes === '' ? null : Number(antes),
+      stock: Number($('#m-stock', velo).value || 0),
+      etiqueta: $('#m-tag', velo).value || null,
+      destacado: $('#m-dest', velo).checked,
+      publicado: $('#m-pub', velo).checked,
+    };
+    boton.disabled = true;
+    err.style.display = 'none';
+    propio();
+
+    const r = esNuevo
+      ? await sb.from('producto').insert(Object.assign({ id: $('#m-id', velo).value.trim() }, datos)).select().maybeSingle()
+      : await sb.from('producto').update(datos).eq('id', p.id).select().maybeSingle();
+
+    if (r.error || !r.data) {
+      err.className = 'aviso mal ancho';
+      err.textContent = r.error ? motivo(r.error) : 'La base no aceptó el cambio: esta cuenta no es el admin.';
+      err.style.display = '';
+      boton.disabled = false;
+      return;
+    }
+    cerrar();
+    await cargar();
+    brindis(esNuevo ? 'Producto creado' : 'Guardado');
+  });
+}
+
+// ── Nuevos ingresos ──────────────────────────────────────────────────────
+
+function hojaNuevos(hoja) {
+  const enCarrusel = estado.productos
+    .filter((p) => p.nuevo_orden)
+    .sort((a, b) => a.nuevo_orden - b.nuevo_orden);
+  const resto = estado.productos
+    .filter((p) => !p.nuevo_orden && p.publicado)
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+
+  hoja.innerHTML = `
+    <div class="caja">
+      <div class="herramientas">
+        <h2 style="font-size:16px">Carrusel de la portada</h2>
+        <div style="flex:1"></div>
+        <button class="btn" id="guardar-orden" disabled>Guardar orden</button>
+      </div>
+      ${enCarrusel.length ? `<ul class="orden" id="lista">
+        ${enCarrusel.map((p, i) => `
+          <li data-id="${esc(p.id)}">
+            <span class="pos">${String(i + 1).padStart(2, '0')}</span>
+            ${p.img ? `<img class="foto" src="${esc(p.img)}" alt="" loading="lazy">` : '<div class="sinfoto">—</div>'}
+            <div style="flex:1;min-width:0">
+              <div class="nom">${esc(p.nombre)}</div>
+              <div class="sku">${esc(p.id)}</div>
+            </div>
+            <button class="icono" data-sube title="Subir">↑</button>
+            <button class="icono" data-baja title="Bajar">↓</button>
+            <button class="icono peligro" data-saca title="Sacar del carrusel">✕</button>
+          </li>`).join('')}
+      </ul>` : '<div class="vacio">El carrusel está vacío.</div>'}
+      <div class="herramientas" style="border-top:1px solid var(--linea);border-bottom:0">
+        <select id="agregar" style="max-width:420px">
+          <option value="">Agregar un producto al carrusel…</option>
+          ${resto.map((p) => `<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <p class="ayuda">Hasta 12 productos. El orden es el que ve el cliente al deslizar.</p>`;
+
+  let ids = enCarrusel.map((p) => p.id);
+  const original = ids.join(',');
+  const refrescar = () => {
+    estado.productos.forEach((p) => {
+      const i = ids.indexOf(p.id);
+      p.nuevo_orden = i >= 0 ? i + 1 : null;
+    });
+    hojaNuevos(hoja);
+    if (ids.join(',') !== original) $('#guardar-orden').disabled = false;
+  };
+
+  hoja.querySelectorAll('#lista li').forEach((li, i) => {
+    li.querySelector('[data-sube]').disabled = i === 0;
+    li.querySelector('[data-baja]').disabled = i === ids.length - 1;
+    li.querySelector('[data-sube]').addEventListener('click', () => {
+      [ids[i - 1], ids[i]] = [ids[i], ids[i - 1]]; refrescar();
+    });
+    li.querySelector('[data-baja]').addEventListener('click', () => {
+      [ids[i + 1], ids[i]] = [ids[i], ids[i + 1]]; refrescar();
+    });
+    li.querySelector('[data-saca]').addEventListener('click', () => { ids.splice(i, 1); refrescar(); });
+  });
+
+  $('#agregar').addEventListener('change', (e) => {
+    if (!e.target.value) return;
+    if (ids.length >= 12) return brindis('El carrusel no lleva más de 12', true);
+    ids.push(e.target.value);
+    refrescar();
+  });
+
+  $('#guardar-orden').addEventListener('click', async (e) => {
+    e.target.disabled = true;
+    propio();
+    // Por función y no con dos UPDATE: adentro es una sola transacción, así
+    // el carrusel no queda vacío en el medio para quien esté en la tienda.
+    const { error } = await sb.rpc('guardar_nuevos', { ids });
+    if (error) {
+      brindis(motivo(error), true);
+      e.target.disabled = false;
+      return;
+    }
+    brindis('Orden guardado');
+    await cargar();
+  });
+}
+
+// ── Categorías ───────────────────────────────────────────────────────────
+
+function hojaCategorias(hoja) {
+  hoja.innerHTML = `
+    <div class="caja">
+      <div class="herramientas">
+        <h2 style="font-size:16px">Categorías</h2>
+        <div style="flex:1"></div>
+        <button class="btn" id="nueva-cat">+ Categoría</button>
+      </div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr>
+          <th>Clave (URL)</th><th>Nombre</th><th class="ocultar-chico">Bajada</th>
+          <th style="text-align:right">Productos</th><th style="text-align:right">Orden</th><th></th>
+        </tr></thead>
+        <tbody>
+        ${estado.categorias.map((c) => `
+          <tr data-key="${esc(c.key)}">
+            <td><span class="sku">/catalogo/${esc(c.key)}</span></td>
+            <td class="fila">
+              <i style="width:10px;height:10px;border-radius:2px;background:${esc(c.accent)};display:inline-block"></i>
+              <input type="text" value="${esc(c.nombre)}" data-campo="nombre" style="max-width:230px">
+            </td>
+            <td class="ocultar-chico"><input type="text" value="${esc(c.nota)}" data-campo="nota"></td>
+            <td style="text-align:right" class="col">${c.productos}</td>
+            <td style="text-align:right">
+              <input class="num" style="width:68px" type="number" value="${c.orden}" data-campo="orden">
+            </td>
+            <td><div class="acciones">
+              <button class="icono peligro" data-borrar title="Borrar" ${c.productos ? 'disabled' : ''}>✕</button>
+            </div></td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>
+    <p class="ayuda">La clave aparece en la URL y no se cambia desde acá. Una categoría con productos no se puede borrar.</p>`;
+
+  hoja.querySelectorAll('tbody tr').forEach((tr) => {
+    const key = tr.dataset.key;
+    const c = estado.categorias.find((x) => x.key === key);
+    tr.querySelectorAll('input[data-campo]').forEach((campo) => {
+      const guardar = async () => {
+        const valor = campo.type === 'number' ? Number(campo.value) : campo.value;
+        if (String(valor) === String(c[campo.dataset.campo])) return;
+        propio();
+        const { data, error } = await sb.from('categoria')
+          .update({ [campo.dataset.campo]: valor }).eq('key', key).select().maybeSingle();
+        if (error || !data) {
+          brindis(error ? motivo(error) : 'La base no aceptó el cambio', true);
+          campo.value = c[campo.dataset.campo];
+          return;
+        }
+        Object.assign(c, data);
+        brindis('Guardado');
+      };
+      campo.addEventListener('blur', guardar);
+      campo.addEventListener('keydown', (e) => { if (e.key === 'Enter') campo.blur(); });
+    });
+    tr.querySelector('[data-borrar]').addEventListener('click', async () => {
+      const seguro = await confirmar('Borrar categoría',
+        '«' + c.nombre + '»\n\nNo se puede deshacer.', 'Borrar');
+      if (!seguro) return;
+      propio();
+      const { error } = await sb.from('categoria').delete().eq('key', key);
+      if (error) return brindis(motivo(error), true);
+      await cargar();
+      brindis('Borrada');
+    });
+  });
+
+  /** "Sellados y coleccionables" → "sellados-y-coleccionables" */
+  const aClave = (t) => t.toLowerCase().normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  $('#nueva-cat').addEventListener('click', async () => {
+    const r = await dialogo({
+      titulo: 'Nueva categoría',
+      aceptar: 'Crear',
+      campos: [
+        { etiqueta: 'Nombre', ejemplo: 'Accesorios' },
+        { etiqueta: 'Clave para la URL', ayuda: 'Así va a aparecer: /catalogo/accesorios' },
+      ],
+      // La clave se arma sola mientras se escribe el nombre, y deja de
+      // hacerlo en cuanto alguien la edita a mano.
+      alAbrir: (velo) => {
+        const [campoNombre, campoClave] = velo.querySelectorAll('.cuerpo input');
+        let aMano = false;
+        campoClave.addEventListener('input', () => { aMano = true; });
+        campoNombre.addEventListener('input', () => {
+          if (!aMano) campoClave.value = aClave(campoNombre.value);
+        });
+      },
+    });
+    if (!r) return;
+    const [nombre, clave] = r;
+    const key = aClave(clave || nombre);
+    if (!nombre || !key) return brindis('Falta el nombre o la clave', true);
+    propio();
+    const { error } = await sb.from('categoria')
+      .insert({ key, nombre, orden: estado.categorias.length + 1 });
+    if (error) return brindis(motivo(error), true);
+    await cargar();
+    brindis('Categoría creada');
+  });
+}
+
+// ── Configuración ────────────────────────────────────────────────────────
+
+function hojaConfig(hoja) {
+  hoja.innerHTML = `
+    <div class="caja">
+      <div class="herramientas">
+        <h2 style="font-size:16px">Cartas de la portada</h2>
+        <div style="flex:1"></div>
+        <span class="col">De izquierda a derecha. La 3 es la del centro.</span>
+      </div>
+      <div class="abanico">
+        ${estado.portada.map((c) => `
+          <div class="carta" data-orden="${c.orden}">
+            <div class="pos">${c.orden}${c.orden === 3 ? ' · centro' : ''}</div>
+            <div class="mini" data-prev style="${c.img
+              ? `background-image:url(&quot;${esc(c.img)}&quot;)`
+              : ''}">${c.img ? '' : 'sin foto'}</div>
+            <input type="file" accept="image/png,image/jpeg,image/webp,image/avif" style="display:none" data-file>
+            <button type="button" class="btn gris chico" data-subir>Cambiar foto</button>
+            <input type="text" value="${esc(c.alt)}" data-alt placeholder="Qué carta es">
+            <div class="ayuda" data-estado></div>
+          </div>`).join('')}
+      </div>
+      <p class="ayuda" style="padding:0 12px 14px">
+        La inclinación y el tamaño de cada lugar no se tocan desde acá: el abanico
+        está calibrado para que las cinco se superpongan bien en cualquier pantalla.
+      </p>
+    </div>
+
+    <div class="caja" style="margin-top:16px">
+      <div class="herramientas"><h2 style="font-size:16px">Datos de la tienda</h2></div>
+      <div style="padding:14px;display:grid;gap:14px;max-width:620px">
+        ${estado.ajustes.map((a) => `
+          <div data-ajuste="${esc(a.clave)}">
+            <label for="cfg-${esc(a.clave)}">${esc(a.etiqueta || a.clave)}</label>
+            ${a.largo
+              ? `<textarea id="cfg-${esc(a.clave)}" rows="3" data-valor>${esc(a.valor)}</textarea>`
+              : `<input id="cfg-${esc(a.clave)}" type="text" value="${esc(a.valor)}" data-valor>`}
+            ${a.ayuda ? `<div class="ayuda">${esc(a.ayuda)}</div>` : ''}
+            <div class="ayuda" data-vista></div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <p class="ayuda">Todo se guarda al salir del campo.</p>`;
+
+  // ── Las cartas ──
+  hoja.querySelectorAll('.carta').forEach((el) => {
+    const orden = Number(el.dataset.orden);
+    const fila = estado.portada.find((x) => x.orden === orden);
+    const prev = el.querySelector('[data-prev]');
+    const estadoFoto = el.querySelector('[data-estado]');
+
+    const guardar = async (campos, aviso) => {
+      propio();
+      const { data, error } = await sb.from('portada')
+        .update(campos).eq('orden', orden).select().maybeSingle();
+      if (error || !data) { brindis(error ? motivo(error) : 'La base no aceptó el cambio', true); return false; }
+      Object.assign(fila, data);
+      brindis(aviso);
+      return true;
+    };
+
+    el.querySelector('[data-subir]').addEventListener('click', () => el.querySelector('[data-file]').click());
+    el.querySelector('[data-file]').addEventListener('change', async (ev) => {
+      const archivo = ev.target.files && ev.target.files[0];
+      if (!archivo) return;
+      estadoFoto.textContent = 'Subiendo…';
+      try {
+        const url = await subirFoto(archivo, 'portada-' + orden);
+        if (await guardar({ img: url }, 'Carta ' + orden + ' cambiada')) {
+          prev.style.backgroundImage = 'url("' + url + '")';
+          prev.textContent = '';
+        }
+        estadoFoto.textContent = '';
+      } catch (err) {
+        estadoFoto.textContent = '';
+        brindis(motivo(err), true);
+      } finally {
+        ev.target.value = '';
+      }
+    });
+
+    const campoAlt = el.querySelector('[data-alt]');
+    const guardarAlt = async () => {
+      const v = campoAlt.value.trim();
+      if (v === fila.alt) return;
+      if (!(await guardar({ alt: v }, 'Guardado'))) campoAlt.value = fila.alt;
+    };
+    campoAlt.addEventListener('blur', guardarAlt);
+    campoAlt.addEventListener('keydown', (e) => { if (e.key === 'Enter') campoAlt.blur(); });
+  });
+
+  // ── Los ajustes ──
+  hoja.querySelectorAll('[data-ajuste]').forEach((el) => {
+    const clave = el.dataset.ajuste;
+    const a = estado.ajustes.find((x) => x.clave === clave);
+    const campo = el.querySelector('[data-valor]');
+    const vista = el.querySelector('[data-vista]');
+
+    // Mostrar cómo queda, que es lo que no se ve escribiendo el dato crudo.
+    const verVista = () => {
+      const v = campo.value.trim();
+      vista.textContent = clave === 'whatsapp' ? (v ? 'Los enlaces van a wa.me/' + v.replace(/\D/g, '') : '')
+                        : clave === 'instagram' ? (v ? 'instagram.com/' + v.replace(/^@/, '') : '')
+                        : '';
+    };
+    verVista();
+    campo.addEventListener('input', verVista);
+
+    const guardar = async () => {
+      let v = campo.value.trim();
+      // Dos errores que la gente comete siempre, y que dejan los enlaces
+      // rotos sin que nada avise: la arroba y los espacios del teléfono.
+      if (clave === 'instagram') v = v.replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/$/, '');
+      if (clave === 'whatsapp') v = v.replace(/\D/g, '');
+      if (v !== campo.value) campo.value = v;
+      if (v === a.valor) return;
+
+      if (clave === 'whatsapp' && v && !/^\d{8,15}$/.test(v)) {
+        brindis('El WhatsApp va con código de país y sin espacios: 595981377541', true);
+        campo.value = a.valor; verVista(); return;
+      }
+
+      propio();
+      const { data, error } = await sb.from('config')
+        .update({ valor: v }).eq('clave', clave).select().maybeSingle();
+      if (error || !data) {
+        brindis(error ? motivo(error) : 'La base no aceptó el cambio', true);
+        campo.value = a.valor; verVista(); return;
+      }
+      Object.assign(a, data);
+      verVista();
+      brindis('Guardado');
+    };
+    campo.addEventListener('blur', guardar);
+    campo.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && campo.tagName !== 'TEXTAREA') campo.blur();
+    });
+  });
+}
+
+// ── Arranque ─────────────────────────────────────────────────────────────
+
+async function arrancar() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { pintarEntrada(); return; }
+
+  // Esto es sólo para la pantalla. Lo que de verdad impide escribir es RLS:
+  // aunque alguien saltee este if, la base le rechaza cada fila.
+  if (cfg.adminEmail && (session.user.email || '').toLowerCase() !== cfg.adminEmail.toLowerCase()) {
+    await sb.auth.signOut();
+    pintarEntrada('Esta cuenta no tiene acceso al panel.');
+    return;
+  }
+
+  estado.sesion = session;
+  escuchar();
+  try {
+    await cargar();
+  } catch (err) {
+    estado.productos = []; estado.categorias = [];
+    pintar();
+    brindis(motivo(err), true);
+  }
+}
+
+if (!listo) {
+  pintarEntrada('Falta configurar rocketcards-config.js (o no cargó supabase-js).');
+} else {
+  arrancar();
+}
+</script>
+</body>
+</html>

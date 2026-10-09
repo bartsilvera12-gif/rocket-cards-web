@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Rocket Cards">
+  <rect width="64" height="64" rx="12" fill="#0A0A0A"/>
+  <rect x="12" y="10" width="10" height="44" rx="1.5" fill="#E30613"/>
+  <path d="M12 10h22a13 13 0 0 1 0 26H12z" fill="#E30613"/>
+  <rect x="22" y="18" width="14" height="10" rx="5" fill="#0A0A0A"/>
+  <path d="M28 33h12l12 21H40z" fill="#E30613"/>
+</svg>
