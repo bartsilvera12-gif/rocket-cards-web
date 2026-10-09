@@ -62,7 +62,10 @@
   .vivo[data-on="0"] .punto { background: var(--rojo); }
 
   /* ── Controles ── */
-  input[type=text], input[type=number], input[type=password], input[type=search], select, textarea {
+  /* Todos los campos menos los interruptores. Enumerar los type uno por uno
+     fue un error: el día que apareció un type=email quedó blanco con letra
+     blanca, invisible. */
+  input:not([type=checkbox]):not([type=radio]), select, textarea {
     background: var(--panel); border: 1px solid var(--linea2); color: var(--texto);
     padding: 9px 11px; border-radius: 3px; width: 100%; outline: 0;
   }
@@ -136,6 +139,20 @@
 
   /* ── Login ── */
   .entrada { min-height: 100dvh; display: grid; place-items: center; padding: 20px; }
+  /* Chrome pinta de blanco los campos que autocompleta y deja el texto
+     ilegible sobre nuestro fondo oscuro. Ese fondo no se puede cambiar con
+     background: hay que taparlo con una sombra interior enorme. La
+     transición absurda es para que no vuelva a pintarse al enfocar. */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-text-fill-color: var(--texto);
+    -webkit-box-shadow: 0 0 0 1000px var(--panel) inset;
+    box-shadow: 0 0 0 1000px var(--panel) inset;
+    caret-color: var(--texto);
+    transition: background-color 9999s ease-in-out 0s;
+  }
   .entrada form { width: min(360px, 100%); display: grid; gap: 14px;
                   background: var(--panel); border: 1px solid var(--linea); padding: 28px; border-radius: 5px; }
 
@@ -363,8 +380,10 @@ function pintarEntrada(error) {
         ${error ? `<div class="aviso mal">${esc(error)}</div>` : ''}
         <div>
           <label for="u">Email</label>
-          <input id="u" name="username" type="email" autocomplete="username" required autofocus
-                 value="${esc(cfg.adminEmail || '')}">
+          <input id="u" name="username" type="email" inputmode="email"
+                 autocomplete="username" autocapitalize="none" autocorrect="off"
+                 spellcheck="false" required autofocus
+                 placeholder="${esc(cfg.adminEmail || 'admin@rocketcards.com')}">
         </div>
         <div>
           <label for="c">Contraseña</label>
