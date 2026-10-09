@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QA Rocket Cards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; }
+  /* Layout: una columna de lectura; arriba el resumen fijo, abajo los pasos
+     agrupados por zona de la tienda, cada paso con su resultado al costado. */
+  :root {
+    --bg: #f6f5f3;
+    --surface: #ffffff;
+    --surface-2: #efede9;
+    --line: #dedad3;
+    --fg: #1b1a18;
+    --muted: #6a665f;
+    --brand: #c8102e;
+    --ok: #1f7a45;
+    --ok-bg: #e3f2e9;
+    --fail: #b3261e;
+    --fail-bg: #fbe5e3;
+    --block: #8a5a00;
+    --block-bg: #fbefd6;
+    --focus: #2b5fd9;
+    --display: 'Saira Condensed', 'Arial Narrow', Arial, sans-serif;
+    --body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121110; --surface: #1b1a18; --surface-2: #24221f; --line: #34312c;
+      --fg: #f1efeb; --muted: #a39e95; --brand: #ff3b52;
+      --ok: #5fcf8c; --ok-bg: #173a26; --fail: #ff7b70; --fail-bg: #43191a;
+      --block: #f0b84a; --block-bg: #3b2c0e; --focus: #7ea2ff;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121110; --surface: #1b1a18; --surface-2: #24221f; --line: #34312c;
+    --fg: #f1efeb; --muted: #a39e95; --brand: #ff3b52;
+    --ok: #5fcf8c; --ok-bg: #173a26; --fail: #ff7b70; --fail-bg: #43191a;
+    --block: #f0b84a; --block-bg: #3b2c0e; --focus: #7ea2ff;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font: 15px/1.55 var(--body);
+    padding-inline: 16px; padding-block: 0 64px;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  h1, h2 { font-family: var(--display); text-transform: uppercase; letter-spacing: .02em; line-height: 1; margin: 0; text-wrap: balance; }
+  a { color: var(--focus); }
+  code, .mono { font-family: var(--mono); font-size: .88em; }
+  button, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* ── cabecera fija con el resumen ── */
+  .top {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+    background: var(--bg); border-bottom: 1px solid var(--line);
+    padding-block: 18px 14px; margin-inline: -16px; padding-inline: 16px;
+  }
+  .top .wrap { display: grid; gap: 12px; }
+  .titulo { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .titulo h1 { font-size: 30px; }
+  .titulo h1 span { color: var(--brand); }
+  .titulo p { margin: 0; color: var(--muted); font-size: 13.5px; }
+  .barra { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; display: flex; }
+  .barra i { display: block; height: 100%; transition: width .3s ease; }
+  .barra .b-ok { background: var(--ok); }
+  .barra .b-fail { background: var(--fail); }
+  .barra .b-block { background: var(--block); }
+  .controles { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .cuenta { font-family: var(--mono); font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; margin-right: auto; }
+  .cuenta b { color: var(--fg); font-weight: 500; }
+  .chip {
+    border: 1px solid var(--line); background: var(--surface); border-radius: 999px;
+    padding: 5px 12px; font-size: 13px; cursor: pointer;
+  }
+  .chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .boton {
+    border: 1px solid var(--fg); background: var(--fg); color: var(--bg);
+    border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 500; cursor: pointer;
+  }
+  .estado-sync { font-size: 12.5px; color: var(--muted); }
+
+  /* ── bloques de texto ── */
+  .aviso {
+    margin-top: 22px; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 16px 18px; display: grid; gap: 10px;
+  }
+  .aviso h2 { font-size: 19px; }
+  .aviso ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+  .aviso li { min-width: 0; overflow-wrap: anywhere; }
+  .aviso.conocidos { background: var(--surface-2); }
+
+  /* ── pasos ── */
+  section.grupo { margin-top: 30px; }
+  section.grupo > h2 { font-size: 22px; padding-bottom: 8px; border-bottom: 2px solid var(--fg); }
+  section.grupo > p.intro { margin: 8px 0 0; color: var(--muted); font-size: 13.5px; }
+  .paso {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 18px;
+    padding: 14px 0; border-bottom: 1px solid var(--line);
+  }
+  .paso[hidden] { display: none !important; }
+  .paso .id { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .paso .accion { margin: 2px 0 0; font-weight: 500; }
+  .paso .esperado { margin: 4px 0 0; color: var(--muted); }
+  .paso .esperado::before { content: "Esperado: "; font-weight: 600; color: var(--fg); }
+  .resultado { display: flex; gap: 6px; align-items: flex-start; }
+  .res {
+    border: 1px solid var(--line); background: var(--surface); border-radius: 6px;
+    padding: 6px 10px; font-size: 12.5px; font-weight: 600; cursor: pointer; min-width: 64px;
+  }
+  .res[data-v="ok"][aria-pressed="true"]    { background: var(--ok-bg);    color: var(--ok);    border-color: var(--ok); }
+  .res[data-v="falla"][aria-pressed="true"] { background: var(--fail-bg);  color: var(--fail);  border-color: var(--fail); }
+  .res[data-v="bloqueado"][aria-pressed="true"] { background: var(--block-bg); color: var(--block); border-color: var(--block); }
+  .nota { grid-column: 1 / -1; display: grid; gap: 4px; }
+  .nota textarea {
+    width: 100%; min-height: 54px; resize: vertical; border: 1px solid var(--line);
+    background: var(--surface); border-radius: 6px; padding: 8px 10px; font-size: 14px;
+  }
+  .nota .quien { font-size: 12px; color: var(--muted); }
+  .paso.falla { box-shadow: inset 3px 0 0 var(--fail); padding-left: 12px; }
+  .paso.bloqueado { box-shadow: inset 3px 0 0 var(--block); padding-left: 12px; }
+
+  .copiado { font-size: 12.5px; color: var(--ok); }
+  #reporte-fallback { width: 100%; min-height: 120px; margin-top: 8px; font-family: var(--mono); font-size: 12.5px; }
+
+  @media (max-width: 600px) {
+    .paso { grid-template-columns: minmax(0, 1fr); }
+    .resultado { flex-wrap: wrap; }
+    .titulo h1 { font-size: 26px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .barra i { transition: none; } }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="titulo">
+      <h1>QA <span>Rocket Cards</span></h1>
+      <p>Tienda y panel de administración · versión para abrir en el navegador</p>
+    </div>
+    <div class="barra" aria-hidden="true">
+      <i class="b-ok" id="b-ok" style="width:0"></i>
+      <i class="b-fail" id="b-fail" style="width:0"></i>
+      <i class="b-block" id="b-block" style="width:0"></i>
+    </div>
+    <div class="controles">
+      <span class="cuenta" id="cuenta">—</span>
+      <button class="chip" type="button" data-filtro="todos" aria-pressed="true">Todos</button>
+      <button class="chip" type="button" data-filtro="pendientes" aria-pressed="false">Pendientes</button>
+      <button class="chip" type="button" data-filtro="problemas" aria-pressed="false">Fallas y bloqueados</button>
+      <button class="boton" type="button" id="copiar">Copiar reporte</button>
+      <button class="chip" type="button" id="reiniciar">Empezar de nuevo</button>
+    </div>
+    <label class="estado-sync" for="tester">Quién prueba:
+      <input id="tester" type="text" placeholder="Tu nombre" autocomplete="name"
+             style="border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:4px 8px;margin-left:6px;font:inherit;color:var(--fg);max-width:220px">
+    </label>
+    <div class="estado-sync" id="sync">Conectando…</div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="aviso">
+    <h2>Antes de empezar</h2>
+    <ul>
+      <li><b>Tienda:</b> <span class="mono">https://www.rocketcards.com.py</span>. Si abajo de todo dice «Tecnología de Shopify», estás viendo la tienda vieja por caché de DNS: poné <span class="mono">8.8.8.8</span> como DNS de tu red, o mientras tanto usá <span class="mono">https://rocket-cards-web.vercel.app</span>, que es la misma web.</li>
+      <li><b>Panel:</b> <span class="mono">/admin.html</span> en cualquiera de las dos direcciones. Usuario <span class="mono">admin@rocketcards.com</span>; la contraseña pedísela al responsable del proyecto por privado.</li>
+      <li><b>Es la tienda real.</b> En el panel trabajá sólo con el producto de prueba <span class="mono">QA-PRUEBA-01</span> que se crea en P-04, y borralo al final (P-23). No cambies precios ni stock de productos reales.</li>
+      <li>Hacé la parte de la tienda en compu <b>y</b> en celular. Los pasos marcados «celular» son sólo para el teléfono.</li>
+      <li>Marcá cada paso con OK, Falla o Bloqueado. Si algo falla, escribí qué pasó y en qué dispositivo. Todo queda guardado en este navegador aunque cierres el archivo; usá siempre el mismo navegador.</li>
+      <li>Al terminar, tocá <b>Copiar reporte</b> y mandá el texto por WhatsApp o mail.</li>
+    </ul>
+  </div>
+
+  <div class="aviso conocidos">
+    <h2>Ya lo sabemos, no hace falta reportarlo</h2>
+    <ul>
+      <li>«Finalizar compra» en el carrito todavía no lleva a ningún lado.</li>
+      <li>Los textos legales tienen partes marcadas <span class="mono">[PENDIENTE — …]</span>.</li>
+      <li>El interruptor «Destacado» del formulario de producto está en revisión.</li>
+      <li>Al reemplazar una foto, la anterior no se borra del almacenamiento.</li>
+    </ul>
+  </div>
+
+  <div id="pasos"></div>
+</main>
+
+<script>
+(() => {
+  // ── El plan ────────────────────────────────────────────────────────────
+  const GRUPOS = [
+    { titulo: 'Portada', pasos: [
+      ['T-01', 'Abrí la portada.', 'Se lee «Hacé crecer tu colección.» con «colección» en rojo, dos botones lado a lado (Explorar cartas y Nuevos ingresos) y un abanico de cinco cartas con Pikachu al centro.'],
+      ['T-02', 'Celular: tocá una carta del abanico.', 'La carta pasa al frente. No se pinta de azul ni se selecciona al tocarla.'],
+      ['T-03', 'Bajá hasta Categorías y tocá cada tarjeta.', 'Hay cuatro: Sellados y coleccionables, Sobres (con «Booster packs» arriba), ETB y Singles («Próximamente»). Cada una abre el catálogo filtrado por esa categoría.'],
+    ]},
+    { titulo: 'Nuevos ingresos', pasos: [
+      ['T-04', 'Usá las flechas ← → del carrusel.', 'Cambia el producto y el contador (por ejemplo 01 / 06). Desde el último vuelve al primero.'],
+      ['T-05', 'Celular: deslizá el carrusel con el dedo.', 'Pasa al siguiente o al anterior. Un deslizamiento corto vuelve a su lugar. Deslizar hacia arriba o abajo mueve la página, no el carrusel.'],
+      ['T-06', 'Tocá «Agregar al carrito» dentro del carrusel.', 'Sube el número del carrito arriba y aparece un aviso abajo.'],
+      ['T-07', 'Tocá la foto o el nombre del producto del carrusel.', 'Abre la ficha de ese producto.'],
+    ]},
+    { titulo: 'Filas por categoría', pasos: [
+      ['T-08', 'En Sobres, Sellados y ETB, usá las flechas de cada fila.', 'La fila se desplaza. Si todos los productos entran en pantalla, las flechas no aparecen; en los extremos se apaga la que no lleva a ningún lado.'],
+      ['T-09', 'Tocá el botón de WhatsApp de la sección Contacto.', 'Abre WhatsApp con el número 0981 377 541.'],
+    ]},
+    { titulo: 'Catálogo', pasos: [
+      ['T-10', 'Entrá a Catálogo desde el menú.', 'La dirección cambia a /catalogo y se ven todos los productos publicados.'],
+      ['T-11', 'Filtrá por una categoría.', 'La dirección cambia a /catalogo/sobres (o la elegida) y sólo quedan productos de esa categoría.'],
+      ['T-12', 'Activá «Mostrar solo productos disponibles».', 'Desaparecen los agotados (por ejemplo Destined Rivals Booster Bundle).'],
+      ['T-13', 'Probá los cuatro órdenes.', '«Más recientes», «Precio: menor a mayor», «Precio: mayor a menor» y «Nombre A–Z» ordenan como dicen.'],
+      ['T-14', 'Tocá «Limpiar filtros».', 'Vuelven todos los productos y el orden por defecto.'],
+    ]},
+    { titulo: 'Ficha de producto', pasos: [
+      ['T-15', 'Abrí un producto.', 'La dirección es /producto/nombre-del-producto. Se ven foto, precio en Gs., stock disponible y botones.'],
+      ['T-16', 'Cambiá la cantidad y tocá «Agregar al carrito».', 'Se agrega esa cantidad al carrito.'],
+      ['T-17', 'Tocá «Comprar ahora».', 'Se agrega y se abre el carrito.'],
+      ['T-18', 'Abrí un producto agotado.', 'Dice Agotado y no deja agregarlo.'],
+      ['T-19', 'Tocá la consulta por WhatsApp de la ficha.', 'Abre WhatsApp al 0981 377 541 con el nombre del producto ya escrito en el mensaje.'],
+    ]},
+    { titulo: 'Carrito', pasos: [
+      ['T-20', 'Agregá más unidades que el stock disponible.', 'No deja pasar del stock y avisa el máximo disponible.'],
+      ['T-21', 'Con menos de Gs. 500.000 en el carrito, mirá el envío.', 'Envío estimado Gs. 35.000 y el total suma subtotal más envío.'],
+      ['T-22', 'Superá los Gs. 500.000.', 'El envío pasa a «Gratis».'],
+      ['T-23', 'Cambiá cantidades y sacá productos.', 'Subtotal, envío y total se actualizan al momento.'],
+    ]},
+    { titulo: 'Búsqueda y direcciones', pasos: [
+      ['T-24', 'Buscá por nombre («pitch») y por SKU («ETB»). Después buscá algo que no exista.', 'Aparecen resultados que coinciden. Con algo inexistente dice «Sin resultados».'],
+      ['T-25', 'Navegá entre portada, catálogo y fichas, y usá el botón Atrás del navegador.', 'Vuelve a la vista anterior cada vez.'],
+      ['T-26', 'Copiá la dirección de una ficha y abrila en una pestaña nueva.', 'Abre directo esa ficha, sin error.'],
+      ['T-27', 'Abrí /producto/ME-PB-ETB.', 'Abre la ficha del Pitch Black Elite Trainer Box y la dirección se corrige al nombre.'],
+      ['T-28', 'Abrí /producto/no-existe.', 'Lleva al catálogo, no a una página rota.'],
+      ['T-29', 'Abrí /privacidad y /terminos.', 'Se ven los textos legales.'],
+    ]},
+    { titulo: 'Celular', pasos: [
+      ['T-30', 'Celular: abrí el menú (la hamburguesa está a la derecha).', 'Se abre encima de la portada sin empujarla hacia abajo.'],
+      ['T-31', 'Celular: tocá la lupa.', 'Se abre el buscador.'],
+      ['T-32', 'Celular: recorré toda la página.', 'Nada se corta ni se sale de la pantalla, y no hay desplazamiento hacia los costados.'],
+      ['T-33', 'Celular: mirá el botón flotante de WhatsApp mientras bajás.', 'Se ve mientras navegás y se esconde al llegar al pie de página.'],
+    ]},
+    { titulo: 'Panel: acceso', pasos: [
+      ['P-01', 'Abrí /admin.html y entrá con admin@rocketcards.com.', 'Entra al panel. Arriba a la derecha dice «EN VIVO».'],
+      ['P-02', 'Salí y entrá con una cuenta que no sea la de admin (pedila al responsable).', 'No deja entrar: «Esta cuenta no tiene acceso al panel».'],
+      ['P-03', 'Probá admin@rocketcards.com con una contraseña equivocada.', '«Email o contraseña incorrectos».'],
+    ]},
+    { titulo: 'Panel: productos', intro: 'Todo sobre el producto de prueba. Dejá la tienda abierta en otra pestaña para ir viendo los cambios.', pasos: [
+      ['P-04', '«+ Producto»: SKU QA-PRUEBA-01, categoría Sobres, nombre «Producto de prueba QA», precio 10000, stock 3, Visible encendido. Crear.', 'Aparece en la lista del panel y en la tienda, en Sobres.'],
+      ['P-05', 'En la fila, cambiá el precio a 12000 y salí del campo.', 'Aviso «listo». En la tienda el precio pasa a Gs. 12.000.'],
+      ['P-06', 'En la fila, cambiá el stock a 1.', 'Se guarda. En la tienda dice «Última unidad».'],
+      ['P-07', 'Apagá «Visible».', 'Desaparece de la tienda. En el panel se encuentra con el filtro «Sólo ocultos». Volvé a encenderlo.'],
+      ['P-08', 'Abrí el lápiz: cambiá nombre y colección, poné etiqueta NUEVO. Guardar.', 'Se guarda y la tienda muestra el nombre nuevo y la etiqueta.'],
+      ['P-09', 'En el lápiz, poné un precio anterior MENOR que el precio. Guardar.', 'No lo guarda y muestra un mensaje de error dentro del formulario.'],
+      ['P-10', 'Usá el buscador y el filtro de categoría del panel.', 'La lista se filtra y el contador «X de Y» cambia.'],
+    ]},
+    { titulo: 'Panel: fotos', pasos: [
+      ['P-11', 'En el producto de prueba, «Subir foto» con una foto sacada con el celular. Después Guardar.', 'Aparece la vista previa y «Lista. Acordate de guardar.». Al guardar, la foto se ve en la tienda y carga rápido.'],
+      ['P-12', 'Intentá subir un archivo que no es imagen (un PDF).', 'No lo acepta.'],
+      ['P-13', 'En Imagen pegá una dirección de otro sitio (https://… de Google Imágenes). Guardar.', 'No deja guardar y explica que tiene que ser una foto subida desde el panel o una ruta del sitio.'],
+    ]},
+    { titulo: 'Panel: Nuevos ingresos', pasos: [
+      ['P-14', 'Tocá la estrella ★ en la fila del producto de prueba.', 'La estrella queda dorada y el producto aparece último en el carrusel de la portada.'],
+      ['P-15', 'Apagá Visible y tocá la estrella de nuevo para sacarlo; después intentá agregarlo estando oculto.', 'Sacarlo funciona. Agregarlo oculto avisa que primero hay que hacerlo visible. Volvé a encender Visible.'],
+      ['P-16', 'En la pestaña Nuevos ingresos subí y bajá productos, y tocá «Guardar orden».', 'El orden del carrusel de la tienda queda igual al del panel. Antes de cambiar algo, «Guardar orden» está apagado.'],
+    ]},
+    { titulo: 'Panel: categorías', pasos: [
+      ['P-17', '«+ Categoría»: escribí «QA Prueba».', 'Se abre un cuadro del panel (no un cartel del navegador) y la clave se completa sola como «qa-prueba». Al crear aparece en la lista.'],
+      ['P-18', 'Borrá la categoría QA Prueba.', 'Pide confirmación en un cuadro del panel. Al confirmar se borra.'],
+      ['P-19', 'Mirá el botón de borrar de una categoría con productos.', 'Está deshabilitado.'],
+    ]},
+    { titulo: 'Panel: historial y en vivo', pasos: [
+      ['P-20', 'Abrí la pestaña Historial.', 'Están los cambios de esta prueba, con quién los hizo y el antes → después de cada campo.'],
+      ['P-21', 'Con la tienda abierta en otra pestaña (sin recargarla), cambiá el precio del producto de prueba.', 'La tienda muestra el precio nuevo sola, en pocos segundos.'],
+      ['P-22', 'Abrí el panel en dos pestañas y cambiá algo en una.', 'La otra avisa «El catálogo cambió» y se actualiza sola. Si estabas escribiendo en un campo, espera a que lo sueltes.'],
+    ]},
+    { titulo: 'Cierre', pasos: [
+      ['P-23', 'Borrá QA-PRUEBA-01 con la ✕ de su fila.', 'Pide confirmación en un cuadro del panel. Desaparece del panel, de la tienda y del carrusel.'],
+      ['P-24', 'Tocá «salir» arriba a la derecha.', 'Vuelve a la pantalla de entrada. Recargar la página no vuelve a entrar sola.'],
+    ]},
+  ];
+  const TODOS = GRUPOS.flatMap((g) => g.pasos.map((p) => p[0]));
+  const ETIQUETA = { ok: 'OK', falla: 'Falla', bloqueado: 'Bloqueado' };
+
+  // ── Estado ─────────────────────────────────────────────────────────────
+  const resultados = {};          // id -> { estado, nota, quien, en }
+  let filtro = 'todos';
+  const miId = null;
+  const nombres = {};             // id de persona -> nombre (sólo para mostrar)
+  const colas = {};               // una escritura a la vez por documento
+
+  const $ = (s, r = document) => r.querySelector(s);
+
+  // ── Armado de la página (una sola vez) ─────────────────────────────────
+  const cont = $('#pasos');
+  for (const g of GRUPOS) {
+    const sec = document.createElement('section');
+    sec.className = 'grupo';
+    const h = document.createElement('h2');
+    h.textContent = g.titulo;
+    sec.append(h);
+    if (g.intro) {
+      const p = document.createElement('p');
+      p.className = 'intro';
+      p.textContent = g.intro;
+      sec.append(p);
+    }
+    for (const [id, accion, esperado] of g.pasos) {
+      const art = document.createElement('article');
+      art.className = 'paso';
+      art.id = id;
+      art.innerHTML = `
+        <div>
+          <div class="id"></div>
+          <p class="accion"></p>
+          <p class="esperado"></p>
+        </div>
+        <div class="resultado" role="group">
+          <button type="button" class="res" data-v="ok" aria-pressed="false">OK</button>
+          <button type="button" class="res" data-v="falla" aria-pressed="false">Falla</button>
+          <button type="button" class="res" data-v="bloqueado" aria-pressed="false">Bloqueado</button>
+        </div>
+        <div class="nota" hidden>
+          <label class="quien" for="n-${id}">Qué pasó (dispositivo, navegador, captura si podés)</label>
+          <textarea id="n-${id}"></textarea>
+          <span class="quien firma"></span>
+        </div>`;
+      $('.id', art).textContent = id;
+      $('.accion', art).textContent = accion;
+      $('.esperado', art).textContent = esperado;
+      $('.resultado', art).setAttribute('aria-label', 'Resultado de ' + id);
+
+      art.querySelectorAll('.res').forEach((b) => b.addEventListener('click', () => {
+        const actual = (resultados[id] || {}).estado;
+        marcar(id, actual === b.dataset.v ? 'pendiente' : b.dataset.v);
+      }));
+
+      const ta = $('textarea', art);
+      let reloj = null;
+      ta.addEventListener('input', () => {
+        clearTimeout(reloj);
+        reloj = setTimeout(() => anotar(id, ta.value), 900);
+      });
+      ta.addEventListener('blur', () => { clearTimeout(reloj); anotar(id, ta.value); });
+
+      sec.append(art);
+    }
+    cont.append(sec);
+  }
+
+  // ── Pintar el estado (sin rehacer el DOM) ──────────────────────────────
+  function pintarPaso(id) {
+    const art = document.getElementById(id);
+    const r = resultados[id] || {};
+    const estado = r.estado || 'pendiente';
+    art.classList.toggle('falla', estado === 'falla');
+    art.classList.toggle('bloqueado', estado === 'bloqueado');
+    art.querySelectorAll('.res').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === estado)));
+    const nota = $('.nota', art);
+    const ta = $('textarea', art);
+    nota.hidden = !(estado === 'falla' || estado === 'bloqueado' || (r.nota || '').length);
+    // No pisar lo que alguien está escribiendo en este mismo campo.
+    if (document.activeElement !== ta && ta.value !== (r.nota || '')) ta.value = r.nota || '';
+    const firma = $('.firma', art);
+    if (r.quien || r.en) {
+      const quien = '';
+      const cuando = r.en ? new Date(r.en).toLocaleString('es-PY', { dateStyle: 'short', timeStyle: 'short' }) : '';
+      firma.textContent = [quien, cuando].filter(Boolean).join(' · ');
+    } else {
+      firma.textContent = '';
+    }
+    art.hidden = !visible(estado);
+  }
+
+  function visible(estado) {
+    if (filtro === 'pendientes') return estado === 'pendiente';
+    if (filtro === 'problemas') return estado === 'falla' || estado === 'bloqueado';
+    return true;
+  }
+
+  function pintarResumen() {
+    const n = { ok: 0, falla: 0, bloqueado: 0 };
+    for (const id of TODOS) { const e = (resultados[id] || {}).estado; if (n[e] !== undefined) n[e]++; }
+    const total = TODOS.length;
+    const pend = total - n.ok - n.falla - n.bloqueado;
+    $('#cuenta').innerHTML = '';
+    const partes = [
+      [n.ok, ' OK'], [n.falla, ' fallas'], [n.bloqueado, ' bloqueados'], [pend, ' pendientes de ' + total],
+    ];
+    partes.forEach(([v, t], i) => {
+      const b = document.createElement('b');
+      b.textContent = v;
+      $('#cuenta').append(b, document.createTextNode(t + (i < partes.length - 1 ? ' · ' : '')));
+    });
+    $('#b-ok').style.width = (n.ok / total * 100) + '%';
+    $('#b-fail').style.width = (n.falla / total * 100) + '%';
+    $('#b-block').style.width = (n.bloqueado / total * 100) + '%';
+  }
+
+  function pintarTodo() {
+    TODOS.forEach(pintarPaso);
+    pintarResumen();
+    document.querySelectorAll('section.grupo').forEach((s) => {
+      s.hidden = !s.querySelector('.paso:not([hidden])');
+    });
+  }
+
+  // ── Guardar ────────────────────────────────────────────────────────────
+  function encolar(id, tarea) {
+    colas[id] = (colas[id] || Promise.resolve()).then(tarea, tarea);
+    return colas[id];
+  }
+
+  async function escribir(id, cuerpo) {
+    guardarLocal();
+  }
+
+  function marcar(id, estado) {
+    const r = Object.assign({}, resultados[id] || {}, {
+      estado, quien: miId || null, en: new Date().toISOString(),
+    });
+    resultados[id] = r;
+    pintarTodo();
+    if (estado === 'falla' || estado === 'bloqueado') {
+      const ta = document.getElementById('n-' + id);
+      if (ta && !ta.value) ta.focus();
+    }
+    return encolar(id, () => escribir(id, { estado: r.estado, nota: r.nota || '', quien: r.quien, en: r.en }));
+  }
+
+  function anotar(id, texto) {
+    const previo = resultados[id] || {};
+    if ((previo.nota || '') === texto) return;   // sólo si cambió
+    const r = Object.assign({}, previo, {
+      estado: previo.estado || 'pendiente', nota: texto, quien: miId || previo.quien || null, en: new Date().toISOString(),
+    });
+    resultados[id] = r;
+    pintarResumen();
+    return encolar(id, () => escribir(id, { estado: r.estado, nota: r.nota, quien: r.quien, en: r.en }));
+  }
+
+  // ── Respaldo local, si no hay base compartida ──────────────────────────
+  const CLAVE = 'qa-rocket-cards-v1';
+  function guardarLocal() {
+    try { localStorage.setItem(CLAVE, JSON.stringify(resultados)); } catch (_) {}
+  }
+  function leerLocal() {
+    try { return JSON.parse(localStorage.getItem(CLAVE) || '{}') || {}; } catch (_) { return {}; }
+  }
+
+  function avisarSync(t) { $('#sync').textContent = t; }
+
+  // ── Filtros y reporte ──────────────────────────────────────────────────
+  document.querySelectorAll('[data-filtro]').forEach((b) => b.addEventListener('click', () => {
+    filtro = b.dataset.filtro;
+    document.querySelectorAll('[data-filtro]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    pintarTodo();
+  }));
+
+  function reporte() {
+    const lineas = [];
+    const n = { ok: 0, falla: 0, bloqueado: 0 };
+    for (const g of GRUPOS) {
+      for (const [id, accion] of g.pasos) {
+        const r = resultados[id] || {};
+        if (n[r.estado] !== undefined) n[r.estado]++;
+        if (r.estado === 'falla' || r.estado === 'bloqueado') {
+          lineas.push(`${id} ${ETIQUETA[r.estado].toUpperCase()} — ${accion}`);
+          if (r.nota) lineas.push('   ' + r.nota.replace(/\n/g, '\n   '));
+        }
+      }
+    }
+    const pend = TODOS.length - n.ok - n.falla - n.bloqueado;
+    const quienPrueba = (campoNombre.value || '').trim();
+    const cabecera = `QA Rocket Cards${quienPrueba ? ' (' + quienPrueba + ')' : ''} — ${n.ok} OK, ${n.falla} fallas, ${n.bloqueado} bloqueados, ${pend} pendientes de ${TODOS.length}`;
+    return [cabecera, '', ...(lineas.length ? lineas : ['Sin fallas ni bloqueos.'])].join('\n');
+  }
+
+  $('#copiar').addEventListener('click', () => {
+    const texto = reporte();
+    const listo = () => {
+      const s = document.createElement('span');
+      s.className = 'copiado';
+      s.textContent = 'Copiado';
+      $('#copiar').after(s);
+      setTimeout(() => s.remove(), 2000);
+    };
+    const fallback = () => {
+      let ta = document.getElementById('reporte-fallback');
+      if (!ta) {
+        ta = document.createElement('textarea');
+        ta.id = 'reporte-fallback';
+        ta.setAttribute('aria-label', 'Reporte para copiar');
+        $('.top .wrap').append(ta);
+      }
+      ta.value = texto;
+      ta.focus(); ta.select();
+    };
+    try {
+      navigator.clipboard.writeText(texto).then(listo, fallback);
+    } catch (_) { fallback(); }
+  });
+
+  // ── Arranque ───────────────────────────────────────────────────────────
+  Object.assign(resultados, leerLocal());
+  pintarTodo();
+
+  // ── Quién prueba ──
+  const CLAVE_NOMBRE = 'qa-rocket-cards-nombre';
+  const campoNombre = $('#tester');
+  try { campoNombre.value = localStorage.getItem(CLAVE_NOMBRE) || ''; } catch (_) {}
+  campoNombre.addEventListener('input', () => {
+    try { localStorage.setItem(CLAVE_NOMBRE, campoNombre.value); } catch (_) {}
+  });
+
+  // ── Empezar de nuevo: dos toques, para no borrar todo por error ──
+  const reiniciar = $('#reiniciar');
+  let armado = null;
+  reiniciar.addEventListener('click', () => {
+    if (!armado) {
+      reiniciar.textContent = '¿Borrar todas las marcas? Tocá de nuevo';
+      armado = setTimeout(() => { armado = null; reiniciar.textContent = 'Empezar de nuevo'; }, 4000);
+      return;
+    }
+    clearTimeout(armado); armado = null;
+    reiniciar.textContent = 'Empezar de nuevo';
+    for (const id of Object.keys(resultados)) delete resultados[id];
+    guardarLocal();
+    document.querySelectorAll('.nota textarea').forEach((t) => { t.value = ''; });
+    pintarTodo();
+  });
+
+  avisarSync('Las marcas se guardan en este navegador.');
+})();
+</script>
+</body>
+</html>
