@@ -38,15 +38,71 @@ COMMENT ON SCHEMA rocketcards IS
 SET LOCAL search_path TO rocketcards, public;
 
 -- ─────────────────────────────────────────────────────────────────────────
--- Restos de la versión anterior
+-- Limpieza de la versión anterior
 -- ─────────────────────────────────────────────────────────────────────────
--- La primera versión de esto traía su propio login, con una tabla de
--- usuarios y otra de sesiones. Ahora de eso se encarga Supabase Auth, así
--- que sobran — y en un esquema publicado por PostgREST, una tabla con hashes
--- de contraseña es justo lo que no querés tener de más.
+-- La primera versión traía un servidor Node propio: login con tabla de
+-- usuarios y de sesiones, y un trigger que mandaba NOTIFY para que ese
+-- servidor recargara su caché. Ahora el login lo hace Supabase Auth y el
+-- aviso lo da Realtime, así que todo eso sobra. Y una tabla con hashes de
+-- contraseña en un esquema publicado por PostgREST es justo lo que no
+-- conviene tener de más.
+--
+-- Todo con IF EXISTS: en una base nueva este bloque no hace nada.
 
-DROP TABLE IF EXISTS sesion;
-DROP TABLE IF EXISTS admin;
+-- Primero los triggers viejos. Si quedan, suben la versión dos veces por
+-- cambio: una ellos y otra los nuevos.
+--
+-- CASCADE se lleva los triggers que usaban la función, así no hace falta
+-- nombrarlos uno por uno — y de paso esto no se rompe en una base nueva,
+-- donde DROP TRIGGER ... ON producto fallaría porque la tabla todavía no
+-- existe.
+DROP FUNCTION IF EXISTS rocketcards.avisar_cambio() CASCADE;
+DROP FUNCTION IF EXISTS rocketcards.limpiar_sesiones() CASCADE;
+
+-- La auditoría vieja referenciaba la tabla admin, y esa clave foránea es la
+-- que impide borrarla. Al soltar la columna se va con ella.
+ALTER TABLE IF EXISTS rocketcards.auditoria DROP COLUMN IF EXISTS admin_id;
+ALTER TABLE IF EXISTS rocketcards.auditoria ADD COLUMN IF NOT EXISTS quien text;
+
+DROP TABLE IF EXISTS rocketcards.sesion;
+DROP TABLE IF EXISTS rocketcards.admin;
+
+-- Las políticas viejas dejaban entrar al rol de aquel servidor. No hacen
+-- daño, pero una política de más es una cosa más que revisar.
+DO $$
+DECLARE
+  t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['producto', 'categoria', 'auditoria', 'version']
+  LOOP
+    IF to_regclass('rocketcards.' || t) IS NOT NULL THEN
+      EXECUTE format('DROP POLICY IF EXISTS app_total ON rocketcards.%I', t);
+    END IF;
+  END LOOP;
+END
+$$;
+
+-- Y el rol de aquel servidor, que ya no se conecta nadie. Si algo todavía
+-- depende de él lo dejamos estar: no vale la pena voltear todo el script
+-- por un rol de sobra.
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'rocketcards_app') THEN
+    EXECUTE 'REVOKE ALL ON ALL TABLES IN SCHEMA rocketcards FROM rocketcards_app';
+    EXECUTE 'REVOKE ALL ON ALL FUNCTIONS IN SCHEMA rocketcards FROM rocketcards_app';
+    EXECUTE 'REVOKE ALL ON ALL SEQUENCES IN SCHEMA rocketcards FROM rocketcards_app';
+    EXECUTE 'REVOKE ALL ON SCHEMA rocketcards FROM rocketcards_app';
+    EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA rocketcards REVOKE ALL ON TABLES FROM rocketcards_app';
+    EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA rocketcards REVOKE ALL ON SEQUENCES FROM rocketcards_app';
+    BEGIN
+      EXECUTE 'DROP ROLE rocketcards_app';
+      RAISE NOTICE 'Borrado el rol rocketcards_app, que era del servidor viejo.';
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'El rol rocketcards_app quedó sin permisos pero no se pudo borrar: %', SQLERRM;
+    END;
+  END IF;
+END
+$$;
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- Quién es el admin
