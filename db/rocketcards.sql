@@ -221,11 +221,24 @@ CREATE TABLE IF NOT EXISTS producto (
   stock           integer     NOT NULL DEFAULT 0 CHECK (stock >= 0),
   etiqueta        text        CHECK (etiqueta IS NULL OR etiqueta <> ''),
   destacado       boolean     NOT NULL DEFAULT false,
+  imagenes        text[]      NOT NULL DEFAULT '{}',   -- límite de 10: ver abajo
   nuevo_orden     integer,    -- posición en "Nuevos ingresos"; NULL = no sale ahí
   publicado       boolean     NOT NULL DEFAULT true,
   creado_en       timestamptz NOT NULL DEFAULT now(),
   actualizado_en  timestamptz NOT NULL DEFAULT now()
 );
+
+-- Galería. Para una base que ya tenía la tabla, el CREATE de arriba no hace
+-- nada, así que la columna se agrega acá.
+ALTER TABLE producto ADD COLUMN IF NOT EXISTS imagenes text[] NOT NULL DEFAULT '{}';
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_constraint WHERE conname = 'producto_imagenes_max') THEN
+    ALTER TABLE rocketcards.producto
+      ADD CONSTRAINT producto_imagenes_max CHECK (cardinality(imagenes) <= 10);
+  END IF;
+END
+$$;
 
 CREATE INDEX IF NOT EXISTS producto_categoria_idx
   ON producto (categoria) WHERE publicado;
@@ -239,6 +252,8 @@ COMMENT ON COLUMN producto.precio_anterior IS
   'Precio tachado. Si está, se calcula el % de descuento.';
 COMMENT ON COLUMN producto.nuevo_orden IS
   'Posición en el carrusel "Nuevos ingresos". NULL = no aparece.';
+COMMENT ON COLUMN producto.imagenes IS
+  'Todas las fotos, en orden; la primera es la portada y se copia a img.';
 COMMENT ON COLUMN producto.destacado IS
   'Lleva etiqueta DESTACADO y va primero en el catálogo.';
 
@@ -473,7 +488,8 @@ AS $$
                'id', p.id, 'name', p.nombre, 'set', p.coleccion,
                'cat', p.categoria, 'img', p.img, 'price', p.precio,
                'old', p.precio_anterior, 'stock', p.stock, 'tag', p.etiqueta,
-               'destacado', CASE WHEN p.destacado THEN true END
+               'destacado', CASE WHEN p.destacado THEN true END,
+               'imagenes', CASE WHEN cardinality(p.imagenes) > 0 THEN to_jsonb(p.imagenes) END
              )) ORDER BY p.destacado DESC, p.nombre)
       FROM producto p
       WHERE p.publicado

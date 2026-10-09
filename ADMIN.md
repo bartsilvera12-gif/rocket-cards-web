@@ -126,8 +126,16 @@ pantalla de la otra sin recargar. Y en la tienda también.
 
 ### Fotos
 
-Se suben desde el formulario del producto, a un bucket de Supabase Storage
-(`rocketcards`). No hace falta meterlas al repo ni volver a publicar el sitio.
+Cada producto tiene una **galería de hasta 10 fotos**. Se cargan desde el
+formulario del producto arrastrándolas desde la carpeta de la compu al
+recuadro, o tocándolo para elegir varias a la vez. Van a un bucket de
+Supabase Storage (`rocketcards`): no hace falta meterlas al repo ni volver a
+publicar el sitio.
+
+La primera foto es la **portada**: es la que se ve en tarjetas, carruseles y
+carrito (se copia al campo `img`). En la ficha del producto aparecen todas,
+con miniaturas para cambiar de foto. Se reordenan con ← →, la ★ pasa una a
+portada y la ✕ la quita de la galería.
 
 Antes de subir, el navegador **la achica a 1000px de lado y la pasa a WebP**.
 Las fotos salen del teléfono con 4000px y 4 MB; subirlas tal cual es

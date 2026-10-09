@@ -586,15 +586,18 @@
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:clamp(22px,3vw,52px);align-items:start">
       <div style="display:flex;flex-direction:column;gap:10px">
         <div style="position:relative;aspect-ratio:1/1;background:#0A0A0A;border:1px solid #1f1f1f;overflow:hidden">
-          <div role="img" aria-label="{{ prod.name }}" style="position:absolute;inset:0;background-image:{{ prod.imgCss }};background-size:contain;background-position:center;background-repeat:no-repeat;margin:clamp(16px,2.6vw,40px)"></div>
+          <div role="img" aria-label="{{ prod.name }}" style="position:absolute;inset:0;background-image:{{ prodFotoCss }};background-size:contain;background-position:center;background-repeat:no-repeat;margin:clamp(16px,2.6vw,40px)"></div>
           <sc-if value="{{ prod.hasTag }}" hint-placeholder-val="{{ false }}">
             <span style="position:absolute;top:12px;left:12px;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;padding:6px 10px;background:{{ prod.tagBg }};color:{{ prod.tagFg }}">{{ prod.tag }}</span>
           </sc-if>
         </div>
-        <div style="display:flex;gap:8px">
-          <span style="width:74px;height:74px;border:1px solid #E30613;background:#0A0A0A;display:block;background-image:{{ prod.imgCss }};background-size:contain;background-position:center;background-repeat:no-repeat"></span>
-          <span style="width:74px;height:74px;border:1px dashed #242424;background:#0A0A0A;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:8.5px;letter-spacing:.06em;color:#3f3f3f;text-align:center;line-height:1.4;padding:6px">FOTO 2 PENDIENTE</span>
-        </div>
+        <sc-if value="{{ prodVariasFotos }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <sc-for list="{{ prodFotos }}" as="f" hint-placeholder-count="3">
+              <button type="button" onClick="{{ f.ver }}" aria-label="{{ f.etiqueta }}" style="width:74px;height:74px;padding:0;border:1px solid {{ f.borde }};background:#0A0A0A;background-image:{{ f.css }};background-size:contain;background-position:center;background-repeat:no-repeat;cursor:pointer;-webkit-tap-highlight-color:transparent"></button>
+            </sc-for>
+          </div>
+        </sc-if>
       </div>
 
       <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
@@ -802,7 +805,7 @@
               <span style="font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.14em;font-size:15px">Total</span>
               <span style="font-family:'Saira Condensed',sans-serif;font-weight:900;font-size:26px">{{ totalLabel }}</span>
             </div>
-            <a href="#checkout" style="margin-top:8px;background:#E30613;color:#fff;text-align:center;font-family:'Saira Condensed',sans-serif;font-weight:800;letter-spacing:.14em;text-transform:uppercase;font-size:15px;padding:16px;border-radius:2px" style-hover="background:#FF1A27;color:#fff">Finalizar compra</a>
+            <a href="{{ checkoutLink }}" target="_blank" rel="noopener" style="margin-top:8px;background:#E30613;color:#fff;text-align:center;font-family:'Saira Condensed',sans-serif;font-weight:800;letter-spacing:.14em;text-transform:uppercase;font-size:15px;padding:16px;border-radius:2px" style-hover="background:#FF1A27;color:#fff">Finalizar compra</a>
             <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5a5a5a;text-align:center;letter-spacing:.06em">Stock validado antes de confirmar el pedido</span>
           </div>
         </sc-if>
@@ -994,7 +997,7 @@ class Component extends DCLogic {
   state = {
     q: '', searchOpen: false, searching: false, results: [], mSearchOpen: false,
     cart: [], cartOpen: false, toast: '', menuOpen: false, catMenuOpen: false, catHover: 0, car: 0,
-    view: 'home', pid: null, qty: 1, fCats: [], fAvail: false, sort: 'recent', legalDoc: 'privacidad', waHidden: false,
+    view: 'home', pid: null, qty: 1, foto: 0, fCats: [], fAvail: false, sort: 'recent', legalDoc: 'privacidad', waHidden: false,
     w: typeof window !== 'undefined' ? window.innerWidth : 1440
   };
 
@@ -1301,7 +1304,7 @@ class Component extends DCLogic {
   }
 
   openProduct(id) {
-    this.setState({ view: 'product', pid: id, qty: 1, catMenuOpen: false, menuOpen: false, searchOpen: false });
+    this.setState({ view: 'product', pid: id, qty: 1, foto: 0, catMenuOpen: false, menuOpen: false, searchOpen: false });
     window.scrollTo(0, 0);
   }
   goSection(id) {
@@ -1344,7 +1347,10 @@ class Component extends DCLogic {
     const byId = id => CATALOG.find(p => p.id === id);
     const pick = (f) => CATALOG.filter(f).map(p => this.decorate(p));
 
-    const cartItems = s.cart.map(ci => {
+    // Con el catálogo en vivo, un producto que está en el carrito puede
+    // desaparecer mientras el cliente mira (lo borraron u ocultaron desde el
+    // panel). Sin este filtro, p queda undefined y la página entera se cae.
+    const cartItems = s.cart.filter(ci => byId(ci.id)).map(ci => {
       const p = byId(ci.id);
       return Object.assign({}, p, {
         qty: ci.qty,
@@ -1363,13 +1369,46 @@ class Component extends DCLogic {
     else if (s.sort === 'name') catalogList = catalogList.slice().sort((a, b) => a.name.localeCompare(b.name));
     catalogList = catalogList.map(p => this.decorate(p));
     const prodRaw = s.pid ? byId(s.pid) : null;
+
+    // Los ids del carrusel, sólo los que existen en el catálogo de ahora.
+    // Con el catálogo en vivo, un producto puede borrarse u ocultarse
+    // mientras su id sigue en la lista, y decorate(undefined) tiraba la
+    // página entera. Si no queda ninguno, mostramos los primeros del
+    // catálogo antes que un carrusel vacío.
+    const nuevos = (() => {
+      const vivos = NEW_IDS.filter(id => byId(id));
+      return vivos.length ? vivos : CATALOG.slice(0, 6).map(p => p.id);
+    })();
+    const car = nuevos.length ? (s.car || 0) % nuevos.length : 0;
     const prodDec = prodRaw ? this.decorate(prodRaw) : null;
     const shipping = subtotal === 0 ? 0 : (subtotal >= 500000 ? 0 : 35000);
 
+    // Galería de la ficha. "imagenes" trae todas las fotos en orden (la
+    // primera es la portada); un producto cargado antes de que existiera la
+    // galería sólo tiene "img".
+    const prodFotosRaw = prodRaw
+      ? (Array.isArray(prodRaw.imagenes) && prodRaw.imagenes.length ? prodRaw.imagenes : [prodRaw.img]).filter(Boolean)
+      : [];
+    const fotoIdx = Math.min(s.foto || 0, Math.max(prodFotosRaw.length - 1, 0));
+
+    // Finalizar compra: el pedido armado, listo para mandar por WhatsApp.
+    // Lleva el SKU de cada producto para identificarlo sin ambigüedad.
+    const pedido = cartItems.length ? [
+      'Hola Rocket Cards, quiero hacer este pedido:',
+      '',
+      ...cartItems.map(i => '• ' + i.qty + ' × ' + i.name + ' (' + i.id + ') — ' + this.fmt(i.price * i.qty)),
+      '',
+      'Subtotal: ' + this.fmt(subtotal),
+      'Envío estimado: ' + (shipping === 0 ? 'Gratis' : this.fmt(shipping)),
+      'Total: ' + this.fmt(subtotal + shipping)
+    ].join('\n') : '';
+
     return {
       isHome: s.view === 'home',
-      isCatalog: s.view === 'catalog',
-      isProduct: s.view === 'product',
+      // Si la ficha abierta se borra u oculta desde el panel mientras alguien
+      // la mira, mostramos el catálogo en vez de una ficha sin producto.
+      isCatalog: s.view === 'catalog' || (s.view === 'product' && !prodDec),
+      isProduct: s.view === 'product' && !!prodDec,
       isLegal: s.view === 'legal',
       waOpacity: s.waHidden ? '0' : '1',
       waTransform: s.waHidden ? 'translateY(22px) scale(.94)' : 'none',
@@ -1505,7 +1544,7 @@ class Component extends DCLogic {
         { n: '14', name: 'Ofertas', count: 19 }, { n: '15', name: 'Preventas', count: 6 }
       ],
 
-      carCounter: ('0' + (s.car + 1)) + ' / ' + ('0' + NEW_IDS.length),
+      carCounter: ('0' + (car + 1)).slice(-2) + ' / ' + ('0' + nuevos.length).slice(-2),
       // Deslizar con el dedo. Un solo camino para dedo, mouse y lápiz con
       // Pointer Events. Mientras se arrastra, las diapositivas acompañan
       // amortiguadas; al soltar, salta de a una o vuelve a su lugar.
@@ -1543,15 +1582,15 @@ class Component extends DCLogic {
         const dx = d.dx || 0;
         if (Math.abs(dx) < 45) return;            // muy corto: vuelve solo
         this._carSwipe = Date.now();              // que no dispare el click
-        const n = NEW_IDS.length;
-        this.setState(st => ({ car: (st.car + (dx < 0 ? 1 : -1) + n) % n }));
+        const n = nuevos.length;
+        this.setState({ car: (car + (dx < 0 ? 1 : -1) + n) % n });
       },
-      carPrev: () => this.setState(st => ({ car: (st.car - 1 + NEW_IDS.length) % NEW_IDS.length })),
-      carNext: () => this.setState(st => ({ car: (st.car + 1) % NEW_IDS.length })),
-      carSlides: NEW_IDS.map((id, i) => {
+      carPrev: () => this.setState({ car: (car - 1 + nuevos.length) % nuevos.length }),
+      carNext: () => this.setState({ car: (car + 1) % nuevos.length }),
+      carSlides: nuevos.map((id, i) => {
         const p = this.decorate(byId(id));
-        const n = NEW_IDS.length;
-        const off = ((i - s.car + n + Math.floor(n / 2)) % n) - Math.floor(n / 2);
+        const n = nuevos.length;
+        const off = ((i - car + n + Math.floor(n / 2)) % n) - Math.floor(n / 2);
         const abs = Math.abs(off);
         const isCur = off === 0;
         return Object.assign({}, p, {
@@ -1639,6 +1678,15 @@ class Component extends DCLogic {
       clearFilters: () => this.setState({ fCats: [], fAvail: false, sort: 'recent' }),
 
       prod: prodDec,
+      prodFotoCss: prodFotosRaw.length ? 'url("' + prodFotosRaw[fotoIdx] + '")' : 'none',
+      prodVariasFotos: prodFotosRaw.length > 1,
+      prodFotos: prodFotosRaw.map((url, i) => ({
+        css: 'url("' + url + '")',
+        borde: i === fotoIdx ? '#E30613' : '#242424',
+        etiqueta: 'Ver foto ' + (i + 1) + ' de ' + prodFotosRaw.length,
+        ver: () => this.setState({ foto: i })
+      })),
+      checkoutLink: 'https://wa.me/595981377541?text=' + encodeURIComponent(pedido),
       prodAttrs: prodDec ? [
         { k: 'Categoría', v: { sellados: 'Sellados y coleccionables', sobres: 'Sobres', etb: 'Elite Trainer Box' }[prodDec.cat] },
         { k: 'Colección', v: prodDec.set.split(' · ')[0] },

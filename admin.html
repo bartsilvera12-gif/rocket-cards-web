@@ -87,6 +87,26 @@
            cursor: pointer; border-radius: 3px; padding: 5px 9px; font-size: 13px; line-height: 1; }
   .icono:hover { color: var(--texto); border-color: var(--oro); }
   .icono.peligro:hover { color: var(--rojo); border-color: var(--rojo); }
+  /* ── Galería de fotos del producto ── */
+  .galeria { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px; }
+  .foto-g { margin: 0; position: relative; border: 1px solid var(--linea2); border-radius: 4px; overflow: hidden; background: var(--panel2); }
+  .foto-g .foto-img { aspect-ratio: 1 / 1; background: #fff center / contain no-repeat; }
+  .foto-g .portada {
+    position: absolute; top: 6px; left: 6px; background: var(--oro); color: #050505;
+    font-family: var(--titulo); font-weight: 800; font-size: 9.5px; letter-spacing: .12em;
+    text-transform: uppercase; padding: 3px 6px; border-radius: 2px;
+  }
+  .foto-g .foto-acc { display: flex; justify-content: space-between; gap: 2px; padding: 5px; }
+  .foto-g .foto-acc .icono { padding: 4px 7px; font-size: 12px; }
+  .soltar {
+    margin-top: 10px; border: 1.5px dashed var(--linea2); border-radius: 4px; padding: 18px 14px;
+    text-align: center; color: var(--suave); cursor: pointer; display: grid; gap: 4px;
+    transition: border-color .15s, background .15s;
+  }
+  .soltar b { color: var(--texto); font-weight: 600; }
+  .soltar:hover, .soltar.encima { border-color: var(--oro); background: rgba(201,162,39,.08); }
+  .soltar.lleno { opacity: .45; pointer-events: none; }
+
   /* La estrella encendida: el producto ya está en el carrusel de la portada. */
   .icono.activo { color: var(--oro); border-color: var(--oro); background: rgba(201,162,39,.12); }
   .icono:disabled { opacity: .4; cursor: wait; }
@@ -714,6 +734,7 @@ function imagenValida(v) {
   return v.startsWith('/') && !v.startsWith('//') && !v.includes('..');
 }
 
+const MAX_FOTOS = 10;    // el mismo límite que pone la base (producto_imagenes_max)
 const LADO_MAX = 1000;   // el uso más grande en la página es el carrusel
 const CALIDAD = 0.85;
 
@@ -807,19 +828,18 @@ function pintarModal() {
           <input id="m-col" type="text" value="${esc(p.coleccion || '')}" placeholder="Mega Evolution · ETB">
         </div>
         <div class="ancho">
-          <label for="m-img">Imagen</label>
-          <div class="fila" style="align-items:flex-start">
-            <div id="m-prev" class="sinfoto" style="width:76px;height:76px;flex:0 0 auto">sin foto</div>
-            <div style="flex:1;min-width:0;display:grid;gap:8px">
-              <input id="m-img" type="text" value="${esc(p.img || '')}" placeholder="/assets/catalogo/foto.webp">
-              <div class="fila">
-                <input type="file" id="m-file" accept="image/png,image/jpeg,image/webp,image/avif" style="display:none">
-                <button type="button" class="btn gris chico" id="m-subir">Subir foto</button>
-                <span class="ayuda" id="m-estado" style="margin:0"></span>
-              </div>
-            </div>
+          <label>Fotos <span class="ayuda" style="margin:0;text-transform:none;letter-spacing:0">— la primera es la portada · hasta ${MAX_FOTOS}</span></label>
+          <div id="m-galeria" class="galeria"></div>
+          <div id="m-soltar" class="soltar" tabindex="0" role="button" aria-label="Agregar fotos desde la computadora">
+            <input type="file" id="m-file" multiple accept="image/png,image/jpeg,image/webp,image/avif" style="display:none">
+            <b>Arrastrá fotos acá</b> o tocá para elegirlas de la compu
+            <span class="ayuda" id="m-estado" style="margin:0"></span>
           </div>
-          <div class="ayuda">La foto se achica y se convierte a WebP antes de subir, así la tienda no se pone lenta. También podés pegar una ruta de <code>assets/</code>.</div>
+          <div class="fila" style="margin-top:8px">
+            <input id="m-ruta" type="text" placeholder="o pegá una ruta del sitio: /assets/catalogo/foto.webp">
+            <button type="button" class="btn gris chico" id="m-agregar-ruta">Agregar</button>
+          </div>
+          <div class="ayuda">Cada foto se achica y se convierte a WebP antes de subir, así la tienda no se pone lenta.</div>
         </div>
         <div>
           <label for="m-precio">Precio (Gs.)</label>
@@ -856,38 +876,103 @@ function pintarModal() {
     </form>`;
   document.body.append(velo);
 
-  // Preview de la foto, y el botón de subir.
-  const campoImg = $('#m-img', velo);
-  const prev = $('#m-prev', velo);
+  // ── Galería ──
+  // La lista ordenada de fotos vive acá hasta que se guarda. Un producto
+  // anterior a la galería sólo tiene "img": arranca con esa.
+  let fotos = (Array.isArray(p.imagenes) && p.imagenes.length) ? p.imagenes.slice() : (p.img ? [p.img] : []);
+  let subiendo = 0;
+  const galeria = $('#m-galeria', velo);
+  const soltar = $('#m-soltar', velo);
   const estadoFoto = $('#m-estado', velo);
 
-  const verPreview = () => {
-    const v = campoImg.value.trim();
-    if (!v) { prev.className = 'sinfoto'; prev.textContent = 'sin foto'; prev.style.backgroundImage = ''; return; }
-    prev.className = '';
-    prev.textContent = '';
-    prev.style.cssText = 'width:76px;height:76px;flex:0 0 auto;border-radius:3px;border:1px solid var(--linea2);' +
-      'background:#fff center/contain no-repeat;background-image:url("' + v.replace(/"/g, '%22') + '")';
-  };
-  verPreview();
-  campoImg.addEventListener('input', verPreview);
+  const pintarGaleria = () => {
+    galeria.innerHTML = fotos.length ? fotos.map((url, i) => `
+      <figure class="foto-g" data-i="${i}">
+        <div class="foto-img" style="background-image:url('${esc(url).replace(/'/g, '%27')}')"></div>
+        ${i === 0 ? '<span class="portada">Portada</span>' : ''}
+        <div class="foto-acc">
+          <button type="button" class="icono" data-izq title="Mover a la izquierda" ${i === 0 ? 'disabled' : ''}>←</button>
+          ${i > 0 ? '<button type="button" class="icono" data-portada title="Usar de portada">★</button>' : ''}
+          <button type="button" class="icono" data-der title="Mover a la derecha" ${i === fotos.length - 1 ? 'disabled' : ''}>→</button>
+          <button type="button" class="icono peligro" data-quitar title="Quitar">✕</button>
+        </div>
+      </figure>`).join('') : '<div class="vacio" style="padding:14px;grid-column:1/-1">Sin fotos todavía.</div>';
 
-  $('#m-subir', velo).addEventListener('click', () => $('#m-file', velo).click());
-  $('#m-file', velo).addEventListener('change', async (ev) => {
-    const archivo = ev.target.files && ev.target.files[0];
-    if (!archivo) return;
-    estadoFoto.textContent = 'Subiendo…';
-    try {
-      const url = await subirFoto(archivo, $('#m-id', velo).value || p.id);
-      campoImg.value = url;
-      verPreview();
-      estadoFoto.textContent = 'Lista. Acordate de guardar.';
-    } catch (err) {
-      estadoFoto.textContent = '';
-      brindis(motivo(err), true);
-    } finally {
-      ev.target.value = '';
+    galeria.querySelectorAll('.foto-g').forEach((fig) => {
+      const i = Number(fig.dataset.i);
+      const mover = (a, b) => { [fotos[a], fotos[b]] = [fotos[b], fotos[a]]; pintarGaleria(); };
+      fig.querySelector('[data-izq]').addEventListener('click', () => mover(i, i - 1));
+      fig.querySelector('[data-der]').addEventListener('click', () => mover(i, i + 1));
+      const portada = fig.querySelector('[data-portada]');
+      if (portada) portada.addEventListener('click', () => { fotos.unshift(fotos.splice(i, 1)[0]); pintarGaleria(); });
+      fig.querySelector('[data-quitar]').addEventListener('click', () => { fotos.splice(i, 1); pintarGaleria(); });
+    });
+    soltar.classList.toggle('lleno', fotos.length >= MAX_FOTOS);
+  };
+  pintarGaleria();
+
+  /** Sube varias fotos de a una, en el orden en que se eligieron. */
+  async function agregarArchivos(lista) {
+    const imagenes = [...lista].filter((a) => a.type.startsWith('image/'));
+    const descartadas = lista.length - imagenes.length;
+    const lugar = MAX_FOTOS - fotos.length;
+    if (lugar <= 0) return brindis('Ya hay ' + MAX_FOTOS + ' fotos: quitá alguna para agregar otra', true);
+    const tanda = imagenes.slice(0, lugar);
+    if (!tanda.length) return brindis('Eso no es una imagen. Se aceptan JPG, PNG, WebP y AVIF.', true);
+
+    const sku = $('#m-id', velo).value || p.id;
+    subiendo++;
+    let hechas = 0, fallas = 0;
+    for (const archivo of tanda) {
+      estadoFoto.textContent = 'Subiendo ' + (hechas + fallas + 1) + ' de ' + tanda.length + '…';
+      try {
+        fotos.push(await subirFoto(archivo, sku));
+        hechas++;
+        pintarGaleria();
+      } catch (err) {
+        fallas++;
+        brindis(archivo.name + ': ' + motivo(err), true);
+      }
     }
+    subiendo--;
+    const avisos = [];
+    if (hechas) avisos.push(hechas === 1 ? '1 foto lista' : hechas + ' fotos listas');
+    if (imagenes.length > tanda.length) avisos.push((imagenes.length - tanda.length) + ' no entraron (máximo ' + MAX_FOTOS + ')');
+    if (descartadas) avisos.push(descartadas + ' no eran imágenes');
+    estadoFoto.textContent = avisos.length ? avisos.join(' · ') + (hechas ? '. Acordate de guardar.' : '') : '';
+  }
+
+  const archivoInput = $('#m-file', velo);
+  soltar.addEventListener('click', (e) => { if (e.target !== archivoInput) archivoInput.click(); });
+  soltar.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); archivoInput.click(); } });
+  archivoInput.addEventListener('change', async () => {
+    const lista = archivoInput.files;
+    if (lista && lista.length) await agregarArchivos(lista);
+    archivoInput.value = '';
+  });
+
+  // Arrastrar y soltar desde la compu. dragover tiene que cancelarse en cada
+  // evento, o el navegador abre la foto en la pestaña en vez de soltarla acá.
+  ['dragenter', 'dragover'].forEach((t) => soltar.addEventListener(t, (e) => {
+    e.preventDefault();
+    soltar.classList.add('encima');
+  }));
+  ['dragleave', 'dragend'].forEach((t) => soltar.addEventListener(t, () => soltar.classList.remove('encima')));
+  soltar.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    soltar.classList.remove('encima');
+    if (e.dataTransfer && e.dataTransfer.files.length) await agregarArchivos(e.dataTransfer.files);
+  });
+
+  $('#m-agregar-ruta', velo).addEventListener('click', () => {
+    const campo = $('#m-ruta', velo);
+    const v = campo.value.trim();
+    if (!v) return;
+    if (!imagenValida(v)) return brindis('Tiene que ser una ruta del sitio (como /assets/catalogo/foto.webp) o una foto subida acá', true);
+    if (fotos.length >= MAX_FOTOS) return brindis('Ya hay ' + MAX_FOTOS + ' fotos', true);
+    fotos.push(v);
+    campo.value = '';
+    pintarGaleria();
   });
 
   const cerrar = () => { velo.remove(); estado.editando = null; };
@@ -903,23 +988,32 @@ function pintarModal() {
     const err = $('#err', velo);
     const boton = velo.querySelector('button[type=submit]');
     const antes = $('#m-antes', velo).value;
-    const img = campoImg.value.trim();
+    if (subiendo) {
+      err.className = 'aviso mal ancho';
+      err.textContent = 'Esperá a que terminen de subir las fotos.';
+      err.style.display = '';
+      return;
+    }
 
     // Una ruta del sitio, o una foto de nuestro bucket. Una URL que apunte
     // a otro lado convertiría el panel en una forma de incrustar contenido
     // de terceros en la tienda.
-    if (!imagenValida(img)) {
+    if (!fotos.every(imagenValida)) {
       err.className = 'aviso mal ancho';
-      err.textContent = 'La imagen tiene que ser una foto subida acá, o una ruta del sitio como /assets/catalogo/foto.webp';
+      err.textContent = 'Las fotos tienen que estar subidas acá, o ser rutas del sitio como /assets/catalogo/foto.webp';
       err.style.display = '';
       return;
     }
+    // La portada se copia a "img": el resto de la tienda (tarjetas,
+    // carruseles, carrito) sigue leyendo ese campo.
+    const img = fotos[0] || '';
 
     const datos = {
       nombre: $('#m-nom', velo).value.trim(),
       coleccion: $('#m-col', velo).value.trim(),
       categoria: $('#m-cat', velo).value,
       img,
+      imagenes: fotos,
       precio: Number($('#m-precio', velo).value),
       precio_anterior: antes === '' ? null : Number(antes),
       stock: Number($('#m-stock', velo).value || 0),

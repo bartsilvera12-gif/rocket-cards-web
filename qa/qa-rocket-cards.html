@@ -187,7 +187,6 @@
   <div class="aviso conocidos">
     <h2>Ya lo sabemos, no hace falta reportarlo</h2>
     <ul>
-      <li>«Finalizar compra» en el carrito todavía no lleva a ningún lado.</li>
       <li>Los textos legales tienen partes marcadas <span class="mono">[PENDIENTE — …]</span>.</li>
       <li>El interruptor «Destacado» del formulario de producto está en revisión.</li>
       <li>Al reemplazar una foto, la anterior no se borra del almacenamiento.</li>
@@ -229,12 +228,14 @@
       ['T-17', 'Tocá «Comprar ahora».', 'Se agrega y se abre el carrito.'],
       ['T-18', 'Abrí un producto agotado.', 'Dice Agotado y no deja agregarlo.'],
       ['T-19', 'Tocá la consulta por WhatsApp de la ficha.', 'Abre WhatsApp al 0981 377 541 con el nombre del producto ya escrito en el mensaje.'],
+      ['T-34', 'Abrí un producto con varias fotos y tocá las miniaturas de abajo.', 'Cambia la foto grande y la miniatura elegida queda marcada en rojo. Un producto con una sola foto no muestra miniaturas.'],
     ]},
     { titulo: 'Carrito', pasos: [
       ['T-20', 'Agregá más unidades que el stock disponible.', 'No deja pasar del stock y avisa el máximo disponible.'],
       ['T-21', 'Con menos de Gs. 500.000 en el carrito, mirá el envío.', 'Envío estimado Gs. 35.000 y el total suma subtotal más envío.'],
       ['T-22', 'Superá los Gs. 500.000.', 'El envío pasa a «Gratis».'],
       ['T-23', 'Cambiá cantidades y sacá productos.', 'Subtotal, envío y total se actualizan al momento.'],
+      ['T-35', 'Con dos o más productos en el carrito, tocá «Finalizar compra».', 'Abre WhatsApp al 0981 377 541 con el pedido escrito: cada producto con cantidad, SKU y precio, más subtotal, envío y total iguales a los del carrito.'],
     ]},
     { titulo: 'Búsqueda y direcciones', pasos: [
       ['T-24', 'Buscá por nombre («pitch») y por SKU («ETB»). Después buscá algo que no exista.', 'Aparecen resultados que coinciden. Con algo inexistente dice «Sin resultados».'],
@@ -265,9 +266,11 @@
       ['P-10', 'Usá el buscador y el filtro de categoría del panel.', 'La lista se filtra y el contador «X de Y» cambia.'],
     ]},
     { titulo: 'Panel: fotos', pasos: [
-      ['P-11', 'En el producto de prueba, «Subir foto» con una foto sacada con el celular. Después Guardar.', 'Aparece la vista previa y «Lista. Acordate de guardar.». Al guardar, la foto se ve en la tienda y carga rápido.'],
-      ['P-12', 'Intentá subir un archivo que no es imagen (un PDF).', 'No lo acepta.'],
-      ['P-13', 'En Imagen pegá una dirección de otro sitio (https://… de Google Imágenes). Guardar.', 'No deja guardar y explica que tiene que ser una foto subida desde el panel o una ruta del sitio.'],
+      ['P-11', 'En el producto de prueba, arrastrá tres fotos desde la carpeta de la compu al recuadro «Arrastrá fotos acá».', 'El recuadro se resalta al pasar por encima, sube las tres («3 fotos listas») y aparecen en la galería. La primera dice «Portada».'],
+      ['P-25', 'Tocá el recuadro y elegí varias fotos a la vez desde la ventana de archivos.', 'Suben todas, en el orden elegido.'],
+      ['P-26', 'En la galería usá ← →, la ★ para cambiar la portada y la ✕ para quitar una. Guardar.', 'En la tienda la ficha muestra las fotos en ese orden, y la portada es la que se ve en tarjetas y carruseles.'],
+      ['P-12', 'Arrastrá un PDF junto con una foto.', 'Sube la foto y avisa que el PDF no era una imagen.'],
+      ['P-13', 'En «pegá una ruta del sitio» poné una dirección de otro sitio (https://… de Google Imágenes) y tocá Agregar.', 'No la agrega y explica que tiene que ser una foto subida desde el panel o una ruta del sitio.'],
     ]},
     { titulo: 'Panel: Nuevos ingresos', pasos: [
       ['P-14', 'Tocá la estrella ★ en la fila del producto de prueba.', 'La estrella queda dorada y el producto aparece último en el carrusel de la portada.'],
