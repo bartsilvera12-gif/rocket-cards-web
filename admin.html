@@ -171,6 +171,19 @@
   @keyframes subir { from { opacity: 0; transform: translateY(10px); } }
 
   .fila { display: flex; align-items: center; gap: 10px; }
+
+  /* Las cinco cartas de la portada, en el mismo orden que en la tienda. */
+  .abanico { display: grid; gap: 12px; padding: 12px;
+             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .abanico .carta { display: grid; gap: 7px; background: var(--panel2);
+                    border: 1px solid var(--linea); border-radius: 4px; padding: 10px; }
+  .abanico .pos { font-family: var(--mono); font-size: 10px; letter-spacing: .14em;
+                  text-transform: uppercase; color: var(--oro); }
+  /* Proporción de carta: 2.5 × 3.5 pulgadas, igual que en la tienda. */
+  .abanico .mini { aspect-ratio: 2.5/3.5; border-radius: 4px; border: 1px solid var(--linea2);
+                   background: #fff center/contain no-repeat; display: grid; place-items: center;
+                   color: var(--tenue); font-size: 10px; }
+  textarea { resize: vertical; min-height: 68px; line-height: 1.5; }
   .ayuda { font-size: 11.5px; color: var(--tenue); margin-top: 4px; }
   .orden { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
   .orden li { display: flex; align-items: center; gap: 10px; background: var(--panel2);
@@ -256,7 +269,7 @@ function motivo(err) {
 const estado = {
   sesion: null,
   pestana: 'productos',
-  productos: [], categorias: [], movimientos: [],
+  productos: [], categorias: [], ajustes: [], portada: [],
   busqueda: '', filtroCat: '', soloOcultos: false,
   version: null, conectado: false,
   editando: null,
@@ -359,9 +372,15 @@ async function cargar() {
   const nombreDe = Object.fromEntries(estado.categorias.map((x) => [x.key, x.nombre]));
   estado.productos = p.data.map((x) => Object.assign({}, x, { categoria_nombre: nombreDe[x.categoria] }));
 
-  if (estado.pestana === 'historial') {
-    const a = await sb.from('auditoria').select('*').order('id', { ascending: false }).limit(80);
-    estado.movimientos = a.error ? [] : a.data;
+  if (estado.pestana === 'config') {
+    const [aj, po] = await Promise.all([
+      sb.from('config').select('*').order('orden'),
+      sb.from('portada').select('*').order('orden'),
+    ]);
+    if (aj.error) throw aj.error;
+    if (po.error) throw po.error;
+    estado.ajustes = aj.data;
+    estado.portada = po.data;
   }
   await leerVersion();
   pintar();
@@ -419,7 +438,7 @@ const PESTANAS = [
   ['productos', 'Productos'],
   ['nuevos', 'Nuevos ingresos'],
   ['categorias', 'Categorías'],
-  ['historial', 'Historial'],
+  ['config', 'Configuración'],
 ];
 
 function pintar() {
@@ -449,7 +468,7 @@ function pintar() {
   app.querySelectorAll('[data-ir]').forEach((b) => b.addEventListener('click', async () => {
     estado.pestana = b.dataset.ir;
     pintar();
-    if (estado.pestana === 'historial') await cargar().catch((e) => brindis(motivo(e), true));
+    if (estado.pestana === 'config') await cargar().catch((e) => brindis(motivo(e), true));
   }));
 
   pintarEstado();
@@ -457,7 +476,7 @@ function pintar() {
     productos: hojaProductos,
     nuevos: hojaNuevos,
     categorias: hojaCategorias,
-    historial: hojaHistorial,
+    config: hojaConfig,
   })[estado.pestana]($('#hoja'));
 
   if (estado.editando) pintarModal();
@@ -1123,41 +1142,145 @@ function hojaCategorias(hoja) {
   });
 }
 
-// ── Historial ────────────────────────────────────────────────────────────
+// ── Configuración ────────────────────────────────────────────────────────
 
-const ACCION = { alta: ['Alta', 'var(--verde)'], cambio: ['Cambio', 'var(--oro)'], baja: ['Baja', 'var(--rojo)'] };
-
-/** Lista los campos que cambiaron, para no mostrar dos JSON enteros. */
-function diferencias(m) {
-  if (m.accion !== 'cambio' || !m.antes || !m.despues) return '';
-  const saltar = new Set(['actualizado_en', 'creado_en']);
-  return Object.keys(m.despues)
-    .filter((k) => !saltar.has(k) && JSON.stringify(m.antes[k]) !== JSON.stringify(m.despues[k]))
-    .map((k) => `${esc(k)}: <s style="color:var(--tenue)">${esc(m.antes[k])}</s> → <b>${esc(m.despues[k])}</b>`)
-    .join(' · ');
-}
-
-function hojaHistorial(hoja) {
+function hojaConfig(hoja) {
   hoja.innerHTML = `
     <div class="caja">
-      <div class="herramientas"><h2 style="font-size:16px">Últimos movimientos</h2></div>
-      ${estado.movimientos.length ? `<div style="overflow-x:auto"><table>
-        <thead><tr><th>Cuándo</th><th>Quién</th><th>Qué</th><th>Detalle</th></tr></thead>
-        <tbody>
-        ${estado.movimientos.map((m) => {
-          const [et, color] = ACCION[m.accion] || [m.accion, 'var(--suave)'];
-          const nombre = (m.despues && m.despues.nombre) || (m.antes && m.antes.nombre) || m.registro_id;
-          return `<tr>
-            <td class="col" style="white-space:nowrap">${esc(fecha(m.creado_en))}</td>
-            <td class="col">${esc(m.quien || '—')}</td>
-            <td><span class="pildora" style="color:${color};border:1px solid currentColor">${et}</span>
-                <span class="sku">${esc(m.registro_id)}</span></td>
-            <td><div class="nom">${esc(nombre)}</div>
-                <div class="col">${diferencias(m) || '—'}</div></td>
-          </tr>`;
-        }).join('')}
-        </tbody></table></div>` : '<div class="vacio">Todavía no hay movimientos.</div>'}
-    </div>`;
+      <div class="herramientas">
+        <h2 style="font-size:16px">Cartas de la portada</h2>
+        <div style="flex:1"></div>
+        <span class="col">De izquierda a derecha. La 3 es la del centro.</span>
+      </div>
+      <div class="abanico">
+        ${estado.portada.map((c) => `
+          <div class="carta" data-orden="${c.orden}">
+            <div class="pos">${c.orden}${c.orden === 3 ? ' · centro' : ''}</div>
+            <div class="mini" data-prev style="${c.img
+              ? `background-image:url(&quot;${esc(c.img)}&quot;)`
+              : ''}">${c.img ? '' : 'sin foto'}</div>
+            <input type="file" accept="image/png,image/jpeg,image/webp,image/avif" style="display:none" data-file>
+            <button type="button" class="btn gris chico" data-subir>Cambiar foto</button>
+            <input type="text" value="${esc(c.alt)}" data-alt placeholder="Qué carta es">
+            <div class="ayuda" data-estado></div>
+          </div>`).join('')}
+      </div>
+      <p class="ayuda" style="padding:0 12px 14px">
+        La inclinación y el tamaño de cada lugar no se tocan desde acá: el abanico
+        está calibrado para que las cinco se superpongan bien en cualquier pantalla.
+      </p>
+    </div>
+
+    <div class="caja" style="margin-top:16px">
+      <div class="herramientas"><h2 style="font-size:16px">Datos de la tienda</h2></div>
+      <div style="padding:14px;display:grid;gap:14px;max-width:620px">
+        ${estado.ajustes.map((a) => `
+          <div data-ajuste="${esc(a.clave)}">
+            <label for="cfg-${esc(a.clave)}">${esc(a.etiqueta || a.clave)}</label>
+            ${a.largo
+              ? `<textarea id="cfg-${esc(a.clave)}" rows="3" data-valor>${esc(a.valor)}</textarea>`
+              : `<input id="cfg-${esc(a.clave)}" type="text" value="${esc(a.valor)}" data-valor>`}
+            ${a.ayuda ? `<div class="ayuda">${esc(a.ayuda)}</div>` : ''}
+            <div class="ayuda" data-vista></div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <p class="ayuda">Todo se guarda al salir del campo.</p>`;
+
+  // ── Las cartas ──
+  hoja.querySelectorAll('.carta').forEach((el) => {
+    const orden = Number(el.dataset.orden);
+    const fila = estado.portada.find((x) => x.orden === orden);
+    const prev = el.querySelector('[data-prev]');
+    const estadoFoto = el.querySelector('[data-estado]');
+
+    const guardar = async (campos, aviso) => {
+      propio();
+      const { data, error } = await sb.from('portada')
+        .update(campos).eq('orden', orden).select().maybeSingle();
+      if (error || !data) { brindis(error ? motivo(error) : 'La base no aceptó el cambio', true); return false; }
+      Object.assign(fila, data);
+      brindis(aviso);
+      return true;
+    };
+
+    el.querySelector('[data-subir]').addEventListener('click', () => el.querySelector('[data-file]').click());
+    el.querySelector('[data-file]').addEventListener('change', async (ev) => {
+      const archivo = ev.target.files && ev.target.files[0];
+      if (!archivo) return;
+      estadoFoto.textContent = 'Subiendo…';
+      try {
+        const url = await subirFoto(archivo, 'portada-' + orden);
+        if (await guardar({ img: url }, 'Carta ' + orden + ' cambiada')) {
+          prev.style.backgroundImage = 'url("' + url + '")';
+          prev.textContent = '';
+        }
+        estadoFoto.textContent = '';
+      } catch (err) {
+        estadoFoto.textContent = '';
+        brindis(motivo(err), true);
+      } finally {
+        ev.target.value = '';
+      }
+    });
+
+    const campoAlt = el.querySelector('[data-alt]');
+    const guardarAlt = async () => {
+      const v = campoAlt.value.trim();
+      if (v === fila.alt) return;
+      if (!(await guardar({ alt: v }, 'Guardado'))) campoAlt.value = fila.alt;
+    };
+    campoAlt.addEventListener('blur', guardarAlt);
+    campoAlt.addEventListener('keydown', (e) => { if (e.key === 'Enter') campoAlt.blur(); });
+  });
+
+  // ── Los ajustes ──
+  hoja.querySelectorAll('[data-ajuste]').forEach((el) => {
+    const clave = el.dataset.ajuste;
+    const a = estado.ajustes.find((x) => x.clave === clave);
+    const campo = el.querySelector('[data-valor]');
+    const vista = el.querySelector('[data-vista]');
+
+    // Mostrar cómo queda, que es lo que no se ve escribiendo el dato crudo.
+    const verVista = () => {
+      const v = campo.value.trim();
+      vista.textContent = clave === 'whatsapp' ? (v ? 'Los enlaces van a wa.me/' + v.replace(/\D/g, '') : '')
+                        : clave === 'instagram' ? (v ? 'instagram.com/' + v.replace(/^@/, '') : '')
+                        : '';
+    };
+    verVista();
+    campo.addEventListener('input', verVista);
+
+    const guardar = async () => {
+      let v = campo.value.trim();
+      // Dos errores que la gente comete siempre, y que dejan los enlaces
+      // rotos sin que nada avise: la arroba y los espacios del teléfono.
+      if (clave === 'instagram') v = v.replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/$/, '');
+      if (clave === 'whatsapp') v = v.replace(/\D/g, '');
+      if (v !== campo.value) campo.value = v;
+      if (v === a.valor) return;
+
+      if (clave === 'whatsapp' && v && !/^\d{8,15}$/.test(v)) {
+        brindis('El WhatsApp va con código de país y sin espacios: 595981377541', true);
+        campo.value = a.valor; verVista(); return;
+      }
+
+      propio();
+      const { data, error } = await sb.from('config')
+        .update({ valor: v }).eq('clave', clave).select().maybeSingle();
+      if (error || !data) {
+        brindis(error ? motivo(error) : 'La base no aceptó el cambio', true);
+        campo.value = a.valor; verVista(); return;
+      }
+      Object.assign(a, data);
+      verVista();
+      brindis('Guardado');
+    };
+    campo.addEventListener('blur', guardar);
+    campo.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && campo.tagName !== 'TEXTAREA') campo.blur();
+    });
+  });
 }
 
 // ── Arranque ─────────────────────────────────────────────────────────────

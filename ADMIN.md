@@ -111,7 +111,7 @@ El panel sale del mismo deploy que la tienda:
 | **Productos** | Alta, baja y edición. El precio, el stock y el interruptor de visible se guardan al salir del campo. Las fotos se suben desde el mismo formulario. |
 | **Nuevos ingresos** | El orden del carrusel de la portada, hasta 12 productos. |
 | **Categorías** | Nombre, bajada y orden. La clave sale en la URL y no se cambia desde acá. |
-| **Historial** | Quién cambió qué y cuándo, con el antes y el después de cada campo. |
+| **Configuración** | Las cinco cartas de la portada y los datos de la tienda: WhatsApp, Instagram, la descripción del pie. |
 
 Arriba a la derecha:
 
@@ -144,6 +144,40 @@ cosas. Lo que **no** acepta es una URL de otro sitio: si no, el panel sería
 una forma de incrustar contenido de terceros en la tienda. Leer el bucket
 puede cualquiera (son fotos de productos); subir, reemplazar y borrar, sólo
 el admin.
+
+### La portada y los datos de la tienda
+
+En **Configuración** hay dos cosas.
+
+**Las cinco cartas del abanico**, numeradas de izquierda a derecha —la 3 es la
+del centro—. De cada una se cambia la foto y la descripción. Lo que **no** se
+edita es la inclinación, el tamaño ni la profundidad: el abanico está
+calibrado para que las cinco se superpongan bien en cualquier pantalla, y un
+número mal puesto lo rompe sin forma obvia de volver atrás.
+
+La página sólo acepta la portada de la base si vienen **las cinco**. Con menos
+se queda con las fotos que ya tenía, porque un abanico incompleto se ve peor
+que uno viejo.
+
+**Los datos de la tienda** salen de la tabla `config`, que guarda la etiqueta
+y la ayuda al lado de cada valor. El panel dibuja el formulario leyendo esa
+tabla, así que **agregar un ajuste nuevo es un INSERT, sin tocar el panel**:
+
+```sql
+insert into rocketcards.config (clave, valor, etiqueta, ayuda, orden)
+values ('email', 'hola@rocketcards.com.py', 'Email de contacto', 'Para los textos legales', 4);
+```
+
+Dos campos se limpian solos al guardar, porque son los errores que todo el
+mundo comete y dejan los enlaces rotos sin que nada avise:
+
+- **WhatsApp** se queda sólo con los números. Si pegás `0981 377-541` lo
+  guarda igual, pero avisa si no parece un número con código de país.
+- **Instagram** se come la arroba y la URL entera: podés pegar
+  `https://instagram.com/rocketcardspy/` y guarda `rocketcardspy`.
+
+Debajo de cada uno se muestra cómo queda el enlace final, que es lo que no se
+ve escribiendo el dato crudo.
 
 ### Destacado
 

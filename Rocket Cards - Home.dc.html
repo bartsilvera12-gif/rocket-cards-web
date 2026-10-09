@@ -722,7 +722,7 @@
             <span style="font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:10px;letter-spacing:.4em;color:#E30613">CARDS</span>
           </span>
         </div>
-        <p style="margin:0;color:#A7A7A7;font-size:13px;line-height:1.65;max-width:280px;text-wrap:pretty">Tienda especializada en Pokémon TCG y coleccionismo. Producto sellado original y envíos a todo Paraguay.</p>
+        <p style="margin:0;color:#A7A7A7;font-size:13px;line-height:1.65;max-width:280px;text-wrap:pretty">{{ descripcionPie }}</p>
       </div>
       <sc-for list="{{ footerCols }}" as="col" hint-placeholder-count="4">
         <div>
@@ -908,6 +908,42 @@ const catCountLabel = (n) => n > 0 ? n + ' productos' : 'Próximamente';
 
 const NEW_IDS = ['FP-S2','ME-PB-ETB','SV-PE-PFC','ME-AH-TS','SV-PE-BB','FP-S1'];
 
+/* La geometria del abanico de la portada: cinco lugares, de izquierda a
+   derecha. Esto NO se edita desde el panel a proposito — esta calibrado para
+   que las cinco cartas se superpongan bien en cualquier pantalla, y un numero
+   mal puesto rompe la portada sin forma obvia de volver atras. Desde el panel
+   se cambia la foto de cada lugar, no su posicion. */
+const HERO_GEO = [
+  { rot: '-16deg', lift: '52px',  delay: '.06s', w: 'clamp(122px,16.6vw,254px)', z: 1 },
+  { rot: '-7deg',  lift: '12px',  delay: '.14s', w: 'clamp(145px,18.4vw,282px)', z: 3 },
+  { rot: '0deg',   lift: '-26px', delay: '.3s',  w: 'clamp(170px,21.4vw,328px)', z: 6 },
+  { rot: '6deg',   lift: '10px',  delay: '.38s', w: 'clamp(145px,18.4vw,282px)', z: 3 },
+  { rot: '13deg',  lift: '34px',  delay: '.46s', w: 'clamp(126px,17.2vw,264px)', z: 2 }
+];
+
+/* Las fotos de esos cinco lugares, y los datos de contacto. Son los valores
+   de respaldo: si hay base, los reemplaza aplicarCatalogo(). */
+const PORTADA = [
+  { img: '/assets/cards/rayquaza-v.webp', alt: 'Rayquaza V · Evolving Skies 194/203' },
+  { img: '/assets/cards/leafeon-ex.webp', alt: 'Leafeon ex · Prismatic Evolutions 144/131' },
+  { img: '/assets/cards/pikachu-ex.webp', alt: 'Pikachu ex · Teracristal 238/191' },
+  { img: '/assets/cards/umbreon-ex.webp', alt: 'Umbreon ex · Prismatic Evolutions 161/131' },
+  { img: '/assets/cards/jirachi-ex.webp', alt: 'Jirachi ex · Pikachu 30 155/128' }
+];
+
+const CONFIG = {
+  whatsapp: '595981377541',
+  instagram: 'rocketcardspy',
+  descripcion: 'Tienda especializada en Pokémon TCG y coleccionismo. Producto sellado original y envíos a todo Paraguay.'
+};
+
+/** El numero tal cual lo escribe la gente: 0981 377 541 */
+function waLegible(n) {
+  const d = String(n || '').replace(/\D/g, '');
+  const local = d.startsWith('595') ? '0' + d.slice(3) : d;
+  return local.replace(/^(\d{4})(\d{3})(\d{3})$/, '$1 $2 $3') || local;
+}
+
 /**
  * Reemplaza el catálogo escrito arriba por el que manda la base.
  *
@@ -939,6 +975,17 @@ function aplicarCatalogo(d) {
   if (Array.isArray(d.nuevos) && d.nuevos.length) {
     NEW_IDS.length = 0;
     NEW_IDS.push.apply(NEW_IDS, d.nuevos);
+  }
+
+  // Los ajustes se mezclan en vez de reemplazarse: si la base todavía no
+  // tiene una clave, sigue valiendo la de acá en vez de quedar vacía.
+  if (d.config && typeof d.config === 'object') Object.assign(CONFIG, d.config);
+
+  // La portada sólo si vienen los cinco lugares: con menos, el abanico
+  // quedaría incompleto y se vería peor que con las fotos viejas.
+  if (Array.isArray(d.portada) && d.portada.length === PORTADA.length) {
+    PORTADA.length = 0;
+    PORTADA.push.apply(PORTADA, d.portada);
   }
   return true;
 }
@@ -1102,7 +1149,7 @@ class Component extends DCLogic {
       btnBg: p.stock === 0 ? '#1f1f1f' : '#E30613',
       btnFg: p.stock === 0 ? '#A7A7A7' : '#ffffff',
       cursor: p.stock === 0 ? 'not-allowed' : 'pointer',
-      waLink: 'https://wa.me/595981377541?text=' + encodeURIComponent('Hola Rocket Cards, quiero consultar por ' + p.name + '.'),
+      waLink: 'https://wa.me/' + CONFIG.whatsapp + '?text=' + encodeURIComponent('Hola Rocket Cards, quiero consultar por ' + p.name + '.'),
       add: (e) => { if (e) { e.preventDefault(); e.stopPropagation(); } this.addToCart(p); },
       shortName: p.name.length > 42 ? p.name.slice(0, 42) + '…' : p.name,
       imgCss: 'url("' + p.img + '")',
@@ -1399,13 +1446,10 @@ class Component extends DCLogic {
         }, 260);
       },
 
-      heroCards: [
-        { src: '/assets/cards/rayquaza-v.webp', alt: 'Rayquaza V · Evolving Skies 194/203', rot: '-16deg', lift: '52px', delay: '.06s', w: 'clamp(122px,16.6vw,254px)', z: 1 },
-        { src: '/assets/cards/leafeon-ex.webp', alt: 'Leafeon ex · Prismatic Evolutions 144/131', rot: '-7deg', lift: '12px', delay: '.14s', w: 'clamp(145px,18.4vw,282px)', z: 3 },
-        { src: '/assets/cards/pikachu-ex.webp', alt: 'Pikachu ex · Teracristal 238/191', rot: '0deg', lift: '-26px', delay: '.3s', w: 'clamp(170px,21.4vw,328px)', z: 6 },
-        { src: '/assets/cards/umbreon-ex.webp', alt: 'Umbreon ex · Prismatic Evolutions 161/131', rot: '6deg', lift: '10px', delay: '.38s', w: 'clamp(145px,18.4vw,282px)', z: 3 },
-        { src: '/assets/cards/jirachi-ex.webp', alt: 'Jirachi ex · Pikachu 30 155/128', rot: '13deg', lift: '34px', delay: '.46s', w: 'clamp(126px,17.2vw,264px)', z: 2 }
-      ],
+      heroCards: HERO_GEO.map((g, i) => Object.assign({}, g, {
+        src: (PORTADA[i] || {}).img || '',
+        alt: (PORTADA[i] || {}).alt || ''
+      })),
       heroEnter: (e) => {
         const el = e.currentTarget;
         el.style.transform = 'rotate(0deg) translateY(calc(' + el.dataset.lift + ' - 34px)) scale(1.07)';
@@ -1548,7 +1592,11 @@ class Component extends DCLogic {
 
 
       igSlots: [1, 2, 3, 4, 5, 6],
-      waGeneralLink: 'https://wa.me/595981377541?text=' + encodeURIComponent('Hola Rocket Cards, quiero hacer una consulta.'),
+      waGeneralLink: 'https://wa.me/' + CONFIG.whatsapp + '?text=' + encodeURIComponent('Hola Rocket Cards, quiero hacer una consulta.'),
+      waNumero: waLegible(CONFIG.whatsapp),
+      igUsuario: '@' + CONFIG.instagram,
+      igLink: 'https://instagram.com/' + CONFIG.instagram,
+      descripcionPie: CONFIG.descripcion,
 
       footerCols: ((cols) => cols.map(c => Object.assign({}, c, {
         links: c.links.map(l => Object.assign({}, l, {
@@ -1557,7 +1605,7 @@ class Component extends DCLogic {
       })))([
         { title: 'Tienda', links: [{ label: 'Sellados y coleccionables', href: '#sellados' }, { label: 'Sobres', href: '#sobres' }, { label: 'ETB', href: '#etb' }, { label: 'Nuevos ingresos', href: '#nuevos' }] },
         { title: 'Legal', links: [{ label: 'Política de Privacidad', href: '#politica-de-privacidad', doc: 'privacidad' }, { label: 'Términos y condiciones', href: '#terminos-y-condiciones', doc: 'terminos' }] },
-        { title: 'Redes', links: [{ label: 'Instagram · @rocketcardspy', href: 'https://instagram.com/rocketcardspy' }, { label: 'WhatsApp', href: 'https://wa.me/595981377541' }] }
+        { title: 'Redes', links: [{ label: 'Instagram · @' + CONFIG.instagram, href: 'https://instagram.com/' + CONFIG.instagram }, { label: 'WhatsApp', href: 'https://wa.me/' + CONFIG.whatsapp }] }
       ]),
 
       catalogCount: catalogList.length,

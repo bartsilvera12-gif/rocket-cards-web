@@ -243,6 +243,69 @@ COMMENT ON COLUMN producto.destacado IS
   'Lleva etiqueta DESTACADO y va primero en el catálogo.';
 
 -- ─────────────────────────────────────────────────────────────────────────
+-- Ajustes de la tienda
+-- ─────────────────────────────────────────────────────────────────────────
+-- Clave y valor, con la etiqueta y la ayuda guardadas al lado. Así el panel
+-- dibuja el formulario leyendo la tabla: agregar un ajuste nuevo es un
+-- INSERT acá, sin tocar el panel.
+
+CREATE TABLE IF NOT EXISTS config (
+  clave           text        PRIMARY KEY CHECK (clave ~ '^[a-z][a-z0-9_]*$'),
+  valor           text        NOT NULL DEFAULT '',
+  etiqueta        text        NOT NULL DEFAULT '',
+  ayuda           text        NOT NULL DEFAULT '',
+  largo           boolean     NOT NULL DEFAULT false,  -- se edita en varias líneas
+  orden           integer     NOT NULL DEFAULT 0,
+  actualizado_en  timestamptz NOT NULL DEFAULT now()
+);
+
+-- El DO UPDATE pisa la etiqueta y la ayuda pero NUNCA el valor: así se puede
+-- volver a correr el script sin borrar lo que el comercio ya configuró.
+INSERT INTO config (clave, valor, etiqueta, ayuda, largo, orden) VALUES
+  ('whatsapp', '595981377541', 'WhatsApp',
+   'Sólo números, con código de país y sin espacios. Ej: 595981377541', false, 1),
+  ('instagram', 'rocketcardspy', 'Instagram',
+   'El usuario, sin la arroba', false, 2),
+  ('descripcion', 'Tienda especializada en Pokémon TCG y coleccionismo. Producto sellado original y envíos a todo Paraguay.',
+   'Descripción del pie', 'El texto chico que aparece abajo a la izquierda', true, 3)
+ON CONFLICT (clave) DO UPDATE
+  SET etiqueta = EXCLUDED.etiqueta,
+      ayuda    = EXCLUDED.ayuda,
+      largo    = EXCLUDED.largo,
+      orden    = EXCLUDED.orden;
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Las cartas de la portada
+-- ─────────────────────────────────────────────────────────────────────────
+-- Cinco lugares fijos, del 1 al 5, en el abanico de la portada. Desde el
+-- panel se cambia la foto y su descripción; la inclinación, el tamaño y la
+-- profundidad de cada lugar viven en la página.
+--
+-- Es a propósito: el abanico está calibrado para que las cinco cartas se
+-- superpongan bien en cualquier pantalla. Si eso fuera editable, un número
+-- mal puesto rompe la portada y no hay forma obvia de volver atrás.
+
+CREATE TABLE IF NOT EXISTS portada (
+  orden           integer     PRIMARY KEY CHECK (orden BETWEEN 1 AND 5),
+  img             text        NOT NULL DEFAULT '',
+  alt             text        NOT NULL DEFAULT '',
+  actualizado_en  timestamptz NOT NULL DEFAULT now()
+);
+
+COMMENT ON COLUMN portada.orden IS
+  'Lugar en el abanico, de izquierda a derecha. El 3 es la carta del centro.';
+COMMENT ON COLUMN portada.alt IS
+  'Qué carta es. Lo leen los lectores de pantalla y los buscadores.';
+
+INSERT INTO portada (orden, img, alt) VALUES
+  (1, '/assets/cards/rayquaza-v.webp',  'Rayquaza V · Evolving Skies 194/203'),
+  (2, '/assets/cards/leafeon-ex.webp',  'Leafeon ex · Prismatic Evolutions 144/131'),
+  (3, '/assets/cards/pikachu-ex.webp',  'Pikachu ex · Teracristal 238/191'),
+  (4, '/assets/cards/umbreon-ex.webp',  'Umbreon ex · Prismatic Evolutions 161/131'),
+  (5, '/assets/cards/jirachi-ex.webp',  'Jirachi ex · Pikachu 30 155/128')
+ON CONFLICT (orden) DO NOTHING;
+
+-- ─────────────────────────────────────────────────────────────────────────
 -- Auditoría
 -- ─────────────────────────────────────────────────────────────────────────
 -- Quién tocó qué. El autor sale del JWT, no de algo que mande el navegador.
@@ -338,6 +401,14 @@ DROP TRIGGER IF EXISTS categoria_fecha ON categoria;
 CREATE TRIGGER categoria_fecha BEFORE UPDATE ON categoria
   FOR EACH ROW EXECUTE FUNCTION rocketcards.marcar_fecha();
 
+DROP TRIGGER IF EXISTS config_fecha ON config;
+CREATE TRIGGER config_fecha BEFORE UPDATE ON config
+  FOR EACH ROW EXECUTE FUNCTION rocketcards.marcar_fecha();
+
+DROP TRIGGER IF EXISTS portada_fecha ON portada;
+CREATE TRIGGER portada_fecha BEFORE UPDATE ON portada
+  FOR EACH ROW EXECUTE FUNCTION rocketcards.marcar_fecha();
+
 DROP TRIGGER IF EXISTS producto_auditar ON producto;
 CREATE TRIGGER producto_auditar AFTER INSERT OR UPDATE OR DELETE ON producto
   FOR EACH ROW EXECUTE FUNCTION rocketcards.auditar('id');
@@ -355,6 +426,22 @@ CREATE TRIGGER producto_version AFTER INSERT OR UPDATE OR DELETE ON producto
 DROP TRIGGER IF EXISTS categoria_version ON categoria;
 CREATE TRIGGER categoria_version AFTER INSERT OR UPDATE OR DELETE ON categoria
   FOR EACH STATEMENT EXECUTE FUNCTION rocketcards.subir_version();
+
+DROP TRIGGER IF EXISTS config_version ON config;
+CREATE TRIGGER config_version AFTER INSERT OR UPDATE OR DELETE ON config
+  FOR EACH STATEMENT EXECUTE FUNCTION rocketcards.subir_version();
+
+DROP TRIGGER IF EXISTS portada_version ON portada;
+CREATE TRIGGER portada_version AFTER INSERT OR UPDATE OR DELETE ON portada
+  FOR EACH STATEMENT EXECUTE FUNCTION rocketcards.subir_version();
+
+DROP TRIGGER IF EXISTS config_auditar ON config;
+CREATE TRIGGER config_auditar AFTER INSERT OR UPDATE OR DELETE ON config
+  FOR EACH ROW EXECUTE FUNCTION rocketcards.auditar('clave');
+
+DROP TRIGGER IF EXISTS portada_auditar ON portada;
+CREATE TRIGGER portada_auditar AFTER INSERT OR UPDATE OR DELETE ON portada
+  FOR EACH ROW EXECUTE FUNCTION rocketcards.auditar('orden');
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- El catálogo, en una sola llamada
@@ -390,6 +477,13 @@ AS $$
              )) ORDER BY p.destacado DESC, p.nombre)
       FROM producto p
       WHERE p.publicado
+    ), '[]'::jsonb),
+    'config', COALESCE((
+      SELECT jsonb_object_agg(c.clave, c.valor) FROM config c
+    ), '{}'::jsonb),
+    'portada', COALESCE((
+      SELECT jsonb_agg(jsonb_build_object('img', t.img, 'alt', t.alt) ORDER BY t.orden)
+      FROM portada t
     ), '[]'::jsonb),
     'nuevos', COALESCE((
       SELECT jsonb_agg(p.id ORDER BY p.nuevo_orden)
@@ -456,9 +550,9 @@ GRANT EXECUTE ON FUNCTION rocketcards.guardar_nuevos(text[]) TO authenticated;
 
 GRANT USAGE ON SCHEMA rocketcards TO anon, authenticated, service_role;
 
-GRANT SELECT ON producto, categoria, version TO anon, authenticated;
+GRANT SELECT ON producto, categoria, version, config, portada TO anon, authenticated;
 GRANT SELECT ON auditoria TO authenticated;
-GRANT INSERT, UPDATE, DELETE ON producto, categoria TO authenticated;
+GRANT INSERT, UPDATE, DELETE ON producto, categoria, config, portada TO authenticated;
 GRANT INSERT ON auditoria TO authenticated;
 GRANT UPDATE ON version TO authenticated;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA rocketcards TO authenticated;
@@ -478,6 +572,8 @@ ALTER TABLE producto  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE categoria ENABLE ROW LEVEL SECURITY;
 ALTER TABLE version   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auditoria ENABLE ROW LEVEL SECURITY;
+ALTER TABLE config    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE portada   ENABLE ROW LEVEL SECURITY;
 
 -- Productos: el público ve los publicados; el admin ve todos.
 DROP POLICY IF EXISTS producto_lectura ON producto;
@@ -495,6 +591,24 @@ CREATE POLICY categoria_lectura ON categoria FOR SELECT USING (true);
 
 DROP POLICY IF EXISTS categoria_escritura ON categoria;
 CREATE POLICY categoria_escritura ON categoria
+  FOR ALL TO authenticated
+  USING (rocketcards.es_admin()) WITH CHECK (rocketcards.es_admin());
+
+-- Ajustes y portada: los lee cualquiera (la tienda los necesita para
+-- dibujarse), los escribe sólo el admin.
+DROP POLICY IF EXISTS config_lectura ON config;
+CREATE POLICY config_lectura ON config FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS config_escritura ON config;
+CREATE POLICY config_escritura ON config
+  FOR ALL TO authenticated
+  USING (rocketcards.es_admin()) WITH CHECK (rocketcards.es_admin());
+
+DROP POLICY IF EXISTS portada_lectura ON portada;
+CREATE POLICY portada_lectura ON portada FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS portada_escritura ON portada;
+CREATE POLICY portada_escritura ON portada
   FOR ALL TO authenticated
   USING (rocketcards.es_admin()) WITH CHECK (rocketcards.es_admin());
 
@@ -580,7 +694,7 @@ BEGIN
     RAISE NOTICE 'No existe la publicación supabase_realtime: Realtime no está habilitado en esta instancia.';
     RETURN;
   END IF;
-  FOREACH t IN ARRAY ARRAY['producto', 'categoria', 'version']
+  FOREACH t IN ARRAY ARRAY['producto', 'categoria', 'version', 'config', 'portada']
   LOOP
     IF NOT EXISTS (
       SELECT FROM pg_publication_tables
