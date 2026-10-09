@@ -113,6 +113,20 @@ fácil de cometer y el más difícil de ver.
 
 `.env` está en `.gitignore`.
 
+**No van la anon key ni la URL del proyecto.** Esas son para hablarle a la API
+REST de Supabase (PostgREST) desde el navegador con `supabase-js`. Nuestro
+servidor se conecta directo a Postgres con el protocolo de Postgres, así que
+lo único que necesita es la cadena de conexión. Y nuestras tablas ni siquiera
+están en un esquema que PostgREST publique: la anon key no las alcanzaría
+aunque la usáramos. Lo mismo con la `service_role`, que además nunca debería
+salir del servidor.
+
+La conexión va **cifrada y verificando el certificado** por omisión, sin
+configurar nada: `node-postgres` no cifra solo aunque la cadena diga
+`postgresql://`, y sin eso la contraseña del rol viajaría en claro. Si al
+conectar aparece `self-signed certificate in certificate chain`, bajá el
+certificado desde Settings → Database → SSL y apuntá `DB_SSL_CA` ahí.
+
 ### 5. Crear el primer usuario
 
 ```bash

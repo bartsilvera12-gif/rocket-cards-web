@@ -12,6 +12,7 @@
 
 import pg from 'pg';
 import { EventEmitter } from 'node:events';
+import { readFileSync } from 'node:fs';
 
 const { Pool, Client } = pg;
 
@@ -24,9 +25,41 @@ if (!process.env.DATABASE_URL) {
   throw new Error('Falta DATABASE_URL (ver .env.ejemplo)');
 }
 
+/**
+ * TLS.
+ *
+ * node-postgres NO cifra por omisión, aunque la cadena diga "postgresql://".
+ * Contra Supabase eso es la contraseña del rol y el catálogo entero viajando
+ * en claro por internet —si la conexión llega a establecerse: Supabase
+ * normalmente la rechaza, y el error no menciona TLS por ningún lado—.
+ *
+ * Por eso: cifrado y con verificación de certificado siempre, salvo contra
+ * una base local, donde no hay red de por medio y casi nunca hay certificado.
+ *
+ *   DB_SSL=0            apagarlo a mano (sólo para una base local rara)
+ *   DB_SSL=1            encenderlo contra localhost
+ *   DB_SSL_CA=ruta.crt  CA propia, si el certificado no lo firma una pública
+ */
+function tls() {
+  const url = process.env.DATABASE_URL;
+  const local = /@(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(url);
+
+  if (process.env.DB_SSL === '0') return false;
+  if (local && process.env.DB_SSL !== '1') return false;
+
+  const ca = process.env.DB_SSL_CA;
+  // rejectUnauthorized en true es lo que hace que el cifrado sirva de algo:
+  // sin eso, cualquiera que se meta en el medio presenta su propio
+  // certificado y la conexión lo acepta sin chistar.
+  return ca
+    ? { ca: readFileSync(ca, 'utf8'), rejectUnauthorized: true }
+    : { rejectUnauthorized: true };
+}
+
 const conexion = {
   connectionString: process.env.DATABASE_URL,
   application_name: 'rocketcards',
+  ssl: tls(),
 };
 
 export const pool = new Pool(Object.assign({
