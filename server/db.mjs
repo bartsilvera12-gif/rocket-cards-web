@@ -21,16 +21,35 @@ const ESPERA_AVISO = 120;     // ms que agrupa avisos seguidos en una sola recar
 const REINTENTO_MIN = 500;
 const REINTENTO_MAX = 15000;
 
-// Salimos acá en vez de lanzar: esto se evalúa al importar el módulo, antes
-// de que index.mjs pueda atajar nada, y un volcado de pila no le dice a nadie
-// qué tiene que hacer.
-if (!process.env.DATABASE_URL) {
-  console.error('Falta DATABASE_URL.');
-  console.error('');
-  console.error('  cp .env.ejemplo .env     y completá la cadena de conexión');
-  console.error('');
-  console.error('En un host (Railway, Render, Fly) va como variable de entorno.');
-  process.exit(1);
+/**
+ * Sin base, el servidor arranca igual.
+ *
+ * Antes se moría acá, y eso era peor de lo que parece: no levantaba nada, así
+ * que /admin no abría y no había ni dónde leer el motivo. Ahora la tienda se
+ * sirve igual —la página trae su propio catálogo— y el panel abre y dice qué
+ * falta, en vez de dejarte con un puerto muerto.
+ *
+ * También vale en producción: que Postgres parpadee no tiene por qué tumbar
+ * la tienda entera.
+ */
+export const hayBase = !!process.env.DATABASE_URL;
+
+/** Lo que devuelve la API cuando no se puede hablar con la base. */
+export class BaseNoDisponible extends Error {
+  constructor(mensaje) { super(mensaje); this.name = 'BaseNoDisponible'; }
+}
+
+const FALTA_URL =
+  'La base no está configurada. Copiá .env.ejemplo como .env y completá DATABASE_URL.';
+
+if (!hayBase) {
+  console.warn('');
+  console.warn('  ⚠  Falta DATABASE_URL: arranco sin base.');
+  console.warn('     La tienda funciona con el catálogo de la página.');
+  console.warn('     El panel abre, pero no vas a poder entrar hasta configurarla.');
+  console.warn('');
+  console.warn('     cp .env.ejemplo .env     y completá la cadena de conexión');
+  console.warn('');
 }
 
 /**
@@ -70,22 +89,25 @@ const conexion = {
   ssl: tls(),
 };
 
-export const pool = new Pool(Object.assign({
-  max: Number(process.env.DB_POOL || 8),
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 8000,
-}, conexion));
+export const pool = hayBase
+  ? new Pool(Object.assign({
+      max: Number(process.env.DB_POOL || 8),
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 8000,
+    }, conexion))
+  : null;
 
 // Nuestras tablas viven en el esquema "rocketcards", no en "public": así
 // PostgREST no las publica. Lo ponemos acá y no en la cadena de conexión
 // porque el pooler de Supabase puede no pasar las opciones de arranque.
 const RUTA = 'SET search_path TO rocketcards, public';
-pool.on('connect', (cliente) => {
-  cliente.query(RUTA).catch((err) => console.error('[db] search_path:', err.message));
-});
-
-// Un error en una conexión ociosa del pool no debe tumbar el proceso.
-pool.on('error', (err) => console.error('[db] conexión ociosa:', err.message));
+if (pool) {
+  pool.on('connect', (cliente) => {
+    cliente.query(RUTA).catch((err) => console.error('[db] search_path:', err.message));
+  });
+  // Un error en una conexión ociosa del pool no debe tumbar el proceso.
+  pool.on('error', (err) => console.error('[db] conexión ociosa:', err.message));
+}
 
 /** Avisa 'catalogo' cada vez que la caché se renueva. Lo usa el stream SSE. */
 export const bus = new EventEmitter();
@@ -97,7 +119,7 @@ let cache = null;             // { version, cuerpo, etag, en }
 let cargando = null;          // promesa en curso, para no pedir lo mismo dos veces
 
 async function leerDeLaBase() {
-  const { rows } = await pool.query('SELECT rocketcards.catalogo() AS c');
+  const { rows } = await consultar('SELECT rocketcards.catalogo() AS c');
   const dato = rows[0].c;
   const cuerpo = JSON.stringify(dato);
   return {
@@ -132,6 +154,15 @@ export function catalogo() {
 
 /** La versión actual sin esperar nada; null si todavía no se cargó. */
 export const versionActual = () => (cache ? cache.version : null);
+
+/**
+ * Cómo está la base, para que el panel pueda decirlo antes de que alguien
+ * escriba la contraseña tres veces creyendo que se la olvidó.
+ */
+export function estadoBase() {
+  if (!hayBase) return 'sin-configurar';
+  return cache ? 'lista' : 'sin-conexion';
+}
 
 // ── El que escucha ───────────────────────────────────────────────────────
 
@@ -193,12 +224,22 @@ function reconectar() {
   }, espera).unref();
 }
 
-/** Arranca la caché y el oyente. Si la base no está, el proceso no arranca. */
+/**
+ * Arranca la caché y el oyente. No lanza: si la base no está, lo dice y
+ * sigue reintentando de fondo, para que el servidor levante igual.
+ */
 export async function iniciar() {
-  await escuchar();
+  if (!pool) return;
+  try {
+    await escuchar();
+  } catch (err) {
+    console.error('[db] no pude conectar:', err.message);
+    console.error('[db] sigo intentando; mientras tanto el panel no va a poder entrar.');
+    reconectar();
+  }
   // Sesiones vencidas, una vez por hora. No hace falta pg_cron.
   setInterval(() => {
-    pool.query('SELECT rocketcards.limpiar_sesiones()')
+    consultar('SELECT rocketcards.limpiar_sesiones()')
       .catch((err) => console.error('[db] limpieza:', err.message));
   }, 3600_000).unref();
 }
@@ -207,7 +248,7 @@ export async function cerrar() {
   cerrado = true;
   clearTimeout(temporizador);
   if (oyente) await oyente.end().catch(() => {});
-  await pool.end().catch(() => {});
+  if (pool) await pool.end().catch(() => {});
 }
 
 // ── Escrituras ───────────────────────────────────────────────────────────
@@ -219,6 +260,7 @@ export async function cerrar() {
  * lleva puesta la identidad del admin anterior.
  */
 export async function comoAdmin(adminId, fn) {
+  if (!pool) throw new BaseNoDisponible(FALTA_URL);
   const cliente = await pool.connect();
   try {
     await cliente.query('BEGIN');
@@ -234,4 +276,7 @@ export async function comoAdmin(adminId, fn) {
   }
 }
 
-export const consultar = (texto, valores) => pool.query(texto, valores);
+export function consultar(texto, valores) {
+  if (!pool) return Promise.reject(new BaseNoDisponible(FALTA_URL));
+  return pool.query(texto, valores);
+}

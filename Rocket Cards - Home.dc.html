@@ -1048,6 +1048,9 @@ class Component extends DCLogic {
     } catch (_) {
       return 'caido';
     }
+    // 503: hay servidor, pero la base no contesta. Vale la pena reintentar;
+    // mientras tanto la página se muestra con su propio catálogo.
+    if (r.status === 503) return 'caido';
     // No alcanza con el código de estado: el fallback de rutas del sitio
     // estático responde 200 con el HTML de la página. Cortamos el cuerpo
     // apenas vemos las cabeceras, así no nos bajamos la página dos veces.

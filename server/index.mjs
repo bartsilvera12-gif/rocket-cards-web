@@ -106,17 +106,15 @@ servidor.keepAliveTimeout = 65000;
 servidor.headersTimeout = 70000;
 servidor.requestTimeout = 0;
 
-try {
-  if (!(await esArchivo(join(SITIO, 'index.html')))) {
-    console.error('Falta dist/index.html. Corré:  npm run build');
-    process.exit(1);
-  }
-  await iniciar();
-} catch (err) {
-  console.error('No pude arrancar:', err.message);
-  console.error('¿Está DATABASE_URL bien puesta y la base corriendo?');
+if (!(await esArchivo(join(SITIO, 'index.html')))) {
+  console.error('Falta dist/index.html. Corré:  npm run build');
   process.exit(1);
 }
+
+// iniciar() no lanza: si la base no está, avisa y reintenta de fondo. El
+// servidor levanta igual, así la tienda se sirve y el panel al menos abre
+// para decir qué falta.
+await iniciar();
 
 servidor.listen(PORT, () => {
   console.log('Rocket Cards en http://localhost:' + PORT);

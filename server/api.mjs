@@ -16,7 +16,7 @@
 //   GET    /api/admin/auditoria
 //   GET    /api/admin/usuarios         POST   /api/admin/usuarios   (sólo dueño)
 
-import { catalogo, bus, consultar, comoAdmin, versionActual } from './db.mjs';
+import { catalogo, bus, consultar, comoAdmin, versionActual, estadoBase, BaseNoDisponible } from './db.mjs';
 import * as auth from './auth.mjs';
 
 const LIMITE_CUERPO = 64 * 1024;
@@ -134,9 +134,23 @@ function recortar(cuerpo, esquema, obligatorios) {
   return salida;
 }
 
+// Códigos de node-postgres y del sistema para "la base no contesta".
+const SIN_CONEXION = new Set([
+  'ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT', 'EHOSTUNREACH', 'ECONNRESET',
+  'EAI_AGAIN', 'CERT_HAS_EXPIRED', 'SELF_SIGNED_CERT_IN_CHAIN',
+  '57P03',  // the database system is starting up
+  '53300',  // too many connections
+]);
+
 /** Convierte un error de Postgres en algo que el panel pueda mostrar. */
 function traducir(err) {
   if (err instanceof ErrorHttp) return err;
+
+  if (err instanceof BaseNoDisponible) return new ErrorHttp(503, err.message);
+  if (SIN_CONEXION.has(err.code)) {
+    return new ErrorHttp(503, 'No hay conexión con la base (' + err.code + ').');
+  }
+
   switch (err.code) {
     case '23505': return new ErrorHttp(409,
       err.constraint === 'producto_nuevo_orden_idx'
@@ -406,7 +420,17 @@ export async function api(req, res, url, seguro) {
 
   try {
     if (ruta === '/api/salud') {
-      responder(res, 200, { ok: true, version: versionActual() });
+      const base = estadoBase();
+      responder(res, base === 'lista' ? 200 : 503, {
+        ok: base === 'lista',
+        base,
+        version: versionActual(),
+        detalle: {
+          'sin-configurar': 'Falta DATABASE_URL. Copiá .env.ejemplo como .env y completala.',
+          'sin-conexion': 'No llego a la base. Revisá DATABASE_URL y que el proyecto esté activo.',
+          lista: 'Todo en orden.',
+        }[base],
+      });
       return true;
     }
     if (ruta === '/api/catalogo' && req.method === 'GET') { await servirCatalogo(req, res); return true; }
@@ -483,6 +507,7 @@ export async function api(req, res, url, seguro) {
       console.error('[api] ' + req.method + ' ' + ruta + ':', err);
       responder(res, 500, { error: 'Error del servidor' });
     }
+
     return true;
   }
 }

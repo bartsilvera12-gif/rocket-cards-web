@@ -216,7 +216,11 @@ async function pedir(ruta, opciones = {}) {
   let dato = null;
   try { dato = await r.json(); } catch (_) { /* 204 y similares */ }
   if (r.status === 401 && estado.admin) { estado.admin = null; pintar(); }
-  if (!r.ok) throw new Error((dato && dato.error) || ('Error ' + r.status));
+  if (!r.ok) {
+    const e = new Error((dato && dato.error) || ('Error ' + r.status));
+    e.estado = r.status;
+    throw e;
+  }
   return dato;
 }
 
@@ -910,8 +914,19 @@ try {
   estado.admin = d.admin;
   escuchar();
   await cargar();
-} catch (_) {
-  pintarEntrada();
+} catch (err) {
+  // Un 401 es lo normal: todavía no entraste. Pero antes de mostrar el
+  // formulario preguntamos cómo está la base: si no contesta, mejor decirlo
+  // ahora que dejar que pruebe la contraseña tres veces creyendo que se la
+  // olvidó.
+  let aviso = err.estado === 503 ? err.message : '';
+  if (!aviso) {
+    try {
+      const salud = await (await fetch('/api/salud')).json();
+      if (salud && salud.base !== 'lista') aviso = salud.detalle;
+    } catch (_) { /* si ni eso contesta, el formulario igual sirve */ }
+  }
+  pintarEntrada(aviso);
 }
 </script>
 </body>
