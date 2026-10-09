@@ -55,8 +55,10 @@ npm install
 psql "postgresql://postgres.<ref>:CLAVE@aws-0-<region>.pooler.supabase.com:5432/postgres"   -f db/rocketcards.sql
 ```
 
-Por `psql`, no pegado en el editor SQL del panel de Supabase: es un cambio
-grande y el editor web corre cada bloque por su cuenta.
+También se puede pegar en el editor SQL del panel de Supabase: el archivo no
+usa ningún comando de psql, así que anda por los dos caminos. Por `psql` es
+mejor igual —ves los `NOTICE` y el error exacto si algo falla—, pero no es
+obligatorio.
 
 Todo el DDL va en una sola transacción y termina con
 `NOTIFY pgrst, 'reload schema';`, una vez al final, para que PostgREST relea

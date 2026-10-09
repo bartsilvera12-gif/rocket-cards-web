@@ -50,4 +50,4 @@ ON CONFLICT (id) DO UPDATE SET
 
 COMMIT;
 
-\echo '4 categorías y 18 productos cargados.'
+DO $$ BEGIN RAISE NOTICE '4 categorias y 18 productos cargados.'; END $$;

@@ -2,8 +2,8 @@
 --
 --   psql "$DATABASE_URL" -f db/rocketcards.sql
 --
--- Por psql, no pegado en el editor SQL del panel de Supabase: es un cambio
--- grande, y el editor web corre cada bloque por su cuenta.
+-- También se puede pegar entero en el editor SQL del panel de Supabase: acá
+-- no hay ningún comando de psql, así que anda por los dos caminos.
 --
 -- Es idempotente: se puede volver a correr sin romper nada.
 --
@@ -453,11 +453,18 @@ COMMIT;
 
 NOTIFY pgrst, 'reload schema';
 
-\echo ''
-\echo 'Esquema rocketcards listo.'
-\echo ''
-\echo 'Falta:'
-\echo '  1) ALTER ROLE rocketcards_app PASSWORD ''...'';'
-\echo '  2) psql "$DATABASE_URL" -f db/semilla.sql   (catálogo actual)'
-\echo '  3) npm run admin:crear -- <usuario> --dueno'
-\echo ''
+-- Nada de comandos de psql aca (los que empiezan con barra invertida): el
+-- editor SQL de Supabase manda el archivo al servidor tal cual y la barra le
+-- da error de sintaxis. RAISE NOTICE lo entiende el servidor, asi que el
+-- mensaje sale igual por los dos caminos.
+
+DO $$
+BEGIN
+  RAISE NOTICE '';
+  RAISE NOTICE 'Esquema rocketcards listo.';
+  RAISE NOTICE 'Falta:';
+  RAISE NOTICE '  1) ALTER ROLE rocketcards_app PASSWORD ''...'';';
+  RAISE NOTICE '  2) correr db/semilla.sql  (catalogo actual)';
+  RAISE NOTICE '  3) npm run admin:crear -- <usuario> --dueno';
+END
+$$;

@@ -83,7 +83,10 @@ L('  nuevo_orden = EXCLUDED.nuevo_orden;');
 L('');
 L('COMMIT;');
 L('');
-L('\\echo ' + "'" + categorias.length + ' categorías y ' + catalog.length + ' productos cargados.' + "'");
+// RAISE NOTICE y no \echo: el editor SQL de Supabase manda el archivo al
+// servidor tal cual, y ahí un comando de psql es un error de sintaxis.
+L("DO $$ BEGIN RAISE NOTICE '" + categorias.length + ' categorias y ' +
+  catalog.length + " productos cargados.'; END $$;");
 L('');
 
 await mkdir(dirname(SALIDA), { recursive: true });
