@@ -1,29 +1,34 @@
-# Publica el sitio en Hostinger con cada push a main.
+# Construye el sitio y lo deja listo para Hostinger en la rama "publicado".
 #
-# Construye dist/ y lo sube por FTPS a public_html/. La acción mantiene un
-# archivo de estado en el servidor, así que en cada publicación sube sólo lo
-# que cambió, no los 1,5 MB de fotos de nuevo.
+# Por qué una rama aparte: el despliegue por Git de Hostinger clona el repo
+# dentro de public_html tal cual, sin construir nada. Si apunta a "main",
+# termina publicando el fuente —la página se llama "Rocket Cards - Home.dc.html",
+# no index.html— y de paso quedan a la vista db/, scripts/ y la carpeta .git
+# con todo el historial.
 #
-# Hacen falta tres secretos en GitHub (Settings → Secrets and variables →
-# Actions → New repository secret). Los datos salen de hPanel → Archivos →
-# Cuentas FTP:
+# En "publicado" va sólo el resultado de scripts/build.mjs: index.html,
+# admin.html, assets/ y el .htaccess, en la raíz. Eso es exactamente lo que
+# tiene que haber en public_html.
 #
-#   FTP_SERVER     el host, p. ej. ftp.rocketcards.com.py (sin ftp:// adelante)
-#   FTP_USERNAME   el usuario de la cuenta FTP
-#   FTP_PASSWORD   su contraseña
+# No hace falta configurar ningún secreto: GITHUB_TOKEN lo pone GitHub solo.
 #
-# Conviene crear una cuenta FTP aparte para esto, con acceso sólo a
-# public_html/, en vez de usar la principal de la cuenta.
+# Del lado de Hostinger (una sola vez):
+#   hPanel → Avanzado → Git → repositorio del proyecto, rama "publicado",
+#   carpeta public_html. Copiá la URL de webhook que te da y pegala en
+#   GitHub → Settings → Webhooks, para que despliegue solo con cada push.
 
-name: Publicar en Hostinger
+name: Publicar
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:        # también se puede lanzar a mano desde la pestaña Actions
+  workflow_dispatch:          # también se puede lanzar a mano desde Actions
+
+permissions:
+  contents: write             # para poder escribir la rama "publicado"
 
 concurrency:
-  # Si se empujan dos commits seguidos, que no se pisen dos subidas a la vez.
+  # Dos commits seguidos no deben pisarse una publicación con la otra.
   group: publicar
   cancel-in-progress: true
 
@@ -40,15 +45,30 @@ jobs:
       - name: Construir dist/
         run: node scripts/build.mjs
 
-      - name: Subir por FTPS
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftps
-          local-dir: ./dist/
-          server-dir: ./public_html/
-          # Los archivos que ya están en el servidor y no vienen del build
-          # (por ejemplo algo subido a mano) no se tocan.
-          dangerous-clean-slate: false
+      - name: Comprobar que el build tiene lo que debe
+        run: |
+          for f in index.html admin.html support.js reveal.js rocketcards-config.js .htaccess; do
+            test -s "dist/$f" || { echo "Falta dist/$f"; exit 1; }
+          done
+          test -d dist/assets || { echo "Falta dist/assets"; exit 1; }
+          echo "dist/ tiene $(find dist -type f | wc -l) archivos."
+
+      - name: Dejarlo en la rama "publicado"
+        run: |
+          # El asunto del commit, leído antes de entrar a dist/. Por git log y
+          # no por github.event: así también sirve cuando se lanza a mano,
+          # que no trae head_commit.
+          TITULO=$(git log -1 --pretty=%s)
+          cd dist
+          # Historia nueva en cada publicación: a esta rama no le interesa el
+          # pasado, y así no crece para siempre con copias de las fotos.
+          git init -q -b publicado
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -q -m "Build de ${GITHUB_SHA:0:7}: $TITULO"
+          git push -q --force \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}" \
+            publicado
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

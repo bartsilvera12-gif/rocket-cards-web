@@ -35,22 +35,36 @@ no va a subir.
 
 ### Automático, con cada push
 
-Hay un workflow en [`.github/workflows/publicar.yml`](.github/workflows/publicar.yml)
-que construye y sube por FTPS a `public_html/` cada vez que se empuja a
-`main`. Sube sólo lo que cambió, no los 1,5 MB de fotos de nuevo.
+Cada push a `main` dispara
+[`.github/workflows/publicar.yml`](.github/workflows/publicar.yml), que
+construye el sitio y deja el resultado en la rama **`publicado`**.
 
-Para que funcione hay que cargar tres secretos en GitHub
-(Settings → Secrets and variables → Actions). Los datos salen de
-hPanel → Archivos → Cuentas FTP:
+Esa rama contiene exactamente lo que tiene que haber en `public_html`:
+`index.html`, `admin.html`, `assets/`, el `.htaccess` y nada más. Historia
+nueva en cada publicación, así no crece para siempre con copias de las fotos.
 
-| Secreto | Qué es |
-|---|---|
-| `FTP_SERVER` | el host, sin `ftp://` adelante |
-| `FTP_USERNAME` | usuario de la cuenta FTP |
-| `FTP_PASSWORD` | su contraseña |
+En Hostinger, una sola vez:
 
-Conviene crear una cuenta FTP aparte para esto, con acceso sólo a
-`public_html/`, en vez de usar la principal.
+1. hPanel → **Avanzado → Git**.
+2. Repositorio: el del proyecto. **Rama: `publicado`.** Carpeta:
+   `public_html`.
+3. Copiá la **URL de webhook** que te da y pegala en GitHub →
+   Settings → Webhooks → Add webhook (content type `application/json`).
+
+Con eso, cada push a `main` construye y Hostinger se actualiza solo.
+
+> **No apuntes el Git de Hostinger a `main`.** Clona el repo tal cual, sin
+> construir: la página se llama `Rocket Cards - Home.dc.html` y no hay
+> `index.html` de verdad, así que las URLs quedan feas. Además te deja a la
+> vista `db/`, `scripts/` y la carpeta `.git` con todo el historial.
+
+### Por FTP, si preferís
+
+Alternativa a la rama: subir por FTPS desde la Action. Hay que crear una
+cuenta FTP en hPanel → Archivos → Cuentas FTP, con acceso sólo a
+`public_html/`, y cargar `FTP_SERVER`, `FTP_USERNAME` y `FTP_PASSWORD` en
+GitHub → Settings → Secrets and variables → Actions. Es más trabajo y deja
+una contraseña guardada; la rama no.
 
 ### A mano
 
@@ -58,9 +72,9 @@ Conviene crear una cuenta FTP aparte para esto, con acceso sólo a
 npm run build
 ```
 
-y subís el **contenido** de `dist/` a `public_html/` por el Administrador de
-archivos de hPanel o por FTP. Ojo: el contenido, no la carpeta — en
-`public_html/` tiene que quedar `index.html`, no `dist/index.html`.
+y subís el **contenido** de `dist/` a `public_html/`. Ojo: el contenido, no
+la carpeta — en `public_html/` tiene que quedar `index.html`, no
+`dist/index.html`.
 
 Que no se te escape el `.htaccess`: empieza con punto y los clientes de FTP
 lo esconden salvo que les pidas mostrar archivos ocultos.
