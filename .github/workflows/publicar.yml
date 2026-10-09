@@ -1,0 +1,54 @@
+# Publica el sitio en Hostinger con cada push a main.
+#
+# Construye dist/ y lo sube por FTPS a public_html/. La acción mantiene un
+# archivo de estado en el servidor, así que en cada publicación sube sólo lo
+# que cambió, no los 1,5 MB de fotos de nuevo.
+#
+# Hacen falta tres secretos en GitHub (Settings → Secrets and variables →
+# Actions → New repository secret). Los datos salen de hPanel → Archivos →
+# Cuentas FTP:
+#
+#   FTP_SERVER     el host, p. ej. ftp.rocketcards.com.py (sin ftp:// adelante)
+#   FTP_USERNAME   el usuario de la cuenta FTP
+#   FTP_PASSWORD   su contraseña
+#
+# Conviene crear una cuenta FTP aparte para esto, con acceso sólo a
+# public_html/, en vez de usar la principal de la cuenta.
+
+name: Publicar en Hostinger
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:        # también se puede lanzar a mano desde la pestaña Actions
+
+concurrency:
+  # Si se empujan dos commits seguidos, que no se pisen dos subidas a la vez.
+  group: publicar
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Construir dist/
+        run: node scripts/build.mjs
+
+      - name: Subir por FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./dist/
+          server-dir: ./public_html/
+          # Los archivos que ya están en el servidor y no vienen del build
+          # (por ejemplo algo subido a mano) no se tocan.
+          dangerous-clean-slate: false

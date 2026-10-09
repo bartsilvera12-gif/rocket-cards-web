@@ -96,7 +96,8 @@ marcha en [ADMIN.md](ADMIN.md).
 El catálogo escrito dentro de la página sigue ahí como respaldo: es lo que se
 ve mientras llega el de la base, y lo que queda si Supabase no contesta.
 
-No hay servidor propio, así que todo esto anda en Vercel.
+No hay servidor propio: es un sitio estático más Supabase, así que se puede
+servir desde cualquier lado.
 
 ## Desarrollo
 
@@ -109,9 +110,11 @@ npm run db:semilla  # regenera db/semilla.sql desde el CATALOG de la página
 Para editar sin build alcanza con servir la carpeta raíz, pero ahí las rutas
 profundas dan 404 porque no hay fallback.
 
-## Deploy
+## Publicar
 
-Va a Vercel; los detalles están en [DEPLOY.md](DEPLOY.md).
+Va a Hostinger, en `rocketcards.com.py`. Cada push a `main` construye y sube
+por FTPS con [`.github/workflows/publicar.yml`](.github/workflows/publicar.yml).
+Vercel queda como vista previa. Los detalles están en [DEPLOY.md](DEPLOY.md).
 
 ## Pendientes
 

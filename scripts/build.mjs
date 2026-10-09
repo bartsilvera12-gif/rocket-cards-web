@@ -28,6 +28,7 @@ const PAGE = 'Rocket Cards - Home.dc.html';
 const INCLUDE = [
   'support.js',           // runtime de la plantilla
   'reveal.js',            // animación de entrada por scroll
+  '.htaccess',            // reescritura de URLs y cabeceras, para Hostinger
   'admin.html',           // panel, en /admin.html
   'rocketcards-config.js',// url y anon key de Supabase (la anon key es pública)
   'assets',               // logo, fotos de catálogo y cartas
