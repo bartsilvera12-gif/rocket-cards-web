@@ -87,6 +87,9 @@
            cursor: pointer; border-radius: 3px; padding: 5px 9px; font-size: 13px; line-height: 1; }
   .icono:hover { color: var(--texto); border-color: var(--oro); }
   .icono.peligro:hover { color: var(--rojo); border-color: var(--rojo); }
+  /* La estrella encendida: el producto ya está en el carrusel de la portada. */
+  .icono.activo { color: var(--oro); border-color: var(--oro); background: rgba(201,162,39,.12); }
+  .icono:disabled { opacity: .4; cursor: wait; }
 
   /* ── Tabla ── */
   .caja { background: var(--panel); border: 1px solid var(--linea); border-radius: 4px; }
@@ -520,6 +523,8 @@ function hojaProductos(hoja) {
               <label class="sw"><input type="checkbox" data-campo="publicado" ${p.publicado ? 'checked' : ''}><span></span></label>
             </td>
             <td><div class="acciones">
+              <button class="icono${p.nuevo_orden ? ' activo' : ''}" data-nuevos
+                      title="${p.nuevo_orden ? 'Sacar de Nuevos ingresos' : 'Mandar a Nuevos ingresos'}">★</button>
               <button class="icono" data-editar title="Editar">✎</button>
               <button class="icono peligro" data-borrar title="Borrar">✕</button>
             </div></td>
@@ -568,12 +573,40 @@ function hojaProductos(hoja) {
       }
     });
 
+    // Mandar al carrusel de la portada desde acá, sin ir a la otra pestaña.
+    // Va por la misma función que la pestaña "Nuevos ingresos": adentro es
+    // una sola transacción, así el carrusel nunca queda a medias para quien
+    // esté mirando la tienda.
+    tr.querySelector('[data-nuevos]').addEventListener('click', async (e) => {
+      const enCarrusel = estado.productos
+        .filter((x) => x.nuevo_orden)
+        .sort((a, b) => a.nuevo_orden - b.nuevo_orden)
+        .map((x) => x.id);
+      const estaba = enCarrusel.includes(id);
+      const ids = estaba ? enCarrusel.filter((x) => x !== id) : [...enCarrusel, id];
+
+      if (!estaba && ids.length > 12) return brindis('El carrusel no lleva más de 12 productos', true);
+      if (!estaba && !p.publicado) {
+        return brindis('Primero hacelo visible: el carrusel sólo muestra productos publicados', true);
+      }
+
+      e.currentTarget.disabled = true;
+      propio();
+      const { error } = await sb.rpc('guardar_nuevos', { ids });
+      if (error) { e.currentTarget.disabled = false; return brindis(motivo(error), true); }
+      await cargar();
+      brindis(estaba ? 'Sacado de Nuevos ingresos' : 'Agregado a Nuevos ingresos (va último)');
+    });
+
     tr.querySelector('[data-editar]').addEventListener('click', () => {
       estado.editando = Object.assign({}, p);
       pintarModal();
     });
     tr.querySelector('[data-borrar]').addEventListener('click', async () => {
-      if (!confirm('¿Borrar "' + p.nombre + '"?\n\nNo se puede deshacer. Si sólo querés sacarlo de la tienda, apagá "Visible".')) return;
+      const seguro = await confirmar('Borrar producto',
+        '«' + p.nombre + '»\n\nNo se puede deshacer. Si sólo querés sacarlo de la tienda, apagá «Visible» en vez de borrarlo.',
+        'Borrar');
+      if (!seguro) return;
       propio();
       const { error } = await sb.from('producto').delete().eq('id', id);
       if (error) return brindis(motivo(error), true);
@@ -583,6 +616,73 @@ function hojaProductos(hoja) {
     });
   });
 }
+
+// ── Diálogos ─────────────────────────────────────────────────────────────
+
+/**
+ * Un diálogo propio, en vez de confirm() y prompt() del navegador.
+ *
+ * Los del navegador anuncian de qué dominio vienen —"rocket-cards-web.vercel.app
+ * dice"—, no se pueden peinar y bloquean la pestaña entera mientras están
+ * abiertos. Al lado del resto del panel parecen un error.
+ *
+ * Devuelve false si se cancela. Si no hay campos devuelve true; si los hay,
+ * un arreglo con lo que se escribió.
+ */
+function dialogo({ titulo, texto, campos = [], aceptar = 'Aceptar', alAbrir }) {
+  return new Promise((resolver) => {
+    const velo = document.createElement('div');
+    velo.className = 'velo';
+    velo.innerHTML = `
+      <form class="modal" style="width:min(460px,100%)">
+        <header>
+          <h2 style="font-size:17px">${esc(titulo)}</h2>
+          <div style="flex:1"></div>
+          <button type="button" class="icono" data-cerrar>✕</button>
+        </header>
+        <div class="cuerpo" style="grid-template-columns:minmax(0,1fr)">
+          ${texto ? `<p style="margin:0;color:var(--suave);font-size:13.5px;line-height:1.55;white-space:pre-line">${esc(texto)}</p>` : ''}
+          ${campos.map((c, i) => `
+            <div>
+              <label for="dlg${i}">${esc(c.etiqueta)}</label>
+              <input id="dlg${i}" type="text" value="${esc(c.valor || '')}"
+                     placeholder="${esc(c.ejemplo || '')}" ${c.opcional ? '' : 'required'}>
+              ${c.ayuda ? `<div class="ayuda">${esc(c.ayuda)}</div>` : ''}
+            </div>`).join('')}
+        </div>
+        <footer>
+          <button type="button" class="btn gris" data-cerrar>Cancelar</button>
+          <button type="submit" class="btn">${esc(aceptar)}</button>
+        </footer>
+      </form>`;
+    document.body.append(velo);
+
+    const salir = (valor) => {
+      document.removeEventListener('keydown', alTeclado);
+      velo.remove();
+      resolver(valor);
+    };
+    const alTeclado = (e) => { if (e.key === 'Escape') salir(false); };
+    document.addEventListener('keydown', alTeclado);
+
+    velo.addEventListener('click', (e) => { if (e.target === velo) salir(false); });
+    velo.querySelectorAll('[data-cerrar]').forEach((b) => b.addEventListener('click', () => salir(false)));
+    velo.querySelector('form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      salir(campos.length
+        ? [...velo.querySelectorAll('.cuerpo input')].map((i) => i.value.trim())
+        : true);
+    });
+
+    if (alAbrir) alAbrir(velo);
+    // El foco al primer campo, o al botón si es sólo una confirmación: así
+    // Enter y Escape hacen lo esperable sin tocar el mouse.
+    (velo.querySelector('.cuerpo input') || velo.querySelector('button[type=submit]')).focus();
+  });
+}
+
+const confirmar = (titulo, texto, aceptar) =>
+  dialogo({ titulo, texto, aceptar: aceptar || 'Confirmar' });
 
 // ── Fotos ────────────────────────────────────────────────────────────────
 
@@ -974,7 +1074,9 @@ function hojaCategorias(hoja) {
       campo.addEventListener('keydown', (e) => { if (e.key === 'Enter') campo.blur(); });
     });
     tr.querySelector('[data-borrar]').addEventListener('click', async () => {
-      if (!confirm('¿Borrar la categoría "' + c.nombre + '"?')) return;
+      const seguro = await confirmar('Borrar categoría',
+        '«' + c.nombre + '»\n\nNo se puede deshacer.', 'Borrar');
+      if (!seguro) return;
       propio();
       const { error } = await sb.from('categoria').delete().eq('key', key);
       if (error) return brindis(motivo(error), true);
@@ -983,12 +1085,35 @@ function hojaCategorias(hoja) {
     });
   });
 
+  /** "Sellados y coleccionables" → "sellados-y-coleccionables" */
+  const aClave = (t) => t.toLowerCase().normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+
   $('#nueva-cat').addEventListener('click', async () => {
-    const nombre = prompt('Nombre de la categoría (ej: Accesorios)');
-    if (!nombre) return;
-    const key = prompt('Clave para la URL (minúsculas, sin espacios)',
-      nombre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
-    if (!key) return;
+    const r = await dialogo({
+      titulo: 'Nueva categoría',
+      aceptar: 'Crear',
+      campos: [
+        { etiqueta: 'Nombre', ejemplo: 'Accesorios' },
+        { etiqueta: 'Clave para la URL', ayuda: 'Así va a aparecer: /catalogo/accesorios' },
+      ],
+      // La clave se arma sola mientras se escribe el nombre, y deja de
+      // hacerlo en cuanto alguien la edita a mano.
+      alAbrir: (velo) => {
+        const [campoNombre, campoClave] = velo.querySelectorAll('.cuerpo input');
+        let aMano = false;
+        campoClave.addEventListener('input', () => { aMano = true; });
+        campoNombre.addEventListener('input', () => {
+          if (!aMano) campoClave.value = aClave(campoNombre.value);
+        });
+      },
+    });
+    if (!r) return;
+    const [nombre, clave] = r;
+    const key = aClave(clave || nombre);
+    if (!nombre || !key) return brindis('Falta el nombre o la clave', true);
     propio();
     const { error } = await sb.from('categoria')
       .insert({ key, nombre, orden: estado.categorias.length + 1 });
