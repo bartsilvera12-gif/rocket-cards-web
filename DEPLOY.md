@@ -10,12 +10,14 @@ El build (`scripts/build.mjs`) copia a `dist/` **sólo** esto:
 |---|---|
 | `index.html` | `Rocket Cards - Home.dc.html` |
 | `support.js` | runtime de la plantilla |
+| `admin.html` | panel de administración |
+| `rocketcards-config.js` | url y anon key de Supabase (la anon key es pública) |
 | `reveal.js` | animación de entrada por scroll |
 | `assets/` | logo, fotos de catálogo y de cartas |
 
 **No se publica** `uploads/` (11 MB: el PDF del proyecto y fotos de WhatsApp),
-`screenshots/`, `.thumbnail`, `.claude/`, `.env`, ni `server/`, `db/` y
-`admin/`, que son del panel y no tienen nada que hacer en el sitio estático.
+`screenshots/`, `.thumbnail`, `.claude/`, `.env` ni `db/`, que son los scripts
+de la base y no los necesita nadie que visite el sitio.
 
 La lista es blanca a propósito: con una lista negra, cualquier archivo nuevo que
 caiga en la carpeta se publicaría sin que nadie lo note. Si agregás un archivo que
@@ -118,12 +120,8 @@ grep -o "\[PENDIENTE[^]]*\]" "Rocket Cards - Home.dc.html" | sort -u
 
 El WhatsApp ya quedó configurado en `595981377541`.
 
-## El panel no va en Vercel
+## El panel
 
-Vercel corre funciones que arrancan y mueren con cada pedido, así que no puede
-sostener la conexión `LISTEN` contra Postgres ni el stream SSE que mantienen el
-catálogo al día. El panel necesita un host donde el proceso quede corriendo
-(un VPS, Railway, Render, Fly). Ver [ADMIN.md](ADMIN.md).
-
-Mientras tanto el sitio de Vercel sigue andando igual que siempre: usa el
-catálogo escrito dentro de la página y ni intenta hablar con la API.
+Sale del mismo deploy, en `/admin.html`. No hace falta nada más: habla directo
+con Supabase desde el navegador, no hay backend que desplegar. Ver
+[ADMIN.md](ADMIN.md).

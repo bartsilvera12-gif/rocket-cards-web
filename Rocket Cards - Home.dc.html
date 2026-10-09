@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="/support.js"></script>
 <script type="module" src="/reveal.js"></script>
+<!-- Catálogo en vivo desde Supabase. Si estos dos no cargan, la página
+     funciona igual con el catálogo escrito más abajo. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.10/dist/umd/supabase.js" defer></script>
+<script src="/rocketcards-config.js" defer></script>
 </head>
 <body>
 <x-dc>
@@ -1000,7 +1004,7 @@ class Component extends DCLogic {
     document.removeEventListener('click', this._onDocClick);
     clearTimeout(this._searchTimer); clearTimeout(this._toastTimer); clearTimeout(this._catTimer);
     window.removeEventListener('popstate', this._onPop);
-    if (this._sse) { this._sse.close(); this._sse = null; }
+    if (this._canal && this._sb) { this._sb.removeChannel(this._canal); this._canal = null; }
   }
 
   /**
@@ -1015,54 +1019,51 @@ class Component extends DCLogic {
    * catálogo no cambie, el navegador no pide nada y la base no recibe ni una
    * consulta, por más gente que esté mirando la tienda.
    */
-  async conectarCatalogo(intento) {
-    const estado = await this.traerCatalogo();
-
-    // 'estatico' es el sitio de Vercel: ahí /api/catalogo devuelve el propio
-    // index.html por el fallback de rutas. No hay nada que escuchar, y abrir
-    // un EventSource contra eso sólo deja un error en la consola.
-    if (estado === 'estatico') return;
-
-    if (estado === 'caido') {
-      // Sí hay servidor pero justo no contestó. Un par de reintentos y listo.
-      if ((intento || 0) < 2) {
-        setTimeout(() => this.conectarCatalogo((intento || 0) + 1), 3000);
-      }
+  /**
+   * Catálogo en vivo.
+   *
+   * El catálogo escrito en esta página es el que se ve mientras llega el de
+   * la base, y el que queda si Supabase no contesta. Nadie ve una tienda
+   * vacía por un problema de red.
+   *
+   * No hay consultas cada tantos segundos: se lee una vez y después la
+   * pantalla queda suscrita por Realtime. Supabase avisa por websocket
+   * cuando una fila cambia y recién ahí volvemos a leer. Mil personas
+   * mirando la tienda con el catálogo quieto son cero consultas.
+   */
+  conectarCatalogo(reintento) {
+    const cfg = window.ROCKET_CONFIG;
+    // Los dos <script> de arriba van con defer, así que pueden no haber
+    // corrido todavía cuando React monta. Si no están, esperamos al load y
+    // probamos una vez más; si tampoco, es que no hay Supabase configurado.
+    if (!cfg || !cfg.url || !window.supabase) {
+      if (!reintento) window.addEventListener('load', () => this.conectarCatalogo(true), { once: true });
       return;
     }
 
-    if (typeof EventSource === 'undefined') return;
-    const es = new EventSource('/api/eventos');
-    this._sse = es;
-    es.addEventListener('recargar', () => this.traerCatalogo());
-    let fallos = 0;
-    es.onopen = () => { fallos = 0; };
-    es.onerror = () => { if (++fallos >= 3) { es.close(); this._sse = null; } };
+    // persistSession en false: la tienda no inicia sesión de nadie, y así no
+    // le escribe nada al localStorage del visitante.
+    this._sb = window.supabase.createClient(cfg.url, cfg.anonKey, {
+      db: { schema: cfg.schema || 'rocketcards' },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    this.traerCatalogo();
+
+    const alCambiar = () => this.traerCatalogo();
+    this._canal = this._sb.channel('tienda-rocketcards')
+      .on('postgres_changes', { event: '*', schema: cfg.schema, table: 'producto' }, alCambiar)
+      .on('postgres_changes', { event: '*', schema: cfg.schema, table: 'categoria' }, alCambiar)
+      .subscribe();
   }
 
-  /** 'vivo' | 'estatico' | 'caido' */
   async traerCatalogo() {
-    let r;
     try {
-      r = await fetch('/api/catalogo', { headers: { Accept: 'application/json' } });
+      const { data, error } = await this._sb.rpc('catalogo');
+      if (error || !data) return;
+      if (aplicarCatalogo(data)) this.forceUpdate();
     } catch (_) {
-      return 'caido';
-    }
-    // 503: hay servidor, pero la base no contesta. Vale la pena reintentar;
-    // mientras tanto la página se muestra con su propio catálogo.
-    if (r.status === 503) return 'caido';
-    // No alcanza con el código de estado: el fallback de rutas del sitio
-    // estático responde 200 con el HTML de la página. Cortamos el cuerpo
-    // apenas vemos las cabeceras, así no nos bajamos la página dos veces.
-    if (!r.ok || !(r.headers.get('content-type') || '').includes('application/json')) {
-      try { if (r.body) r.body.cancel(); } catch (_) {}
-      return 'estatico';
-    }
-    try {
-      if (aplicarCatalogo(await r.json())) this.forceUpdate();
-      return 'vivo';
-    } catch (_) {
-      return 'estatico';
+      // Sin base, la página se queda con el catálogo que ya tenía.
     }
   }
 

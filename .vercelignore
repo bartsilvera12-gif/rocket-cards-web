@@ -8,7 +8,5 @@ assets-originales/
 .env
 .env.*
 
-# del panel: no es parte del sitio estatico
-server/
+# scripts de la base: no son parte del sitio
 db/
-admin/

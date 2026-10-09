@@ -9,6 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@700;800;900&family=Poppins:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.10/dist/umd/supabase.js"></script>
+<script src="/rocketcards-config.js"></script>
 <style>
   :root {
     --fondo: #050505; --panel: #0D0D0D; --panel2: #121212;
@@ -170,12 +172,25 @@
 // ─────────────────────────────────────────────────────────────────────────
 // Panel de Rocket Cards
 //
-// Sin framework ni build: un módulo que arma HTML y lo mete en #app. El panel
-// no consulta la base por su cuenta — el servidor mantiene el catálogo en
-// memoria, y el stream /api/eventos avisa cuando algo cambió (lo que llega
-// desde Postgres por NOTIFY). Si otra persona edita algo desde otra máquina,
-// esta pantalla se entera sola.
+// Habla directo con Supabase por supabase-js: no hay servidor propio en el
+// medio. Lo que decide qué puede hacer cada uno es RLS, del lado de la base
+// (ver db/rocketcards.sql). El chequeo del email que hay acá abajo es sólo
+// para no mostrarle la pantalla a quien no corresponde: si alguien lo saltea
+// editando el JavaScript, igual no va a poder escribir una fila.
+//
+// Y nadie pregunta cada tantos segundos: la pantalla se suscribe por
+// Realtime y vuelve a leer sólo cuando una fila cambió de verdad.
 // ─────────────────────────────────────────────────────────────────────────
+
+const cfg = window.ROCKET_CONFIG || {};
+const listo = !!(cfg.url && cfg.anonKey && window.supabase);
+
+const sb = listo
+  ? window.supabase.createClient(cfg.url, cfg.anonKey, {
+      db: { schema: cfg.schema || 'rocketcards' },
+      auth: { persistSession: true, autoRefreshToken: true },
+    })
+  : null;
 
 const $ = (sel, raiz = document) => raiz.querySelector(sel);
 const app = $('#app');
@@ -195,74 +210,61 @@ function brindis(texto, mal) {
   setTimeout(() => d.remove(), 3600);
 }
 
-// ── Cliente de la API ────────────────────────────────────────────────────
-
-async function pedir(ruta, opciones = {}) {
-  const metodo = opciones.method || (opciones.cuerpo ? 'POST' : 'GET');
-  // Dejamos marcada la hora de nuestros propios cambios: el aviso que vuelve
-  // por el stream unos milisegundos después es el eco de esto, no la novedad
-  // de que alguien más tocó algo.
-  if (metodo !== 'GET' && ruta !== '/api/admin/login') estado.cambioPropio = Date.now();
-
-  const r = await fetch(ruta, Object.assign({
-    headers: Object.assign(
-      { 'X-Rocket-Admin': '1' },
-      opciones.cuerpo ? { 'Content-Type': 'application/json' } : {}
-    ),
-    body: opciones.cuerpo ? JSON.stringify(opciones.cuerpo) : undefined,
-    credentials: 'same-origin',
-  }, { method: metodo }));
-
-  let dato = null;
-  try { dato = await r.json(); } catch (_) { /* 204 y similares */ }
-  if (r.status === 401 && estado.admin) { estado.admin = null; pintar(); }
-  if (!r.ok) {
-    const e = new Error((dato && dato.error) || ('Error ' + r.status));
-    e.estado = r.status;
-    throw e;
+/** Traduce los errores de PostgREST a algo que se entienda. */
+function motivo(err) {
+  if (!err) return 'Error desconocido';
+  const m = err.message || String(err);
+  if (err.code === '42501' || /row-level security|No autorizado/i.test(m)) {
+    return 'La base rechazó el cambio: esta cuenta no es el admin.';
   }
-  return dato;
+  if (err.code === '23505') {
+    return /nuevo_orden/.test(m)
+      ? 'Ya hay otro producto en esa posición de Nuevos ingresos'
+      : 'Ya existe un producto con ese SKU';
+  }
+  if (err.code === '23503') return 'Esa categoría no existe, o todavía tiene productos';
+  if (err.code === '23514') return 'Algún valor no cumple las reglas de la base';
+  if (err.code === 'PGRST205' || /schema cache/i.test(m)) {
+    return 'PostgREST no ve el esquema. Agregá "rocketcards" a Exposed schemas y corré: notify pgrst, \'reload schema\';';
+  }
+  if (/Failed to fetch|NetworkError/i.test(m)) return 'No llego a Supabase. ¿Está bien la URL en rocketcards-config.js?';
+  return m;
 }
 
 // ── Estado ───────────────────────────────────────────────────────────────
 
 const estado = {
-  admin: null,
+  sesion: null,
   pestana: 'productos',
-  productos: [], categorias: [], movimientos: [], usuarios: [],
+  productos: [], categorias: [], movimientos: [],
   busqueda: '', filtroCat: '', soloOcultos: false,
   version: null, conectado: false,
-  editando: null,      // producto en el modal, o null
-  cambioPropio: 0,     // hora del último cambio hecho desde esta pantalla
-  pendiente: null,     // versión por aplicar, en espera de que suelten el teclado
+  editando: null,
+  cambioPropio: 0,
+  pendiente: null,
 };
 
-// ── Eventos en vivo ──────────────────────────────────────────────────────
-// Sin polling: el navegador deja una conexión abierta y el servidor escribe
-// en ella cuando Postgres avisa. Si se corta, EventSource reconecta solo.
+// ── Realtime ─────────────────────────────────────────────────────────────
 
-let flujo = null;
+let canal = null;
 function escuchar() {
-  if (flujo) flujo.close();
-  flujo = new EventSource('/api/eventos');
-  flujo.onopen = () => { estado.conectado = true; pintarEstado(); };
-  flujo.onerror = () => { estado.conectado = false; pintarEstado(); };
-  flujo.addEventListener('version', (e) => {
-    estado.version = JSON.parse(e.data).version;
-    pintarEstado();
-  });
-  flujo.addEventListener('recargar', async (e) => {
-    estado.version = JSON.parse(e.data).version;
-    pintarEstado();
+  if (canal) sb.removeChannel(canal);
+  const alCambiar = () => novedad();
+  canal = sb.channel('panel-rocketcards')
+    .on('postgres_changes', { event: '*', schema: cfg.schema, table: 'producto' }, alCambiar)
+    .on('postgres_changes', { event: '*', schema: cfg.schema, table: 'categoria' }, alCambiar)
+    .subscribe((st) => {
+      estado.conectado = st === 'SUBSCRIBED';
+      pintarEstado();
+    });
+}
 
-    // El eco de nuestro propio cambio: la respuesta ya actualizó la pantalla.
-    if (Date.now() - estado.cambioPropio < 2500) return;
-
-    // Alguien más editó algo. Si en este momento estás escribiendo, repintar
-    // te sacaría el cursor del campo: lo dejamos para cuando lo sueltes.
-    if (escribiendo()) { diferir(estado.version); return; }
-    await aplicarNovedad();
-  });
+function novedad() {
+  // El eco de nuestro propio cambio: la respuesta ya actualizó la pantalla.
+  if (Date.now() - estado.cambioPropio < 2500) { leerVersion(); return; }
+  // Si estás escribiendo, repintar te sacaría el cursor del campo.
+  if (escribiendo()) { diferir(); return; }
+  aplicarNovedad().catch((e) => brindis(motivo(e), true));
 }
 
 const escribiendo = () => {
@@ -273,35 +275,33 @@ const escribiendo = () => {
 let reloj = null;
 
 /**
- * Guarda la novedad para después y vuelve a mirar cada tanto. El focusout de
- * abajo es el camino normal y aplica el cambio en el momento en que suelta el
- * campo; esto es la red para que un cursor olvidado en un input no deje la
- * pantalla desactualizada para siempre.
+ * Guarda la novedad para después y vuelve a mirar cada tanto. El focusout es
+ * el camino normal; esto es la red para que un cursor olvidado en un input no
+ * deje la pantalla desactualizada para siempre.
  */
-function diferir(v) {
-  estado.pendiente = v;
+function diferir() {
+  estado.pendiente = true;
   pintarEstado();
   clearTimeout(reloj);
   reloj = setTimeout(function revisar() {
-    if (!escribiendo()) return aplicarNovedad().catch((e) => brindis(e.message, true));
+    if (!escribiendo()) return aplicarNovedad().catch((e) => brindis(motivo(e), true));
     reloj = setTimeout(revisar, 1500);
   }, 1500);
 }
 
 async function aplicarNovedad() {
-  const v = estado.pendiente ?? estado.version;
   clearTimeout(reloj);
   estado.pendiente = null;
   await cargar();
-  brindis('El catálogo cambió (v' + v + '). Actualicé la pantalla.');
+  brindis('El catálogo cambió (v' + (estado.version ?? '—') + '). Actualicé la pantalla.');
 }
 
 document.addEventListener('focusout', () => {
-  if (estado.pendiente === null) return;
+  if (!estado.pendiente) return;
   // Margen para que el foco salte al campo siguiente sin repintar en el medio.
   setTimeout(() => {
-    if (estado.pendiente !== null && !escribiendo()) {
-      aplicarNovedad().catch((e) => brindis(e.message, true));
+    if (estado.pendiente && !escribiendo()) {
+      aplicarNovedad().catch((e) => brindis(motivo(e), true));
     }
   }, 150);
 });
@@ -312,29 +312,45 @@ function pintarEstado() {
   el.dataset.on = estado.conectado ? '1' : '0';
   el.lastElementChild.textContent = !estado.conectado
     ? 'SIN CONEXIÓN'
-    : estado.pendiente !== null
-      ? 'NOVEDAD · v' + estado.pendiente
+    : estado.pendiente
+      ? 'NOVEDAD'
       : 'EN VIVO · v' + (estado.version ?? '—');
 }
 
 // ── Carga ────────────────────────────────────────────────────────────────
 
+async function leerVersion() {
+  const { data } = await sb.from('version').select('version').maybeSingle();
+  if (data) { estado.version = data.version; pintarEstado(); }
+}
+
 async function cargar() {
-  const tareas = [
-    pedir('/api/admin/productos').then((d) => { estado.productos = d.productos; estado.version = d.version; }),
-    pedir('/api/admin/categorias').then((d) => { estado.categorias = d.categorias; }),
-  ];
+  const [p, c] = await Promise.all([
+    sb.from('producto').select('*').order('nombre'),
+    sb.from('categoria').select('*').order('orden'),
+  ]);
+  if (p.error) throw p.error;
+  if (c.error) throw c.error;
+
+  const porCat = {};
+  p.data.forEach((x) => { porCat[x.categoria] = (porCat[x.categoria] || 0) + 1; });
+
+  estado.categorias = c.data.map((x) => Object.assign({}, x, { productos: porCat[x.key] || 0 }));
+  const nombreDe = Object.fromEntries(estado.categorias.map((x) => [x.key, x.nombre]));
+  estado.productos = p.data.map((x) => Object.assign({}, x, { categoria_nombre: nombreDe[x.categoria] }));
+
   if (estado.pestana === 'historial') {
-    tareas.push(pedir('/api/admin/auditoria?limite=80').then((d) => { estado.movimientos = d.movimientos; }));
+    const a = await sb.from('auditoria').select('*').order('id', { ascending: false }).limit(80);
+    estado.movimientos = a.error ? [] : a.data;
   }
-  if (estado.pestana === 'usuarios' && estado.admin.rol === 'dueno') {
-    tareas.push(pedir('/api/admin/usuarios').then((d) => { estado.usuarios = d.usuarios; }));
-  }
-  await Promise.all(tareas);
+  await leerVersion();
   pintar();
 }
 
-// ── Login ────────────────────────────────────────────────────────────────
+/** Marca que lo que viene por Realtime en seguida es eco nuestro. */
+const propio = () => { estado.cambioPropio = Date.now(); };
+
+// ── Entrar ───────────────────────────────────────────────────────────────
 
 function pintarEntrada(error) {
   app.innerHTML = `
@@ -346,14 +362,15 @@ function pintarEntrada(error) {
         </div>
         ${error ? `<div class="aviso mal">${esc(error)}</div>` : ''}
         <div>
-          <label for="u">Usuario</label>
-          <input id="u" name="username" type="text" autocomplete="username" required autofocus>
+          <label for="u">Email</label>
+          <input id="u" name="username" type="email" autocomplete="username" required autofocus
+                 value="${esc(cfg.adminEmail || '')}">
         </div>
         <div>
           <label for="c">Contraseña</label>
           <input id="c" name="password" type="password" autocomplete="current-password" required>
         </div>
-        <button class="btn" type="submit">Entrar</button>
+        <button class="btn" type="submit" ${listo ? '' : 'disabled'}>Entrar</button>
       </form>
     </div>`;
 
@@ -361,17 +378,16 @@ function pintarEntrada(error) {
     e.preventDefault();
     const boton = $('#f-login button');
     boton.disabled = true;
-    try {
-      estado.admin = await pedir('/api/admin/login', {
-        cuerpo: { usuario: $('#u').value, clave: $('#c').value },
-      });
-      escuchar();
-      await cargar();
-    } catch (err) {
-      pintarEntrada(err.message);
-    } finally {
-      boton.disabled = false;
+    const { error: err } = await sb.auth.signInWithPassword({
+      email: $('#u').value.trim(), password: $('#c').value,
+    });
+    if (err) {
+      pintarEntrada(/Invalid login/i.test(err.message)
+        ? 'Email o contraseña incorrectos'
+        : motivo(err));
+      return;
     }
+    arrancar();
   });
 }
 
@@ -382,13 +398,10 @@ const PESTANAS = [
   ['nuevos', 'Nuevos ingresos'],
   ['categorias', 'Categorías'],
   ['historial', 'Historial'],
-  ['usuarios', 'Usuarios'],
 ];
 
 function pintar() {
-  if (!estado.admin) return pintarEntrada();
-
-  const visibles = PESTANAS.filter(([k]) => k !== 'usuarios' || estado.admin.rol === 'dueno');
+  if (!estado.sesion) return pintarEntrada();
 
   app.innerHTML = `
     <div class="barra">
@@ -397,35 +410,33 @@ function pintar() {
       <div class="vivo" id="vivo" data-on="0"><i class="punto"></i><span>…</span></div>
       <a href="/" target="_blank" rel="noopener" class="ocultar-chico"
          style="font-size:12px;color:var(--suave);text-decoration:none">Ver tienda ↗</a>
-      <button class="icono" id="salir" title="Cerrar sesión">${esc(estado.admin.usuario)} · salir</button>
+      <button class="icono" id="salir" title="Cerrar sesión">${esc(estado.sesion.user.email)} · salir</button>
     </div>
     <nav class="pestanas" role="tablist">
-      ${visibles.map(([k, t]) => `
+      ${PESTANAS.map(([k, t]) => `
         <button role="tab" data-ir="${k}" aria-selected="${estado.pestana === k}">${t}</button>`).join('')}
     </nav>
     <main id="hoja"></main>`;
 
   $('#salir').addEventListener('click', async () => {
-    await pedir('/api/admin/logout', { method: 'POST', cuerpo: {} }).catch(() => {});
-    if (flujo) flujo.close();
-    estado.admin = null;
+    if (canal) sb.removeChannel(canal);
+    await sb.auth.signOut();
+    estado.sesion = null;
     pintar();
   });
   app.querySelectorAll('[data-ir]').forEach((b) => b.addEventListener('click', async () => {
     estado.pestana = b.dataset.ir;
     pintar();
-    await cargar().catch((e) => brindis(e.message, true));
+    if (estado.pestana === 'historial') await cargar().catch((e) => brindis(motivo(e), true));
   }));
 
   pintarEstado();
-  const hoja = $('#hoja');
   ({
     productos: hojaProductos,
     nuevos: hojaNuevos,
     categorias: hojaCategorias,
     historial: hojaHistorial,
-    usuarios: hojaUsuarios,
-  })[estado.pestana](hoja);
+  })[estado.pestana]($('#hoja'));
 
   if (estado.editando) pintarModal();
 }
@@ -497,7 +508,7 @@ function hojaProductos(hoja) {
         </tbody>
       </table></div>` : `<div class="vacio">No hay productos que coincidan.</div>`}
     </div>
-    <p class="ayuda">El precio y el stock se guardan al salir del campo. Cada cambio avisa a la tienda al instante.</p>`;
+    <p class="ayuda">El precio y el stock se guardan al salir del campo. Cada cambio llega a la tienda al instante.</p>`;
 
   $('#q').addEventListener('input', (e) => {
     estado.busqueda = e.target.value;
@@ -518,19 +529,18 @@ function hojaProductos(hoja) {
         const valor = campo.type === 'checkbox' ? campo.checked : Number(campo.value);
         if (valor === p[campo.dataset.campo]) return;
         campo.disabled = true;
-        try {
-          const d = await pedir('/api/admin/productos/' + encodeURIComponent(id), {
-            method: 'PATCH', cuerpo: { [campo.dataset.campo]: valor },
-          });
-          Object.assign(p, d.producto);
-          brindis(p.nombre.slice(0, 34) + ': listo');
-        } catch (err) {
-          brindis(err.message, true);
+        propio();
+        const { data, error } = await sb.from('producto')
+          .update({ [campo.dataset.campo]: valor }).eq('id', id).select().maybeSingle();
+        campo.disabled = false;
+        if (error || !data) {
+          brindis(error ? motivo(error) : 'La base no aceptó el cambio', true);
           if (campo.type === 'checkbox') campo.checked = p[campo.dataset.campo];
           else campo.value = p[campo.dataset.campo];
-        } finally {
-          campo.disabled = false;
+          return;
         }
+        Object.assign(p, data);
+        brindis(p.nombre.slice(0, 34) + ': listo');
       };
       if (campo.type === 'checkbox') campo.addEventListener('change', guardar);
       else {
@@ -545,12 +555,12 @@ function hojaProductos(hoja) {
     });
     tr.querySelector('[data-borrar]').addEventListener('click', async () => {
       if (!confirm('¿Borrar "' + p.nombre + '"?\n\nNo se puede deshacer. Si sólo querés sacarlo de la tienda, apagá "Visible".')) return;
-      try {
-        await pedir('/api/admin/productos/' + encodeURIComponent(id), { method: 'DELETE' });
-        estado.productos = estado.productos.filter((x) => x.id !== id);
-        hojaProductos(hoja);
-        brindis('Borrado');
-      } catch (err) { brindis(err.message, true); }
+      propio();
+      const { error } = await sb.from('producto').delete().eq('id', id);
+      if (error) return brindis(motivo(error), true);
+      estado.productos = estado.productos.filter((x) => x.id !== id);
+      hojaProductos(hoja);
+      brindis('Borrado');
     });
   });
 }
@@ -644,11 +654,22 @@ function pintarModal() {
     const err = $('#err', velo);
     const boton = velo.querySelector('button[type=submit]');
     const antes = $('#m-antes', velo).value;
+    const img = $('#m-img', velo).value.trim();
+
+    // Las imágenes son rutas del propio sitio. Una URL que apunte afuera
+    // convertiría el panel en una forma de incrustar contenido de terceros.
+    if (img && (!img.startsWith('/') || img.startsWith('//') || img.includes('..'))) {
+      err.className = 'aviso mal ancho';
+      err.textContent = 'La imagen tiene que ser una ruta del sitio, como /assets/catalogo/foto.webp';
+      err.style.display = '';
+      return;
+    }
+
     const datos = {
-      nombre: $('#m-nom', velo).value,
-      coleccion: $('#m-col', velo).value,
+      nombre: $('#m-nom', velo).value.trim(),
+      coleccion: $('#m-col', velo).value.trim(),
       categoria: $('#m-cat', velo).value,
-      img: $('#m-img', velo).value,
+      img,
       precio: Number($('#m-precio', velo).value),
       precio_anterior: antes === '' ? null : Number(antes),
       stock: Number($('#m-stock', velo).value || 0),
@@ -658,27 +679,22 @@ function pintarModal() {
     };
     boton.disabled = true;
     err.style.display = 'none';
-    try {
-      if (esNuevo) {
-        datos.id = $('#m-id', velo).value.trim();
-        const d = await pedir('/api/admin/productos', { cuerpo: datos });
-        estado.productos.push(Object.assign(d.producto, {
-          categoria_nombre: (estado.categorias.find((c) => c.key === d.producto.categoria) || {}).nombre,
-        }));
-        estado.productos.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
-      } else {
-        const d = await pedir('/api/admin/productos/' + encodeURIComponent(p.id), { method: 'PATCH', cuerpo: datos });
-        Object.assign(estado.productos.find((x) => x.id === p.id), d.producto);
-      }
-      cerrar();
-      pintar();
-      brindis(esNuevo ? 'Producto creado' : 'Guardado');
-    } catch (ex) {
+    propio();
+
+    const r = esNuevo
+      ? await sb.from('producto').insert(Object.assign({ id: $('#m-id', velo).value.trim() }, datos)).select().maybeSingle()
+      : await sb.from('producto').update(datos).eq('id', p.id).select().maybeSingle();
+
+    if (r.error || !r.data) {
       err.className = 'aviso mal ancho';
-      err.textContent = ex.message;
+      err.textContent = r.error ? motivo(r.error) : 'La base no aceptó el cambio: esta cuenta no es el admin.';
       err.style.display = '';
       boton.disabled = false;
+      return;
     }
+    cerrar();
+    await cargar();
+    brindis(esNuevo ? 'Producto creado' : 'Guardado');
   });
 }
 
@@ -725,7 +741,6 @@ function hojaNuevos(hoja) {
   let ids = enCarrusel.map((p) => p.id);
   const original = ids.join(',');
   const refrescar = () => {
-    // Reescribimos nuevo_orden en memoria y volvemos a pintar la hoja.
     estado.productos.forEach((p) => {
       const i = ids.indexOf(p.id);
       p.nuevo_orden = i >= 0 ? i + 1 : null;
@@ -743,9 +758,7 @@ function hojaNuevos(hoja) {
     li.querySelector('[data-baja]').addEventListener('click', () => {
       [ids[i + 1], ids[i]] = [ids[i], ids[i + 1]]; refrescar();
     });
-    li.querySelector('[data-saca]').addEventListener('click', () => {
-      ids.splice(i, 1); refrescar();
-    });
+    li.querySelector('[data-saca]').addEventListener('click', () => { ids.splice(i, 1); refrescar(); });
   });
 
   $('#agregar').addEventListener('change', (e) => {
@@ -757,14 +770,17 @@ function hojaNuevos(hoja) {
 
   $('#guardar-orden').addEventListener('click', async (e) => {
     e.target.disabled = true;
-    try {
-      await pedir('/api/admin/nuevos', { method: 'PUT', cuerpo: { ids } });
-      brindis('Orden guardado');
-      await cargar();
-    } catch (err) {
-      brindis(err.message, true);
+    propio();
+    // Por función y no con dos UPDATE: adentro es una sola transacción, así
+    // el carrusel no queda vacío en el medio para quien esté en la tienda.
+    const { error } = await sb.rpc('guardar_nuevos', { ids });
+    if (error) {
+      brindis(motivo(error), true);
       e.target.disabled = false;
+      return;
     }
+    brindis('Orden guardado');
+    await cargar();
   });
 }
 
@@ -797,7 +813,7 @@ function hojaCategorias(hoja) {
               <input class="num" style="width:68px" type="number" value="${c.orden}" data-campo="orden">
             </td>
             <td><div class="acciones">
-              <button class="icono peligro" data-borrar title="Borrar" ${Number(c.productos) ? 'disabled' : ''}>✕</button>
+              <button class="icono peligro" data-borrar title="Borrar" ${c.productos ? 'disabled' : ''}>✕</button>
             </div></td>
           </tr>`).join('')}
         </tbody>
@@ -812,25 +828,27 @@ function hojaCategorias(hoja) {
       const guardar = async () => {
         const valor = campo.type === 'number' ? Number(campo.value) : campo.value;
         if (String(valor) === String(c[campo.dataset.campo])) return;
-        try {
-          const d = await pedir('/api/admin/categorias/' + key, {
-            method: 'PATCH', cuerpo: { [campo.dataset.campo]: valor },
-          });
-          Object.assign(c, d.categoria);
-          brindis('Guardado');
-        } catch (err) { brindis(err.message, true); campo.value = c[campo.dataset.campo]; }
+        propio();
+        const { data, error } = await sb.from('categoria')
+          .update({ [campo.dataset.campo]: valor }).eq('key', key).select().maybeSingle();
+        if (error || !data) {
+          brindis(error ? motivo(error) : 'La base no aceptó el cambio', true);
+          campo.value = c[campo.dataset.campo];
+          return;
+        }
+        Object.assign(c, data);
+        brindis('Guardado');
       };
       campo.addEventListener('blur', guardar);
       campo.addEventListener('keydown', (e) => { if (e.key === 'Enter') campo.blur(); });
     });
-    const borrar = tr.querySelector('[data-borrar]');
-    borrar.addEventListener('click', async () => {
+    tr.querySelector('[data-borrar]').addEventListener('click', async () => {
       if (!confirm('¿Borrar la categoría "' + c.nombre + '"?')) return;
-      try {
-        await pedir('/api/admin/categorias/' + key, { method: 'DELETE' });
-        await cargar();
-        brindis('Borrada');
-      } catch (err) { brindis(err.message, true); }
+      propio();
+      const { error } = await sb.from('categoria').delete().eq('key', key);
+      if (error) return brindis(motivo(error), true);
+      await cargar();
+      brindis('Borrada');
     });
   });
 
@@ -840,11 +858,12 @@ function hojaCategorias(hoja) {
     const key = prompt('Clave para la URL (minúsculas, sin espacios)',
       nombre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
     if (!key) return;
-    try {
-      await pedir('/api/admin/categorias', { cuerpo: { key, nombre, orden: estado.categorias.length + 1 } });
-      await cargar();
-      brindis('Categoría creada');
-    } catch (err) { brindis(err.message, true); }
+    propio();
+    const { error } = await sb.from('categoria')
+      .insert({ key, nombre, orden: estado.categorias.length + 1 });
+    if (error) return brindis(motivo(error), true);
+    await cargar();
+    brindis('Categoría creada');
   });
 }
 
@@ -874,7 +893,7 @@ function hojaHistorial(hoja) {
           const nombre = (m.despues && m.despues.nombre) || (m.antes && m.antes.nombre) || m.registro_id;
           return `<tr>
             <td class="col" style="white-space:nowrap">${esc(fecha(m.creado_en))}</td>
-            <td class="col">${esc(m.usuario || '—')}</td>
+            <td class="col">${esc(m.quien || '—')}</td>
             <td><span class="pildora" style="color:${color};border:1px solid currentColor">${et}</span>
                 <span class="sku">${esc(m.registro_id)}</span></td>
             <td><div class="nom">${esc(nombre)}</div>
@@ -885,48 +904,35 @@ function hojaHistorial(hoja) {
     </div>`;
 }
 
-// ── Usuarios ─────────────────────────────────────────────────────────────
-
-function hojaUsuarios(hoja) {
-  hoja.innerHTML = `
-    <div class="caja">
-      <div class="herramientas"><h2 style="font-size:16px">Usuarios del panel</h2></div>
-      <div style="overflow-x:auto"><table>
-        <thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Último acceso</th></tr></thead>
-        <tbody>
-        ${estado.usuarios.map((u) => `
-          <tr>
-            <td class="sku">${esc(u.usuario)}${u.activo ? '' : ' (inactivo)'}</td>
-            <td>${esc(u.nombre || '—')}</td>
-            <td class="col">${u.rol === 'dueno' ? 'Dueño' : 'Editor'}</td>
-            <td class="col">${esc(fecha(u.ultimo_acceso))}</td>
-          </tr>`).join('')}
-        </tbody></table></div>
-    </div>
-    <p class="ayuda">Los usuarios se crean desde la terminal, para que la contraseña no viaje por el navegador:<br>
-      <code>npm run admin:crear -- nombre-de-usuario</code></p>`;
-}
-
 // ── Arranque ─────────────────────────────────────────────────────────────
 
-try {
-  const d = await pedir('/api/admin/yo');
-  estado.admin = d.admin;
-  escuchar();
-  await cargar();
-} catch (err) {
-  // Un 401 es lo normal: todavía no entraste. Pero antes de mostrar el
-  // formulario preguntamos cómo está la base: si no contesta, mejor decirlo
-  // ahora que dejar que pruebe la contraseña tres veces creyendo que se la
-  // olvidó.
-  let aviso = err.estado === 503 ? err.message : '';
-  if (!aviso) {
-    try {
-      const salud = await (await fetch('/api/salud')).json();
-      if (salud && salud.base !== 'lista') aviso = salud.detalle;
-    } catch (_) { /* si ni eso contesta, el formulario igual sirve */ }
+async function arrancar() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { pintarEntrada(); return; }
+
+  // Esto es sólo para la pantalla. Lo que de verdad impide escribir es RLS:
+  // aunque alguien saltee este if, la base le rechaza cada fila.
+  if (cfg.adminEmail && (session.user.email || '').toLowerCase() !== cfg.adminEmail.toLowerCase()) {
+    await sb.auth.signOut();
+    pintarEntrada('Esta cuenta no tiene acceso al panel.');
+    return;
   }
-  pintarEntrada(aviso);
+
+  estado.sesion = session;
+  escuchar();
+  try {
+    await cargar();
+  } catch (err) {
+    estado.productos = []; estado.categorias = [];
+    pintar();
+    brindis(motivo(err), true);
+  }
+}
+
+if (!listo) {
+  pintarEntrada('Falta configurar rocketcards-config.js (o no cargó supabase-js).');
+} else {
+  arrancar();
 }
 </script>
 </body>

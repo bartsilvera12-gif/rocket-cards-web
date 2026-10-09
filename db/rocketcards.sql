@@ -1,79 +1,97 @@
--- Rocket Cards — esquema (Supabase / Postgres)
+-- Rocket Cards — esquema (Supabase)
 --
---   psql "$DATABASE_URL" -f db/rocketcards.sql
+--   Supabase → SQL Editor → pegar entero → Run
+--   (o: psql "$DATABASE_URL" -f db/rocketcards.sql)
 --
--- También se puede pegar entero en el editor SQL del panel de Supabase: acá
--- no hay ningún comando de psql, así que anda por los dos caminos.
---
+-- Acá no hay comandos de psql, así que anda por los dos caminos.
 -- Es idempotente: se puede volver a correr sin romper nada.
 --
 -- Todo el DDL va en UNA transacción y al final hay un solo
 -- NOTIFY pgrst, 'reload schema'.
 --
--- ── Por qué un esquema propio ───────────────────────────────────────────
--- Nada de esto vive en "public". PostgREST publica "public" por defecto, así
--- que cualquier tabla que pongamos ahí queda al alcance de la clave anónima
--- del proyecto. Acá hay hashes de contraseña y identificadores de sesión: en
--- "public" serían legibles desde internet aunque nosotros nunca usemos la API
--- REST.
+-- ── Cómo funciona ───────────────────────────────────────────────────────
+-- La tienda y el panel hablan directo con Supabase por supabase-js, con la
+-- anon key. No hay servidor propio en el medio. El esquema "rocketcards" se
+-- publica por PostgREST, y lo que protege las cosas es RLS, no el secreto de
+-- la clave: la anon key es pública por diseño, va dentro de la página.
 --
--- Con el esquema "rocketcards" —que no está en la lista de esquemas expuestos
--- de PostgREST— no hace falta RLS para que estas tablas sean inalcanzables
--- por la API: PostgREST directamente no las ve. Nuestro servidor entra por
--- conexión directa, que no pasa por ahí.
---
--- Si alguna vez querés leer "producto" desde supabase-js, no agregues este
--- esquema a la lista de expuestos: hacé una vista en "public" con los campos
--- públicos y ponele RLS.
+-- Entonces todo depende de que las políticas estén bien. La regla de oro acá
+-- es que escribir exige ser el admin de verdad —se verifica contra el email
+-- del JWT, del lado del servidor—, no simplemente "estar autenticado".
 --
 -- ── Por qué no se sobrecarga la base ────────────────────────────────────
--- La tienda no consulta la base. El servidor lee el catálogo una vez con
--- rocketcards.catalogo(), lo guarda en memoria, y sólo vuelve a leer cuando
--- Postgres le avisa por el canal 'rocketcards' (LISTEN/NOTIFY). Mil visitas
--- con el catálogo quieto son cero consultas.
+-- Nadie pregunta cada tantos segundos. La página lee el catálogo una vez al
+-- cargar y después se queda suscrita por Realtime: Supabase le avisa por
+-- websocket cuando una fila cambia, y recién ahí vuelve a leer. Mil personas
+-- mirando la tienda con el catálogo quieto son cero consultas.
 --
--- OJO con la cadena de conexión: el pooler de Supabase en modo transacción
--- (puerto 6543) NO soporta LISTEN/NOTIFY. Hay que usar la conexión directa o
--- el pooler en modo sesión (5432). Ver ADMIN.md.
+-- Para que eso ande, las tablas tienen que estar en la publicación
+-- supabase_realtime, que es lo último que hace este script.
 
 BEGIN;
 
 CREATE SCHEMA IF NOT EXISTS rocketcards;
 
 COMMENT ON SCHEMA rocketcards IS
-  'Datos de la tienda. Fuera de public a propósito: PostgREST no lo publica.';
+  'Catálogo de Rocket Cards. Se publica por PostgREST; lo protege RLS.';
 
 SET LOCAL search_path TO rocketcards, public;
 
 -- ─────────────────────────────────────────────────────────────────────────
--- Rol de la aplicación
+-- Restos de la versión anterior
 -- ─────────────────────────────────────────────────────────────────────────
--- Nace SIN contraseña, así no puede conectarse hasta que le pongas una. Es a
--- propósito: un rol con la contraseña escrita en un archivo del repo es un
--- rol público. Al terminar este script:
---
---   ALTER ROLE rocketcards_app PASSWORD 'la-que-elijas';
---
--- En Supabase el usuario de la cadena de conexión no es "rocketcards_app" a
--- secas: por el pooler va "rocketcards_app.<ref-del-proyecto>". Ver ADMIN.md.
+-- La primera versión de esto traía su propio login, con una tabla de
+-- usuarios y otra de sesiones. Ahora de eso se encarga Supabase Auth, así
+-- que sobran — y en un esquema publicado por PostgREST, una tabla con hashes
+-- de contraseña es justo lo que no querés tener de más.
 
-DO $$
+DROP TABLE IF EXISTS sesion;
+DROP TABLE IF EXISTS admin;
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Quién es el admin
+-- ─────────────────────────────────────────────────────────────────────────
+-- Una sola línea para cambiarlo. Lo usan todas las políticas de escritura.
+--
+-- Verifica el email del JWT, que lo arma el servidor de auth y el navegador
+-- no puede falsificar. Con "to authenticated using (true)" alcanzaría con
+-- que cualquiera se cree una cuenta para poder escribir; esto no.
+--
+-- El rodeo por auth.users es porque en Supabase self-hosted el claim 'email'
+-- a veces no viene en el token. El 'sub' sí viene siempre, así que si falta
+-- el email lo buscamos por id. SECURITY DEFINER porque auth.users no es
+-- legible para anon ni authenticated.
+
+CREATE OR REPLACE FUNCTION rocketcards.es_admin() RETURNS boolean
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = rocketcards, public, pg_temp
+AS $$
+DECLARE
+  correo text;
 BEGIN
-  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'rocketcards_app') THEN
-    CREATE ROLE rocketcards_app LOGIN;
+  correo := nullif(auth.jwt() ->> 'email', '');
+  IF correo IS NULL AND auth.uid() IS NOT NULL THEN
+    SELECT u.email INTO correo FROM auth.users u WHERE u.id = auth.uid();
   END IF;
+  RETURN lower(coalesce(correo, '')) = 'admin@rocketcards.com';
 END
 $$;
+
+REVOKE ALL ON FUNCTION rocketcards.es_admin() FROM public;
+GRANT EXECUTE ON FUNCTION rocketcards.es_admin() TO anon, authenticated, service_role;
+
+COMMENT ON FUNCTION rocketcards.es_admin() IS
+  'true sólo para admin@rocketcards.com. Cambiar el email acá y nada más.';
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- Versión del catálogo
 -- ─────────────────────────────────────────────────────────────────────────
--- Una sola fila. Sube de a uno cada vez que cambia algo que la tienda
--- muestra. El servidor la usa como ETag: si el navegador ya tiene esa
--- versión, le responde 304 sin mirar la base ni mandar el catálogo de nuevo.
+-- Una sola fila, sube de a uno con cada cambio. No es imprescindible para
+-- que la tienda funcione, pero sirve para ver de un vistazo si dos pantallas
+-- están mirando lo mismo, y es lo que muestra el panel arriba a la derecha.
 --
--- El CHECK (id) con DEFAULT true es el truco para que la tabla no pueda tener
--- más de una fila: la clave primaria sólo admite el valor true.
+-- El CHECK (id) con DEFAULT true es el truco para que la tabla no pueda
+-- tener más de una fila: la clave primaria sólo admite el valor true.
 
 CREATE TABLE IF NOT EXISTS version (
   id              boolean     PRIMARY KEY DEFAULT true CHECK (id),
@@ -82,9 +100,6 @@ CREATE TABLE IF NOT EXISTS version (
 );
 
 INSERT INTO version (id) VALUES (true) ON CONFLICT DO NOTHING;
-
-COMMENT ON TABLE version IS
-  'Fila única. Se incrementa una vez por transacción que modifique el catálogo.';
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- Categorías
@@ -141,53 +156,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS producto_nuevo_orden_idx
   ON producto (nuevo_orden) WHERE nuevo_orden IS NOT NULL;
 
 COMMENT ON COLUMN producto.precio_anterior IS
-  'Precio tachado. Si está, el producto sale en Ofertas y se calcula el % de descuento.';
+  'Precio tachado. Si está, se calcula el % de descuento.';
 COMMENT ON COLUMN producto.nuevo_orden IS
   'Posición en el carrusel "Nuevos ingresos". NULL = no aparece.';
 
 -- ─────────────────────────────────────────────────────────────────────────
--- Administradores y sesiones
--- ─────────────────────────────────────────────────────────────────────────
--- El hash lo calcula el servidor con scrypt (nativo de Node, sin
--- dependencias) y se guarda como "scrypt$N$r$p$salt$hash". Acá nunca entra
--- una contraseña en claro.
---
--- Estas dos tablas son la razón principal por la que nada de esto vive en
--- "public": ver el comentario del encabezado.
-
-CREATE TABLE IF NOT EXISTS admin (
-  id              integer     GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  usuario         text        NOT NULL UNIQUE
-                              CHECK (usuario = lower(usuario) AND length(usuario) >= 3),
-  hash            text        NOT NULL,
-  nombre          text        NOT NULL DEFAULT '',
-  rol             text        NOT NULL DEFAULT 'editor'
-                              CHECK (rol IN ('dueno', 'editor')),
-  activo          boolean     NOT NULL DEFAULT true,
-  creado_en       timestamptz NOT NULL DEFAULT now(),
-  ultimo_acceso   timestamptz
-);
-
-COMMENT ON COLUMN admin.rol IS
-  'dueno: puede todo, incluso administrar usuarios. editor: sólo catálogo.';
-
-CREATE TABLE IF NOT EXISTS sesion (
-  id          text        PRIMARY KEY,          -- 32 bytes al azar, en hex
-  admin_id    integer     NOT NULL REFERENCES admin (id) ON DELETE CASCADE,
-  creado_en   timestamptz NOT NULL DEFAULT now(),
-  expira_en   timestamptz NOT NULL,
-  ip          inet,
-  agente      text
-);
-
-CREATE INDEX IF NOT EXISTS sesion_expira_idx ON sesion (expira_en);
-
--- ─────────────────────────────────────────────────────────────────────────
 -- Auditoría
 -- ─────────────────────────────────────────────────────────────────────────
--- Quién tocó qué. El servidor declara quién está logueado con
--- set_config('rocketcards.admin', ...) antes de escribir; si no lo declara,
--- queda NULL y se ve igual que el cambio pasó.
+-- Quién tocó qué. El autor sale del JWT, no de algo que mande el navegador.
 
 CREATE TABLE IF NOT EXISTS auditoria (
   id          bigint      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -196,58 +172,15 @@ CREATE TABLE IF NOT EXISTS auditoria (
   accion      text        NOT NULL CHECK (accion IN ('alta', 'cambio', 'baja')),
   antes       jsonb,
   despues     jsonb,
-  admin_id    integer     REFERENCES admin (id) ON DELETE SET NULL,
+  quien       text,
   creado_en   timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS auditoria_creado_idx ON auditoria (creado_en DESC);
-CREATE INDEX IF NOT EXISTS auditoria_registro_idx ON auditoria (tabla, registro_id);
 
 -- ─────────────────────────────────────────────────────────────────────────
--- El aviso: un solo NOTIFY por transacción
+-- Triggers
 -- ─────────────────────────────────────────────────────────────────────────
--- Si el admin corrige el stock de cuarenta productos en una sola operación,
--- esto manda UN aviso, no cuarenta. La marca se guarda con set_config(...,
--- true): ese "true" la hace local a la transacción, así que se borra sola al
--- terminar, haya COMMIT o ROLLBACK.
---
--- El NOTIFY viaja recién en el COMMIT, así que el que escucha nunca ve un
--- cambio que después se revirtió.
---
--- Nada que ver con el NOTIFY a 'pgrst' del final: ese avisa que cambió la
--- FORMA de la base y lo escucha PostgREST. Éste avisa que cambió el
--- CONTENIDO del catálogo y lo escucha nuestro servidor.
-
-CREATE OR REPLACE FUNCTION rocketcards.avisar_cambio() RETURNS trigger
-LANGUAGE plpgsql
-SET search_path = rocketcards, pg_temp
-AS $$
-DECLARE
-  v bigint;
-BEGIN
-  IF current_setting('rocketcards.avisado', true) = txid_current()::text THEN
-    RETURN NULL;                      -- ya avisamos en esta transacción
-  END IF;
-  PERFORM set_config('rocketcards.avisado', txid_current()::text, true);
-
-  UPDATE version
-     SET version = version + 1, actualizado_en = now()
-   WHERE id
-  RETURNING version INTO v;
-
-  PERFORM pg_notify('rocketcards', json_build_object(
-    'tipo',    'recargar',
-    'version', v,
-    'tabla',   TG_TABLE_NAME,
-    'en',      to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
-  )::text);
-
-  RETURN NULL;
-END
-$$;
-
-COMMENT ON FUNCTION rocketcards.avisar_cambio() IS
-  'Sube version y manda un NOTIFY por el canal rocketcards. Una vez por transacción.';
 
 CREATE OR REPLACE FUNCTION rocketcards.marcar_fecha() RETURNS trigger
 LANGUAGE plpgsql
@@ -259,36 +192,53 @@ BEGIN
 END
 $$;
 
--- La auditoría sí es por fila: interesa el detalle de cada uno. El nombre de
--- la columna clave llega como argumento del trigger, porque no es el mismo en
--- las dos tablas: producto.id y categoria.key.
-CREATE OR REPLACE FUNCTION rocketcards.auditar() RETURNS trigger
-LANGUAGE plpgsql
+-- Sube la versión una sola vez por transacción, aunque se toquen cien filas.
+-- La marca se guarda con set_config(..., true): ese "true" la hace local a
+-- la transacción, así que se borra sola al terminar, haya COMMIT o ROLLBACK.
+CREATE OR REPLACE FUNCTION rocketcards.subir_version() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = rocketcards, pg_temp
 AS $$
+BEGIN
+  IF current_setting('rocketcards.contado', true) = txid_current()::text THEN
+    RETURN NULL;
+  END IF;
+  PERFORM set_config('rocketcards.contado', txid_current()::text, true);
+  UPDATE version SET version = version + 1, actualizado_en = now() WHERE id;
+  RETURN NULL;
+END
+$$;
+
+-- La auditoría sí es por fila: interesa el detalle de cada uno. El nombre de
+-- la columna clave llega como argumento, porque no es el mismo en las dos
+-- tablas: producto.id y categoria.key.
+CREATE OR REPLACE FUNCTION rocketcards.auditar() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = rocketcards, public, pg_temp
+AS $$
 DECLARE
-  quien  integer := nullif(current_setting('rocketcards.admin', true), '')::integer;
-  clave  text    := TG_ARGV[0];
-  nuevo  jsonb   := to_jsonb(NEW);
-  viejo  jsonb   := to_jsonb(OLD);
+  clave text  := TG_ARGV[0];
+  nuevo jsonb := to_jsonb(NEW);
+  viejo jsonb := to_jsonb(OLD);
+  autor text  := coalesce(auth.jwt() ->> 'email', auth.uid()::text, 'desconocido');
 BEGIN
   IF TG_OP = 'INSERT' THEN
-    INSERT INTO auditoria (tabla, registro_id, accion, despues, admin_id)
-    VALUES (TG_TABLE_NAME, nuevo ->> clave, 'alta', nuevo, quien);
+    INSERT INTO auditoria (tabla, registro_id, accion, despues, quien)
+    VALUES (TG_TABLE_NAME, nuevo ->> clave, 'alta', nuevo, autor);
     RETURN NEW;
   ELSIF TG_OP = 'UPDATE' THEN
-    -- Un UPDATE que no cambió nada no es noticia. Hay que sacar
-    -- actualizado_en de la comparación: el trigger de fecha ya lo movió, así
-    -- que si no lo quitamos las dos filas nunca son iguales.
+    -- Hay que sacar actualizado_en de la comparación: el trigger de fecha ya
+    -- lo movió, así que si no lo quitamos las dos filas nunca son iguales y
+    -- un UPDATE que no cambió nada entraría igual al historial.
     IF (nuevo - 'actualizado_en') = (viejo - 'actualizado_en') THEN
       RETURN NEW;
     END IF;
-    INSERT INTO auditoria (tabla, registro_id, accion, antes, despues, admin_id)
-    VALUES (TG_TABLE_NAME, nuevo ->> clave, 'cambio', viejo, nuevo, quien);
+    INSERT INTO auditoria (tabla, registro_id, accion, antes, despues, quien)
+    VALUES (TG_TABLE_NAME, nuevo ->> clave, 'cambio', viejo, nuevo, autor);
     RETURN NEW;
   ELSE
-    INSERT INTO auditoria (tabla, registro_id, accion, antes, admin_id)
-    VALUES (TG_TABLE_NAME, viejo ->> clave, 'baja', viejo, quien);
+    INSERT INTO auditoria (tabla, registro_id, accion, antes, quien)
+    VALUES (TG_TABLE_NAME, viejo ->> clave, 'baja', viejo, autor);
     RETURN OLD;
   END IF;
 END
@@ -299,43 +249,41 @@ $$;
 -- instante sin su trigger para nadie más.
 
 DROP TRIGGER IF EXISTS producto_fecha ON producto;
-CREATE TRIGGER producto_fecha
-  BEFORE UPDATE ON producto
+CREATE TRIGGER producto_fecha BEFORE UPDATE ON producto
   FOR EACH ROW EXECUTE FUNCTION rocketcards.marcar_fecha();
 
 DROP TRIGGER IF EXISTS categoria_fecha ON categoria;
-CREATE TRIGGER categoria_fecha
-  BEFORE UPDATE ON categoria
+CREATE TRIGGER categoria_fecha BEFORE UPDATE ON categoria
   FOR EACH ROW EXECUTE FUNCTION rocketcards.marcar_fecha();
 
 DROP TRIGGER IF EXISTS producto_auditar ON producto;
-CREATE TRIGGER producto_auditar
-  AFTER INSERT OR UPDATE OR DELETE ON producto
+CREATE TRIGGER producto_auditar AFTER INSERT OR UPDATE OR DELETE ON producto
   FOR EACH ROW EXECUTE FUNCTION rocketcards.auditar('id');
 
 DROP TRIGGER IF EXISTS categoria_auditar ON categoria;
-CREATE TRIGGER categoria_auditar
-  AFTER INSERT OR UPDATE OR DELETE ON categoria
+CREATE TRIGGER categoria_auditar AFTER INSERT OR UPDATE OR DELETE ON categoria
   FOR EACH ROW EXECUTE FUNCTION rocketcards.auditar('key');
 
 -- FOR EACH STATEMENT, no FOR EACH ROW: un UPDATE de cien filas entra acá una
 -- sola vez, y la marca de transacción se encarga del resto.
-DROP TRIGGER IF EXISTS producto_avisar ON producto;
-CREATE TRIGGER producto_avisar
-  AFTER INSERT OR UPDATE OR DELETE ON producto
-  FOR EACH STATEMENT EXECUTE FUNCTION rocketcards.avisar_cambio();
+DROP TRIGGER IF EXISTS producto_version ON producto;
+CREATE TRIGGER producto_version AFTER INSERT OR UPDATE OR DELETE ON producto
+  FOR EACH STATEMENT EXECUTE FUNCTION rocketcards.subir_version();
 
-DROP TRIGGER IF EXISTS categoria_avisar ON categoria;
-CREATE TRIGGER categoria_avisar
-  AFTER INSERT OR UPDATE OR DELETE ON categoria
-  FOR EACH STATEMENT EXECUTE FUNCTION rocketcards.avisar_cambio();
+DROP TRIGGER IF EXISTS categoria_version ON categoria;
+CREATE TRIGGER categoria_version AFTER INSERT OR UPDATE OR DELETE ON categoria
+  FOR EACH STATEMENT EXECUTE FUNCTION rocketcards.subir_version();
 
 -- ─────────────────────────────────────────────────────────────────────────
--- El catálogo, en una sola consulta
+-- El catálogo, en una sola llamada
 -- ─────────────────────────────────────────────────────────────────────────
--- Devuelve exactamente lo que la página necesita, ya con los nombres de campo
--- que usa el front. El servidor llama a esto una vez y guarda el resultado;
--- no vuelve hasta que le avisen.
+-- La tienda pide esto y ya: un viaje en vez de tres, y con los nombres de
+-- campo que usa la página, así no hay que traducir nada del lado del
+-- navegador.
+--
+-- SECURITY INVOKER a propósito (es el default): corre con los permisos de
+-- quien llama, así que RLS sigue aplicando y el público sólo ve los
+-- productos publicados.
 
 CREATE OR REPLACE FUNCTION rocketcards.catalogo() RETURNS jsonb
 LANGUAGE sql STABLE
@@ -345,27 +293,17 @@ AS $$
     'version', (SELECT version FROM version WHERE id),
     'categorias', COALESCE((
       SELECT jsonb_agg(jsonb_build_object(
-               'key',      c.key,
-               'name',     c.nombre,
-               'kicker',   c.kicker,
-               'note',     c.nota,
-               'notaMenu', c.nota_menu,
-               'accent',   c.accent,
-               'img',      c.img
+               'key', c.key, 'name', c.nombre, 'kicker', c.kicker,
+               'note', c.nota, 'notaMenu', c.nota_menu,
+               'accent', c.accent, 'img', c.img
              ) ORDER BY c.orden, c.key)
       FROM categoria c
     ), '[]'::jsonb),
     'productos', COALESCE((
       SELECT jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
-               'id',      p.id,
-               'name',    p.nombre,
-               'set',     p.coleccion,
-               'cat',     p.categoria,
-               'img',     p.img,
-               'price',   p.precio,
-               'old',     p.precio_anterior,
-               'stock',   p.stock,
-               'tag',     p.etiqueta,
+               'id', p.id, 'name', p.nombre, 'set', p.coleccion,
+               'cat', p.categoria, 'img', p.img, 'price', p.precio,
+               'old', p.precio_anterior, 'stock', p.stock, 'tag', p.etiqueta,
                'premium', CASE WHEN p.premium THEN true END
              )) ORDER BY p.nombre)
       FROM producto p
@@ -379,118 +317,161 @@ AS $$
   );
 $$;
 
-COMMENT ON FUNCTION rocketcards.catalogo() IS
-  'Todo el catálogo público en un jsonb, con los nombres de campo que usa la página.';
+GRANT EXECUTE ON FUNCTION rocketcards.catalogo() TO anon, authenticated, service_role;
 
 -- ─────────────────────────────────────────────────────────────────────────
--- Limpieza de sesiones vencidas
+-- Reordenar "Nuevos ingresos" de una sola vez
 -- ─────────────────────────────────────────────────────────────────────────
--- La llama el servidor una vez por hora. No hace falta pg_cron.
+-- Por PostgREST cada llamada es su propia transacción, así que el panel no
+-- puede hacer "borro el orden y después lo escribo" sin que el carrusel
+-- quede vacío en el medio para quien esté mirando la tienda. Además el
+-- índice único no deja que dos productos compartan posición ni un instante.
+--
+-- Por eso va como función: adentro es una sola transacción, y Realtime manda
+-- un solo aviso en vez de dos.
 
-CREATE OR REPLACE FUNCTION rocketcards.limpiar_sesiones() RETURNS integer
-LANGUAGE plpgsql
-SET search_path = rocketcards, pg_temp
+CREATE OR REPLACE FUNCTION rocketcards.guardar_nuevos(ids text[])
+RETURNS SETOF text
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = rocketcards, public, pg_temp
 AS $$
 DECLARE
-  n integer;
+  tocados integer;
 BEGIN
-  DELETE FROM sesion WHERE expira_en < now();
-  GET DIAGNOSTICS n = ROW_COUNT;
-  RETURN n;
+  IF NOT rocketcards.es_admin() THEN
+    RAISE EXCEPTION 'No autorizado' USING ERRCODE = '42501';
+  END IF;
+  IF array_length(ids, 1) > 12 THEN
+    RAISE EXCEPTION 'El carrusel no lleva más de 12 productos';
+  END IF;
+  IF (SELECT count(DISTINCT x) FROM unnest(ids) x) <> coalesce(array_length(ids, 1), 0) THEN
+    RAISE EXCEPTION 'Hay productos repetidos en la lista';
+  END IF;
+
+  UPDATE producto SET nuevo_orden = NULL WHERE nuevo_orden IS NOT NULL;
+
+  IF coalesce(array_length(ids, 1), 0) > 0 THEN
+    UPDATE producto p SET nuevo_orden = n.orden
+      FROM unnest(ids) WITH ORDINALITY AS n(id, orden)
+     WHERE p.id = n.id;
+    GET DIAGNOSTICS tocados = ROW_COUNT;
+    IF tocados <> array_length(ids, 1) THEN
+      RAISE EXCEPTION 'Alguno de esos productos no existe';
+    END IF;
+  END IF;
+
+  RETURN QUERY SELECT p.id FROM producto p WHERE p.nuevo_orden IS NOT NULL ORDER BY p.nuevo_orden;
 END
 $$;
+
+REVOKE ALL ON FUNCTION rocketcards.guardar_nuevos(text[]) FROM public;
+GRANT EXECUTE ON FUNCTION rocketcards.guardar_nuevos(text[]) TO authenticated;
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- Permisos
 -- ─────────────────────────────────────────────────────────────────────────
--- La aplicación no es dueña de nada: no puede borrar tablas ni cambiar el
--- esquema. Sobre auditoria sólo inserta (vía trigger) y lee; no puede
--- reescribir el historial.
+-- Los GRANT abren la puerta; RLS decide quién pasa. Hacen falta los dos.
 
-GRANT USAGE ON SCHEMA rocketcards TO rocketcards_app;
+GRANT USAGE ON SCHEMA rocketcards TO anon, authenticated, service_role;
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON producto, categoria, admin, sesion TO rocketcards_app;
-GRANT SELECT, INSERT ON auditoria TO rocketcards_app;
-GRANT SELECT, UPDATE ON version TO rocketcards_app;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA rocketcards TO rocketcards_app;
-GRANT EXECUTE ON FUNCTION rocketcards.catalogo(), rocketcards.limpiar_sesiones()
-  TO rocketcards_app;
+GRANT SELECT ON producto, categoria, version TO anon, authenticated;
+GRANT SELECT ON auditoria TO authenticated;
+GRANT INSERT, UPDATE, DELETE ON producto, categoria TO authenticated;
+GRANT INSERT ON auditoria TO authenticated;
+GRANT UPDATE ON version TO authenticated;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA rocketcards TO authenticated;
+GRANT ALL ON ALL TABLES IN SCHEMA rocketcards TO service_role;
 
--- Para las tablas que se agreguen más adelante.
-ALTER DEFAULT PRIVILEGES IN SCHEMA rocketcards
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO rocketcards_app;
-ALTER DEFAULT PRIVILEGES IN SCHEMA rocketcards
-  GRANT USAGE, SELECT ON SEQUENCES TO rocketcards_app;
-
--- Primera barrera: anon y authenticated no tienen ningún privilegio acá.
--- Aunque el esquema esté en la lista de expuestos de PostgREST, sin USAGE
--- sobre el esquema la API responde "permission denied" y no se ve nada.
-DO $$
-BEGIN
-  IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon') THEN
-    REVOKE ALL ON SCHEMA rocketcards FROM anon;
-    REVOKE ALL ON ALL TABLES IN SCHEMA rocketcards FROM anon;
-    REVOKE ALL ON ALL FUNCTIONS IN SCHEMA rocketcards FROM anon;
-  END IF;
-  IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN
-    REVOKE ALL ON SCHEMA rocketcards FROM authenticated;
-    REVOKE ALL ON ALL TABLES IN SCHEMA rocketcards FROM authenticated;
-    REVOKE ALL ON ALL FUNCTIONS IN SCHEMA rocketcards FROM authenticated;
-  END IF;
-END
-$$;
-
--- Segunda barrera: RLS en todas las tablas, con una sola política que deja
--- entrar a rocketcards_app y a nadie más.
+-- ─────────────────────────────────────────────────────────────────────────
+-- RLS
+-- ─────────────────────────────────────────────────────────────────────────
+-- Lo único que separa el catálogo de internet. La anon key está escrita en
+-- la página, así que cualquiera puede hablarle a PostgREST con ella.
 --
--- Los permisos de arriba alcanzan hoy. Esto es para mañana: si alguien algún
--- día corre un "GRANT ALL ... TO anon" —a mano, o copiando una receta de
--- internet para poder leer el catálogo desde supabase-js— los permisos dejan
--- de frenar nada y RLS sigue en pie. Sin política, ningún rol que no sea el
--- dueño de la tabla ve una sola fila.
+-- Escribir exige es_admin(), no "estar autenticado": en una instancia con
+-- registro abierto, cualquiera se crea una cuenta en diez segundos y ya
+-- sería "authenticated".
+
+ALTER TABLE producto  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE categoria ENABLE ROW LEVEL SECURITY;
+ALTER TABLE version   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auditoria ENABLE ROW LEVEL SECURITY;
+
+-- Productos: el público ve los publicados; el admin ve todos.
+DROP POLICY IF EXISTS producto_lectura ON producto;
+CREATE POLICY producto_lectura ON producto
+  FOR SELECT USING (publicado OR rocketcards.es_admin());
+
+DROP POLICY IF EXISTS producto_escritura ON producto;
+CREATE POLICY producto_escritura ON producto
+  FOR ALL TO authenticated
+  USING (rocketcards.es_admin()) WITH CHECK (rocketcards.es_admin());
+
+-- Categorías: lectura pública, escritura sólo del admin.
+DROP POLICY IF EXISTS categoria_lectura ON categoria;
+CREATE POLICY categoria_lectura ON categoria FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS categoria_escritura ON categoria;
+CREATE POLICY categoria_escritura ON categoria
+  FOR ALL TO authenticated
+  USING (rocketcards.es_admin()) WITH CHECK (rocketcards.es_admin());
+
+-- Versión: la lee cualquiera; la sube el trigger, que es SECURITY DEFINER.
+DROP POLICY IF EXISTS version_lectura ON version;
+CREATE POLICY version_lectura ON version FOR SELECT USING (true);
+
+-- Auditoría: sólo el admin la ve. Las filas las pone el trigger.
+DROP POLICY IF EXISTS auditoria_lectura ON auditoria;
+CREATE POLICY auditoria_lectura ON auditoria
+  FOR SELECT TO authenticated USING (rocketcards.es_admin());
+
+COMMIT;
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Realtime
+-- ─────────────────────────────────────────────────────────────────────────
+-- Esto es lo que reemplaza al "avisame cuando cambie": Supabase empuja los
+-- cambios de estas tablas por websocket a quien esté suscrito, y la página
+-- vuelve a leer el catálogo sólo en ese momento.
 --
--- El dueño (postgres) no pasa por RLS: por eso el panel de Supabase y las
--- migraciones siguen funcionando igual.
+-- Fuera de la transacción porque ALTER PUBLICATION falla si la tabla ya está
+-- y no queremos que eso tire abajo todo lo demás.
 
 DO $$
 DECLARE
   t text;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['producto', 'categoria', 'admin', 'sesion', 'auditoria', 'version']
+  IF NOT EXISTS (SELECT FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    RAISE NOTICE 'No existe la publicación supabase_realtime: Realtime no está habilitado en esta instancia.';
+    RETURN;
+  END IF;
+  FOREACH t IN ARRAY ARRAY['producto', 'categoria', 'version']
   LOOP
-    EXECUTE format('ALTER TABLE rocketcards.%I ENABLE ROW LEVEL SECURITY', t);
-    EXECUTE format('DROP POLICY IF EXISTS app_total ON rocketcards.%I', t);
-    EXECUTE format(
-      'CREATE POLICY app_total ON rocketcards.%I FOR ALL TO rocketcards_app USING (true) WITH CHECK (true)',
-      t);
+    IF NOT EXISTS (
+      SELECT FROM pg_publication_tables
+       WHERE pubname = 'supabase_realtime' AND schemaname = 'rocketcards' AND tablename = t
+    ) THEN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE rocketcards.%I', t);
+      RAISE NOTICE 'Realtime: agregada rocketcards.%', t;
+    END IF;
   END LOOP;
 END
 $$;
 
-COMMIT;
-
 -- ─────────────────────────────────────────────────────────────────────────
 -- Avisar a PostgREST
 -- ─────────────────────────────────────────────────────────────────────────
--- PostgREST guarda el esquema en caché: si no se lo decimos, no ve los
--- cambios. Va una sola vez y después del COMMIT, no una por cada DDL: antes
--- del commit los cambios todavía no existen para nadie más, y repetirlo por
--- cada CREATE lo obliga a releer el catálogo entero una vez por línea.
+-- Guarda el esquema en caché: si no se lo decimos, no ve las tablas nuevas.
+-- Una sola vez y después del COMMIT.
 
 NOTIFY pgrst, 'reload schema';
 
--- Nada de comandos de psql aca (los que empiezan con barra invertida): el
--- editor SQL de Supabase manda el archivo al servidor tal cual y la barra le
--- da error de sintaxis. RAISE NOTICE lo entiende el servidor, asi que el
--- mensaje sale igual por los dos caminos.
-
 DO $$
 BEGIN
-  RAISE NOTICE '';
   RAISE NOTICE 'Esquema rocketcards listo.';
   RAISE NOTICE 'Falta:';
-  RAISE NOTICE '  1) ALTER ROLE rocketcards_app PASSWORD ''...'';';
-  RAISE NOTICE '  2) correr db/semilla.sql  (catalogo actual)';
-  RAISE NOTICE '  3) npm run admin:crear -- <usuario> --dueno';
+  RAISE NOTICE '  1) agregar "rocketcards" a Settings -> API -> Exposed schemas';
+  RAISE NOTICE '  2) correr db/semilla.sql';
+  RAISE NOTICE '  3) crear el usuario admin@rocketcards.com en Authentication';
 END
 $$;

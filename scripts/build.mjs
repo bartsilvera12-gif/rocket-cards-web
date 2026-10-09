@@ -21,10 +21,15 @@ const PAGE = 'Rocket Cards - Home.dc.html';
 /** Todo lo que se publica. Si agregás un archivo nuevo, va acá.
  *  (pack-opening/ sigue en el repo pero no se publica: la sección está
  *  desconectada. Para reactivarla, sumarlo acá y volver a poner el script
- *  y el div #rc-pack-slot en la página.) */
+ *  y el div #rc-pack-slot en la página.)
+ *
+ *  db/ no se publica: son los scripts de la base, no los necesita nadie
+ *  que visite el sitio. */
 const INCLUDE = [
   'support.js',           // runtime de la plantilla
   'reveal.js',            // animación de entrada por scroll
+  'admin.html',           // panel, en /admin.html
+  'rocketcards-config.js',// url y anon key de Supabase (la anon key es pública)
   'assets',               // logo, fotos de catálogo y cartas
   'favicon.ico',          // iconos (los genera scripts/favicon.py)
   'favicon.svg',
@@ -57,7 +62,7 @@ async function main() {
   }
 
   // Red de seguridad: que nunca se cuele lo que no debe publicarse.
-  const PROHIBIDO = ['uploads', 'screenshots', '.thumbnail', '.claude', '.env', 'server', 'db', 'admin'];
+  const PROHIBIDO = ['uploads', 'screenshots', '.thumbnail', '.claude', '.env', 'db'];
   const salida = await readdir(DIST);
   const colados = salida.filter((f) => PROHIBIDO.includes(f));
   if (colados.length) {

@@ -1,367 +1,169 @@
 # Panel de administración
 
-Hasta ahora el catálogo estaba escrito a mano dentro de la página. Con esto
-pasa a vivir en Postgres y se edita desde `/admin`, sin tocar código ni volver
-a publicar el sitio.
+El catálogo vive en Supabase y se edita desde `/admin.html`, sin tocar código
+ni volver a publicar el sitio.
+
+No hay servidor propio: la tienda y el panel hablan directo con Supabase por
+`supabase-js`, igual que
+[tienda-aguara-vulka](https://github.com/bartsilvera12-gif/tienda-aguara-vulka).
+Por eso todo esto funciona en Vercel.
 
 ## Por qué no se sobrecarga la base
 
-La tienda **no consulta la base**. Ni una vez por visita.
+Nadie pregunta cada tantos segundos.
 
 ```
-  panel  ──escribe──►  Postgres  ──NOTIFY──►  servidor  ──SSE──►  navegadores
-                                              (caché en
-                                               memoria)
+  panel ──escribe──► Supabase ──Realtime (websocket)──► navegadores abiertos
 ```
 
-1. El servidor lee el catálogo entero **una sola vez** con `rocketcards.catalogo()` y lo
-   guarda en memoria, ya serializado.
-2. Queda escuchando el canal `rocketcards` con `LISTEN`. Mientras nadie edite
-   nada, esa conexión está quieta y no genera carga.
-3. Cuando el panel cambia algo, un trigger sube `rocketcards.version`, manda un
-   `pg_notify`, y recién ahí el servidor vuelve a leer. **Una consulta por
-   edición, no una por visita.**
-4. Los navegadores abiertos reciben el aviso por `/api/eventos` (SSE) y
-   refrescan solos. Tampoco preguntan cada tantos segundos: esperan.
-5. Para el que recarga la página, `/api/catalogo` responde con `ETag`. Si ya
-   tiene la versión actual, recibe un `304` sin cuerpo.
+La página lee el catálogo **una vez** al cargar, con `rocketcards.catalogo()`
+—un viaje, no tres—, y después se queda suscrita. Supabase le avisa por
+websocket cuando una fila cambia, y recién ahí vuelve a leer. Mil personas
+mirando la tienda con el catálogo quieto son **cero consultas**.
 
-Mil personas mirando la tienda durante una hora, con el catálogo quieto, son
-**cero consultas**.
+Para que eso ande, las tablas tienen que estar en la publicación
+`supabase_realtime`; el script las agrega solo.
 
-Tres detalles que hacen que eso funcione de verdad:
+## Lo que de verdad protege los datos
 
-- **Un aviso por transacción, no por fila.** Si corregís el stock de cuarenta
-  productos de una, `rocketcards.avisar_cambio()` manda un solo `NOTIFY`: la primera vez
-  deja una marca local a la transacción y las siguientes salen sin hacer nada.
-- **El `NOTIFY` viaja en el `COMMIT`.** Nadie se entera de un cambio que
-  después se revirtió.
-- **El que escucha tiene conexión propia.** `LISTEN` vive en la sesión, y las
-  del pool se reciclan entre consultas. Si esa conexión se cae, se reconecta
-  con espera creciente y **relee** apenas vuelve, porque mientras estuvo caída
-  pudo perderse un aviso.
+**La anon key es pública.** Va escrita dentro de la página, cualquiera que
+abra el sitio la puede leer y usar contra la API. No es un secreto y no hay
+forma de que lo sea.
+
+Lo que separa el catálogo de internet es **RLS**:
+
+| | anon (cualquiera) | admin@rocketcards.com |
+|---|---|---|
+| Productos publicados | lee | lee |
+| Productos ocultos | no los ve | lee |
+| Escribir cualquier cosa | **no** | sí |
+| Historial de cambios | **no** | lee |
+
+Escribir exige `rocketcards.es_admin()`, que compara el email del JWT —lo
+firma el servidor de auth, el navegador no lo puede falsificar— contra
+`admin@rocketcards.com`.
+
+> **Esto es distinto de lo que hace aguara-vulka**, y a propósito. Allá las
+> políticas dicen `for all to authenticated using (true)`: alcanza con *estar
+> autenticado*. Como el registro está abierto en esa instancia de Supabase,
+> cualquiera se crea una cuenta en diez segundos y ya puede escribir por la
+> API. El chequeo del email que hay en su `admin.html` corre en el navegador:
+> sólo esconde la pantalla, no frena nada. Conviene arreglarlo allá también.
+
+El chequeo de email que hay en nuestro `admin.html` tiene el mismo alcance
+—esconder la pantalla—, pero acá no es lo único: abajo está RLS.
 
 ## Instalación
 
-La base es **Supabase**. Hace falta Node 20.12 o más nuevo y `psql` instalado.
-
-```bash
-npm install
-```
-
 ### 1. Crear el esquema
 
-```bash
-psql "postgresql://postgres.<ref>:CLAVE@aws-0-<region>.pooler.supabase.com:5432/postgres"   -f db/rocketcards.sql
-```
+Supabase → **SQL Editor** → pegar `db/rocketcards.sql` entero → Run.
 
-También se puede pegar en el editor SQL del panel de Supabase: el archivo no
-usa ningún comando de psql, así que anda por los dos caminos. Por `psql` es
-mejor igual —ves los `NOTICE` y el error exacto si algo falla—, pero no es
-obligatorio.
+Crea el esquema `rocketcards`, las tablas, los triggers, las políticas, y
+agrega las tablas a Realtime. Es idempotente: se puede volver a correr.
 
-Todo el DDL va en una sola transacción y termina con
-`NOTIFY pgrst, 'reload schema';`, una vez al final, para que PostgREST relea
-el esquema una sola vez y no una por cada `CREATE`.
+Todo el DDL va en una transacción y termina con
+`NOTIFY pgrst, 'reload schema';`, una vez al final.
 
-El script se puede volver a correr cuantas veces quieras: no borra datos.
+> Si ya habías corrido la versión anterior, el script **borra las tablas
+> `admin` y `sesion`**, que eran del login propio. Ahora de eso se encarga
+> Supabase Auth, y una tabla con hashes de contraseña en un esquema publicado
+> por PostgREST es justo lo que no conviene tener de más.
 
-**Nada vive en `public`.** Todo queda en un esquema `rocketcards`, que no está
-en la lista de esquemas que publica PostgREST. Eso importa: acá hay hashes de
-contraseña y identificadores de sesión, y en `public` serían legibles con la
-clave anónima del proyecto aunque nosotros nunca usemos la API REST. Como
-PostgREST directamente no ve el esquema, no hace falta RLS para taparlo.
+### 2. Exponer el esquema
 
-### Si el esquema quedó expuesto en PostgREST
+Settings → API → **Exposed schemas** → agregar `rocketcards`.
 
-Exponerlo no abre nada por sí solo: `anon` y `authenticated` no tienen ni
-`USAGE` sobre el esquema, así que la API responde `permission denied`.
-Comprobalo:
-
-```sql
-select has_schema_privilege('anon','rocketcards','USAGE')          as anon_usa,
-       has_schema_privilege('authenticated','rocketcards','USAGE') as auth_usa;
-
-select grantee, table_name, privilege_type
-  from information_schema.role_table_grants
- where table_schema = 'rocketcards' and grantee in ('anon','authenticated');
-```
-
-Lo sano es `false, false` y cero filas. Si sale otra cosa, volvé a correr
-`db/rocketcards.sql`: revoca esos permisos.
-
-Encima de eso hay RLS en las seis tablas, con una sola política que deja
-entrar a `rocketcards_app`. Es para el día que alguien corra un
-`GRANT ALL … TO anon` copiando una receta de internet: los permisos dejarían
-de frenar, RLS no.
-
-Aun así, **si no lo necesitás, sacalo de los esquemas expuestos**
-(Settings → API → Exposed schemas). Nada de lo nuestro usa PostgREST. Y si
-alguna vez querés leer `producto` desde `supabase-js`, hacé una vista en
-`public` con los campos públicos y ponele RLS, en vez de exponer el esquema
-entero.
-
-### 2. Ponerle contraseña al rol
-
-```bash
-psql "$DATABASE_URL_ADMIN" -c "ALTER ROLE rocketcards_app PASSWORD 'la-que-elijas'"
-```
-
-El script crea `rocketcards_app` **sin contraseña** a propósito: un rol con la
-clave escrita en un archivo del repo es un rol público. El rol no es dueño de
-nada —no puede tocar el esquema ni reescribir la auditoría—, por eso la app
-no corre como `postgres`.
+Sin esto PostgREST no lo ve y el panel avisa *"PostgREST no ve el esquema"*.
 
 ### 3. Cargar el catálogo actual
 
 ```bash
-npm run db:semilla                        # regenera db/semilla.sql
-psql "$DATABASE_URL" -f db/semilla.sql
+npm run db:semilla
 ```
 
-`db/semilla.sql` sale de los arreglos `CATALOG`, `CATEGORIAS` y `NEW_IDS` que
-todavía están en la página. Es el puente de una sola vez. De ahí en adelante
-la fuente de verdad es la base.
+y pegar `db/semilla.sql` en el SQL Editor. Es el puente de una sola vez: de
+ahí en adelante la fuente de verdad es la base.
 
-### 4. Configurar el servidor
+### 4. Crear el usuario
 
-```bash
-cp .env.ejemplo .env
-```
+Supabase → Authentication → Users → **Add user**, con email
+`admin@rocketcards.com` y la contraseña que elijas. Marcá *auto confirm*.
 
-y completá `DATABASE_URL`. **Tiene que ser conexión directa o pooler en modo
-sesión (puerto 5432).** El pooler en modo transacción (6543) reparte cada
-consulta por una conexión distinta y no soporta `LISTEN/NOTIFY`: con esa
-cadena el servidor arranca igual, pero nunca se entera de los cambios y la
-tienda queda congelada mostrando el catálogo del arranque. Es el error más
-fácil de cometer y el más difícil de ver.
+Ese email está en dos lados y tienen que coincidir:
 
-`.env` está en `.gitignore`.
+- `rocketcards-config.js` → `adminEmail` (para la pantalla)
+- `db/rocketcards.sql` → `es_admin()` (el que manda de verdad)
 
-**No van la anon key ni la URL del proyecto.** Esas son para hablarle a la API
-REST de Supabase (PostgREST) desde el navegador con `supabase-js`. Nuestro
-servidor se conecta directo a Postgres con el protocolo de Postgres, así que
-lo único que necesita es la cadena de conexión. Y nuestras tablas ni siquiera
-están en un esquema que PostgREST publique: la anon key no las alcanzaría
-aunque la usáramos. Lo mismo con la `service_role`, que además nunca debería
-salir del servidor.
+Si querés cambiarlo, cambialo en los dos y volvé a correr el SQL.
 
-La conexión va **cifrada y verificando el certificado** por omisión, sin
-configurar nada: `node-postgres` no cifra solo aunque la cadena diga
-`postgresql://`, y sin eso la contraseña del rol viajaría en claro. Si al
-conectar aparece `self-signed certificate in certificate chain`, bajá el
-certificado desde Settings → Database → SSL y apuntá `DB_SSL_CA` ahí.
+### 5. Listo
 
-### 4b. Comprobar que la conexión sirve
+El panel sale del mismo deploy que la tienda:
 
-```bash
-npm run db:probar
-```
-
-Revisa en orden: que conecte, que vaya cifrada, que el esquema exista, que
-`catalogo()` responda, que haya un usuario del panel, y —la que importa— que
-**LISTEN/NOTIFY funcione**. Con el pooler en modo transacción todo lo demás
-pasa igual y sólo falla esa, que es justo la que hace que la tienda se entere
-de los cambios.
-
-Nunca muestra la contraseña: la cadena sale con la clave tapada.
-
-#### Supabase propio (self-hosted)
-
-Si Supabase corre en tu servidor y lo publicás por un dominio detrás de
-Cloudflare, **el puerto de Postgres no se alcanza desde afuera**: Cloudflare
-proxea HTTP y HTTPS, no TCP cualquiera. La API REST responde, la base no.
-
-Lo más simple es correr este servidor **en la misma máquina que Supabase**, y
-apuntar a la base por la red interna:
-
-```
-DATABASE_URL=postgresql://rocketcards_app:CLAVE@localhost:5432/postgres
-```
-
-o, si va en el mismo `docker compose` que Supabase, por el nombre del servicio
-(`@db:5432`). Si en cambio el servidor va en otro lado, necesitás un nombre
-que llegue directo a la base —un registro DNS sin proxear, con el firewall
-abierto sólo para la IP de ese servidor— o un túnel.
-
-### 5. Crear el primer usuario
-
-```bash
-npm run admin:crear -- admin@rocketcards.com --dueno --nombre "Rocket Cards"
-```
-
-Pide la contraseña por teclado y no la muestra mientras la escribís. No se
-pasa por argumento a propósito: los argumentos quedan en el historial del
-shell y en la lista de procesos de la máquina.
-
-El rol `dueno` puede todo, incluso ver y crear usuarios. `editor` sólo toca el
-catálogo.
-
-**Sólo entra quien esté en `ADMIN_PERMITIDOS`** (por omisión,
-`admin@rocketcards.com`). Es una lista blanca aparte de la tabla: que exista
-la fila en la base no alcanza. Se revisa en el login y también al validar cada
-sesión, así sacar a alguien de la lista lo echa en el acto en vez de esperar a
-que venza su cookie. El script de arriba se niega a crear un usuario que no
-esté en la lista, para no dejarte una cuenta que después no entra.
-
-### 6. Levantar
-
-```bash
-npm run build
-npm start
-```
-
-- Tienda: http://localhost:4000
-- Panel: http://localhost:4000/admin
-
-## Subirlo a producción
-
-**El panel no puede vivir en Vercel.** Si entrás a `tu-sitio.vercel.app/admin`
-te aparece la tienda, no el panel: el archivo ni siquiera se sube (`admin/`
-está en `.vercelignore`) y, aunque se subiera, el panel necesita `/api/...`,
-que necesita un proceso vivo sosteniendo la conexión `LISTEN` contra Postgres
-y los streams SSE. Vercel arranca y mata una función por pedido. Supabase
-tampoco sirve: te da la base, no un lugar donde correr esto.
-
-Hace falta un host donde el proceso quede corriendo. Cualquiera de estos:
-
-### Railway o Render (lo más rápido)
-
-Conectás el repo de GitHub y configurás:
-
-| | |
-|---|---|
-| Build | `npm run build` |
-| Start | `npm start` |
-| Health check | `/api/salud` |
-
-Variables de entorno: `DATABASE_URL` (la de sesión, puerto 5432),
-`ADMIN_PERMITIDOS`, y **`DETRAS_DE_TLS=1`** —estos hosts terminan HTTPS
-adelante, y sin eso la cookie de sesión no se marca como `Secure`—. `PORT` lo
-pone el host solo, no lo toques.
-
-### Fly, Cloud Run o un VPS con Docker
-
-Hay un `Dockerfile` en la raíz, listo para usar:
-
-```bash
-docker build -t rocketcards .
-docker run -p 4000:4000 --env-file .env rocketcards
-```
-
-### Después de desplegar
-
-La tienda y el panel salen del mismo proceso, así que lo más simple es apuntar
-el dominio ahí y dejar de usar el deploy de Vercel:
-
-- Tienda: `https://tu-dominio/`
-- Panel: `https://tu-dominio/admin`
-
-Si preferís dejar la tienda en Vercel y sólo el panel en el otro host, la
-tienda de Vercel va a seguir mostrando el catálogo escrito en la página, no el
-de la base: para que lea la API haría falta CORS y una URL absoluta, que hoy
-no están.
-
-El `npm start` corre el build antes de arrancar (`prestart`), así que nunca
-levanta sin `dist/`.
-
-Lo primero que conviene mirar en el log al levantar:
-
-```
-[db] escuchando rocketcards
-[db] catálogo v1
-```
-
-Si el segundo no vuelve a aparecer cuando editás algo desde el panel, es el
-pooler en modo transacción: cambiá la cadena a la de sesión (puerto 5432).
+- Local: `npm run preview` → http://localhost:4322/admin.html
+- Vercel: `https://tu-sitio.vercel.app/admin.html`
 
 ## El panel
 
 | Pestaña | Qué hace |
 |---|---|
-| **Productos** | Alta, baja y edición. El precio, el stock y el interruptor de visible se guardan al salir del campo, sin abrir nada. |
+| **Productos** | Alta, baja y edición. El precio, el stock y el interruptor de visible se guardan al salir del campo. |
 | **Nuevos ingresos** | El orden del carrusel de la portada, hasta 12 productos. |
 | **Categorías** | Nombre, bajada y orden. La clave sale en la URL y no se cambia desde acá. |
 | **Historial** | Quién cambió qué y cuándo, con el antes y el después de cada campo. |
-| **Usuarios** | Sólo para el dueño. Las contraseñas se ponen desde la terminal. |
 
-Arriba a la derecha hay un indicador:
+Arriba a la derecha:
 
-- **EN VIVO · v12** — conectado, mostrando la versión 12 del catálogo.
-- **NOVEDAD · v13** — alguien más cambió algo mientras estabas escribiendo. La
+- **EN VIVO · v12** — suscrito, mostrando la versión 12 del catálogo.
+- **NOVEDAD** — alguien más cambió algo mientras estabas escribiendo. La
   pantalla no se repinta hasta que soltás el campo, para no sacarte el cursor
   de las manos.
-- **SIN CONEXIÓN** — se cortó el stream. Reconecta solo.
+- **SIN CONEXIÓN** — se cortó el websocket. Reconecta solo.
 
 Si dos personas tienen el panel abierto, los cambios de una aparecen en la
-pantalla de la otra sin recargar.
+pantalla de la otra sin recargar. Y en la tienda también.
 
-## La página sigue andando sin servidor
+### Reordenar el carrusel
+
+Va por una función (`rocketcards.guardar_nuevos`) y no con dos `UPDATE`
+sueltos. Por PostgREST cada llamada es su propia transacción, así que "borro
+el orden y después lo escribo" dejaría el carrusel vacío un instante para
+quien esté mirando la tienda. Dentro de la función es una sola transacción, y
+Realtime manda un aviso en vez de dos.
+
+## La página sigue andando sin Supabase
 
 El catálogo escrito dentro de `Rocket Cards - Home.dc.html` **no se borró**.
-Al cargar, la página pide `/api/catalogo`:
+Es lo que se ve mientras llega el de la base, y lo que queda si Supabase no
+contesta. Nadie ve una tienda vacía por un problema de red.
 
-- Si hay servidor, lo reemplaza por el de la base y se queda escuchando.
-- Si no (el sitio estático de Vercel, donde esa ruta devuelve el propio
-  `index.html` por el fallback de rutas), se queda con el que ya tenía y ni
-  abre el stream. No hay errores en la consola ni nada roto.
-
-Así que hoy conviven dos despliegues:
-
-| | Vercel (hoy) | Servidor con base |
-|---|---|---|
-| Catálogo | el del HTML | Postgres |
-| Para cambiar un precio | editar y publicar | el panel |
-| Panel | no hay | `/admin` |
-
-Vercel corre funciones que arrancan y mueren con cada pedido, así que no puede
-sostener un `LISTEN` ni un stream SSE abierto. Supabase tampoco: te da la base,
-no un proceso. El servidor va en un host donde quede corriendo —Railway,
-Render, Fly, un VPS—. La tienda puede seguir en Vercel apuntando a esa API, o
-servirse del mismo proceso, que es lo que hace `npm start`.
-
-## Seguridad
-
-- Contraseñas con **scrypt** (nativo de Node), nunca en claro ni en la base ni
-  en los logs.
-- Sesiones en la base, cookie `HttpOnly` + `SameSite=Lax`, 12 horas con
-  renovación. Con `DETRAS_DE_TLS=1` la cookie va además como `Secure`.
-- Todo lo que escribe exige la cabecera `X-Rocket-Admin: 1`, que un formulario
-  de otro sitio no puede poner sin preflight. Eso más `SameSite=Lax` cierra el
-  CSRF.
-- Diez intentos fallidos por IP y usuario cada 15 minutos. El contador vive en
-  memoria: escribir en la base en cada intento fallido es justo lo que busca
-  quien prueba contraseñas en masa.
-- El login tarda lo mismo con un usuario que no existe que con una contraseña
-  incorrecta, así nadie puede averiguar qué usuarios hay.
-- Las rutas de imagen tienen que ser del propio sitio. Si no, el panel sería
-  una forma de incrustar contenido de terceros en la tienda.
-- El rol `rocketcards_app` no es dueño de nada: no puede borrar tablas ni
-  cambiar el esquema, y sobre `auditoria` sólo puede insertar y leer, no
-  reescribir el historial.
-- Al panel sólo entra quien esté en `ADMIN_PERMITIDOS`, además de tener fila
-  en la tabla `admin`.
-- Todo fuera de `public`, así PostgREST no lo publica. Además el script le
-  revoca explícitamente los permisos a `anon` y `authenticated`, por si
-  alguien agrega el esquema a la lista de expuestos sin leer la advertencia.
-- `/admin` responde con `X-Robots-Tag: noindex, nofollow`.
+También es la red para un error de configuración: si falta exponer el
+esquema, o la anon key está mal, la tienda se ve igual. El que avisa es el
+panel.
 
 ## Qué queda afuera
 
-Lo probé con un servidor de prueba que habla el mismo contrato, pero **no pude
-correrlo contra Postgres**: en esta máquina no hay ni `psql` ni Docker. Antes
-de ponerlo en producción hay que hacer el recorrido completo una vez —esquema,
-semilla, usuario, y editar un producto con la tienda abierta en otra pestaña—,
-que es justo donde saldría cualquier error de tipeo del SQL.
+Probé contra tu Supabase real que el panel carga, que `supabase-js` y la
+config se enganchan, que el login llega al servidor de auth y traduce bien el
+error, y que la tienda cae a su catálogo propio cuando la API responde
+`permission denied`.
 
-Lo primero que conviene comprobar es que el `LISTEN` ande con la cadena de
-conexión que elegiste: editá algo desde el panel y mirá si el log del servidor
-imprime `[db] catálogo v…`. Si no aparece, es el pooler en modo transacción.
+Lo que **no** pude probar, porque hace falta correr el SQL nuevo y crear el
+usuario —y no voy a crear cuentas en tu Supabase—:
+
+- entrar al panel y editar de verdad;
+- que las políticas dejen pasar al admin y frenen a los demás;
+- que Realtime empuje los cambios a la tienda.
+
+Después del paso 4: entrá al panel, cambiá un precio con la tienda abierta en
+otra pestaña, y fijate si cambia sola. Si algo falla, el panel dice el motivo
+en vez de quedarse mudo.
 
 Tampoco hay todavía:
 
 - Subida de imágenes desde el panel: las fotos se siguen subiendo a `assets/`
-  con el repo, y en el panel se escribe la ruta.
-- Pedidos ni carrito del lado del servidor: el carrito sigue siendo del
-  navegador y el cierre es por WhatsApp.
-- Backups. Un `pg_dump` diario a otro disco es lo mínimo.
+  con el repo, y en el panel se escribe la ruta. (Supabase Storage sería el
+  paso siguiente.)
+- Pedidos del lado del servidor: el carrito sigue siendo del navegador y el
+  cierre es por WhatsApp.
