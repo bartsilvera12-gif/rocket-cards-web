@@ -30,7 +30,14 @@ DirectoryIndex index.html
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
-  # Todo lo demás lo resuelve el router del cliente.
+  # Las rutas sin extensión las resuelve el router del cliente.
+  #
+  # Lo de la extensión importa: sin esa condición, pedir una foto que no
+  # existe devuelve la página entera con código 200 en vez de un 404. El
+  # navegador muestra la imagen rota igual, pero un módulo JS que falte da
+  # un error de MIME incomprensible en vez de decir que no está, y los
+  # buscadores terminan indexando la home bajo mil URLs inventadas.
+  RewriteCond %{REQUEST_URI} !\.[a-zA-Z0-9]{1,8}$
   RewriteRule ^ index.html [L]
 </IfModule>
 
