@@ -87,7 +87,7 @@
   input::placeholder, textarea::placeholder { color: #A99E84; }
   /* El campo que el formulario rechazó: borde rojo hasta que se vuelve a guardar. */
   .con-error, .con-error:focus { border-color: var(--rojo) !important; box-shadow: 0 0 0 3px rgba(200,16,46,.18) !important; }
-  input[type=number] { font-family: var(--mono); }
+  input[type=number], input.gs { font-family: var(--mono); font-variant-numeric: tabular-nums; }
   label { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .14em;
           text-transform: uppercase; color: var(--suave); font-weight: 500; margin-bottom: 5px; }
   .btn {
@@ -279,6 +279,30 @@ const esc = (s) => String(s == null ? '' : s)
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
 const gs = (n) => 'Gs. ' + Number(n || 0).toLocaleString('es-PY');
+
+// Precios con divisor de miles: se ven «120.000» y se guardan como 120000.
+// Los guaraníes no tienen decimales, así que el punto es siempre de miles y
+// cualquier cosa que no sea un dígito se descarta.
+const digitos = (v) => String(v == null ? '' : v).replace(/\D/g, '');
+const miles = (v) => {
+  const d = digitos(v).replace(/^0+(?=\d)/, '');
+  return d.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+};
+
+// Al escribir en un campo de precio, se reacomodan los puntos sin que el
+// cursor salte al final: se cuenta cuántos dígitos había antes del cursor y
+// se lo vuelve a poner después de esa misma cantidad.
+document.addEventListener('input', (e) => {
+  const c = e.target;
+  if (!c.classList || !c.classList.contains('gs')) return;
+  const antesDelCursor = digitos(c.value.slice(0, c.selectionStart || 0)).length;
+  const nuevo = miles(c.value);
+  if (nuevo === c.value) return;
+  c.value = nuevo;
+  let pos = 0, vistos = 0;
+  while (pos < nuevo.length && vistos < antesDelCursor) { if (/\d/.test(nuevo[pos])) vistos++; pos++; }
+  c.setSelectionRange(pos, pos);
+});
 const fecha = (s) => s ? new Date(s).toLocaleString('es-PY', { dateStyle: 'short', timeStyle: 'short' }) : '—';
 
 function brindis(texto, mal) {
@@ -596,7 +620,7 @@ function hojaProductos(hoja) {
             </td>
             <td class="ocultar-chico col">${esc(p.categoria_nombre || p.categoria)}</td>
             <td style="text-align:right">
-              <input class="num" type="number" min="0" step="1" value="${p.precio}" data-campo="precio">
+              <input class="num gs" type="text" inputmode="numeric" autocomplete="off" value="${miles(p.precio)}" data-campo="precio">
               ${p.precio_anterior ? `<div class="col" style="text-align:right">antes ${gs(p.precio_anterior)}</div>` : ''}
             </td>
             <td style="text-align:right">
@@ -633,7 +657,8 @@ function hojaProductos(hoja) {
 
     tr.querySelectorAll('input[data-campo]').forEach((campo) => {
       const guardar = async () => {
-        const valor = campo.type === 'checkbox' ? campo.checked : Number(campo.value);
+        const valor = campo.type === 'checkbox' ? campo.checked
+          : campo.classList.contains('gs') ? Number(digitos(campo.value)) : Number(campo.value);
         if (valor === p[campo.dataset.campo]) return;
         campo.disabled = true;
         propio();
@@ -643,7 +668,7 @@ function hojaProductos(hoja) {
         if (error || !data) {
           brindis(error ? motivo(error) : 'La base no aceptó el cambio', true);
           if (campo.type === 'checkbox') campo.checked = p[campo.dataset.campo];
-          else campo.value = p[campo.dataset.campo];
+          else campo.value = campo.classList.contains('gs') ? miles(p[campo.dataset.campo]) : p[campo.dataset.campo];
           return;
         }
         Object.assign(p, data);
@@ -853,8 +878,14 @@ function pintarModal() {
         <div id="err" class="ancho" style="display:none"></div>
         <div>
           <label for="m-id">SKU</label>
-          <input id="m-id" type="text" value="${esc(p.id || '')}" ${esNuevo ? 'required' : 'disabled'}>
-          <div class="ayuda">${esNuevo ? 'Se muestra en el buscador. Ej: SV-PIKA-238' : 'No se puede cambiar.'}</div>
+          ${esNuevo ? `
+          <div class="fila" style="gap:6px">
+            <input id="m-id" type="text" required autocomplete="off" spellcheck="false">
+            <button type="button" class="icono" id="m-otro-sku" title="Generar otro SKU" aria-label="Generar otro SKU" style="padding:9px 11px">↻</button>
+          </div>
+          <div class="ayuda">Se genera solo según la categoría. Podés cambiarlo.</div>` : `
+          <input id="m-id" type="text" value="${esc(p.id || '')}" disabled>
+          <div class="ayuda">No se puede cambiar.</div>`}
         </div>
         <div>
           <label for="m-cat">Categoría</label>
@@ -887,11 +918,11 @@ function pintarModal() {
         </div>
         <div>
           <label for="m-precio">Precio (Gs.)</label>
-          <input id="m-precio" type="number" min="0" step="1" value="${p.precio ?? ''}" required>
+          <input id="m-precio" class="gs" type="text" inputmode="numeric" autocomplete="off" value="${p.precio != null ? miles(p.precio) : ''}" placeholder="120.000" required>
         </div>
         <div>
           <label for="m-antes">Precio anterior</label>
-          <input id="m-antes" type="number" min="0" step="1" value="${p.precio_anterior ?? ''}" placeholder="vacío = sin oferta">
+          <input id="m-antes" class="gs" type="text" inputmode="numeric" autocomplete="off" value="${p.precio_anterior != null ? miles(p.precio_anterior) : ''}" placeholder="vacío = sin oferta">
         </div>
         <div>
           <label for="m-stock">Stock</label>
@@ -919,6 +950,32 @@ function pintarModal() {
       </footer>
     </form>`;
   document.body.append(velo);
+
+  // ── SKU automático ──
+  // Prefijo de la categoría + 4 caracteres al azar, sin los que se confunden
+  // al leerlos (0/O, 1/I/L). Se rehace al cambiar la categoría, hasta que
+  // alguien lo edite a mano.
+  if (esNuevo) {
+    const campoSku = $('#m-id', velo);
+    const campoCat = $('#m-cat', velo);
+    const LETRAS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    let aMano = false;
+    const generar = () => {
+      const prefijo = (campoCat.value || 'PRD').replace(/[^a-z0-9]/gi, '').slice(0, 3).toUpperCase() || 'PRD';
+      const usados = new Set(estado.productos.map((x) => x.id.toUpperCase()));
+      let sku;
+      do {
+        const azar = crypto.getRandomValues(new Uint32Array(4));
+        sku = prefijo + '-' + [...azar].map((n) => LETRAS[n % LETRAS.length]).join('');
+      } while (usados.has(sku));
+      campoSku.value = sku;
+      campoSku.classList.remove('con-error');
+    };
+    generar();
+    campoSku.addEventListener('input', () => { aMano = true; });
+    campoCat.addEventListener('change', () => { if (!aMano) generar(); });
+    $('#m-otro-sku', velo).addEventListener('click', () => { aMano = false; generar(); });
+  }
 
   // ── Galería ──
   // La lista ordenada de fotos vive acá hasta que se guarda. Un producto
@@ -1031,7 +1088,7 @@ function pintarModal() {
     e.preventDefault();
     const err = $('#err', velo);
     const boton = velo.querySelector('button[type=submit]');
-    const antes = $('#m-antes', velo).value;
+    const antes = digitos($('#m-antes', velo).value);
     if (subiendo) {
       err.className = 'aviso mal ancho';
       err.textContent = 'Esperá a que terminen de subir las fotos.';
@@ -1061,14 +1118,14 @@ function pintarModal() {
     };
     const entero = (v) => v !== '' && /^\d+$/.test(String(v).trim());
     const sku = $('#m-id', velo).value.trim();
-    const precioTxt = $('#m-precio', velo).value;
+    const precioTxt = digitos($('#m-precio', velo).value);
     const stockTxt = $('#m-stock', velo).value || '0';
 
     if (esNuevo && !sku) return fallar('#m-id', 'Falta el SKU.');
     if (esNuevo && !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(sku)) return fallar('#m-id', REGLAS.producto_id_check);
     if (!$('#m-nom', velo).value.trim()) return fallar('#m-nom', REGLAS.producto_nombre_check);
-    if (!entero(precioTxt)) return fallar('#m-precio', 'El precio va en guaraníes, sin puntos ni decimales. Ejemplo: 37500.');
-    if (antes !== '' && !entero(antes)) return fallar('#m-antes', 'El precio anterior va en guaraníes, sin puntos ni decimales.');
+    if (!entero(precioTxt)) return fallar('#m-precio', 'Falta el precio, en guaraníes. Ejemplo: 37.500.');
+    if (antes !== '' && !entero(antes)) return fallar('#m-antes', 'El precio anterior va en guaraníes. Ejemplo: 45.000.');
     if (antes !== '' && Number(antes) <= Number(precioTxt)) return fallar('#m-antes', REGLAS.producto_precio_anterior_check);
     if (!entero(stockTxt)) return fallar('#m-stock', 'El stock tiene que ser un número entero, 0 o más.');
 
@@ -1082,7 +1139,7 @@ function pintarModal() {
       categoria: $('#m-cat', velo).value,
       img,
       imagenes: fotos,
-      precio: Number($('#m-precio', velo).value),
+      precio: Number(precioTxt),
       precio_anterior: antes === '' ? null : Number(antes),
       stock: Number($('#m-stock', velo).value || 0),
       etiqueta: $('#m-tag', velo).value || null,
