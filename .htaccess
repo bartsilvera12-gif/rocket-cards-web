@@ -1,0 +1,79 @@
+# Rocket Cards — configuración de Apache/LiteSpeed (Hostinger).
+#
+# Este archivo se copia a dist/ con el build y termina en public_html/.
+#
+# Lo importante es la reescritura: el sitio tiene URLs reales (/catalogo,
+# /producto/pitch-black-etb) que no corresponden a ningún archivo. Sin esto,
+# entrar directo a /catalogo da 404 — y entrar directo es lo que pasa cuando
+# alguien comparte un link o lo abre desde Google.
+
+Options -Indexes
+DirectoryIndex index.html
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # HTTPS.
+  #
+  # Si todavía no emitiste el certificado en hPanel (Sitios web → SSL),
+  # comentá estas tres líneas: redirigir a https sin certificado deja el
+  # sitio inaccesible. Una vez emitido, descomentalas.
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+  # Un archivo o carpeta que existe de verdad se sirve tal cual. Esto cubre
+  # /admin.html, /support.js, /assets/... y hay que dejarlo ANTES de la
+  # regla de abajo, que si no se traga todo.
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Las rutas sin extensión las resuelve el router del cliente.
+  #
+  # Lo de la extensión importa: sin esa condición, pedir una foto que no
+  # existe devuelve la página entera con código 200 en vez de un 404. El
+  # navegador muestra la imagen rota igual, pero un módulo JS que falte da
+  # un error de MIME incomprensible en vez de decir que no está, y los
+  # buscadores terminan indexando la home bajo mil URLs inventadas.
+  RewriteCond %{REQUEST_URI} !\.[a-zA-Z0-9]{1,8}$
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set X-Frame-Options "SAMEORIGIN"
+
+  # Las fotos casi no cambian: una hora de caché y una semana sirviendo la
+  # vieja mientras se revalida. Los nombres no llevan hash, así que un valor
+  # mucho más alto haría que reemplazar una foto tarde en verse.
+  <FilesMatch "\.(webp|png|jpe?g|svg|ico|woff2?)$">
+    Header set Cache-Control "public, max-age=3600, stale-while-revalidate=604800"
+  </FilesMatch>
+
+  # El HTML y los scripts se revalidan siempre, así una publicación se ve al
+  # instante en vez de quedar pegada en el navegador de la gente.
+  <FilesMatch "\.(html|js|mjs|webmanifest)$">
+    Header set Cache-Control "public, max-age=0, must-revalidate"
+  </FilesMatch>
+
+  # El panel no se indexa.
+  <Files "admin.html">
+    Header always set X-Robots-Tag "noindex, nofollow"
+  </Files>
+</IfModule>
+
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css text/plain text/xml \
+    application/javascript application/json image/svg+xml \
+    application/manifest+json
+</IfModule>
+
+<IfModule mod_mime.c>
+  AddType image/webp .webp
+  AddType image/avif .avif
+  AddType application/manifest+json .webmanifest
+  AddType font/woff2 .woff2
+</IfModule>
