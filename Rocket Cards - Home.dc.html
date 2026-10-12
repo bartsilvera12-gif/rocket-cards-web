@@ -59,6 +59,18 @@
     -webkit-user-select: none; user-select: none;
   }
   #dc-root [data-rot] img { -webkit-user-drag: none; pointer-events: none; }
+  /* El menú del teléfono ocupa toda la pantalla debajo de la barra. Antes
+     medía lo que su contenido y debajo se veía la página, que además se
+     podía deslizar con el menú abierto. 100% es el alto de la barra (el
+     menú cuelga de ella); dvh descuenta la barra del navegador del
+     teléfono, y la línea de vh queda para los que no lo entienden. */
+  #dc-root [data-menu-movil] {
+    height: calc(100vh - 100%);
+    height: calc(100dvh - 100%);
+    overscroll-behavior: contain;
+  }
+  /* Mientras el menú está abierto, la página de atrás no se mueve. */
+  html.rc-menu-abierto, html.rc-menu-abierto body { overflow: hidden; }
   /* Los dos botones del hero, lado a lado también en el teléfono. */
   @media (max-width: 480px) {
     #dc-root [data-hero-cta] { flex-wrap: nowrap; gap: 8px; }
@@ -221,7 +233,7 @@
     </sc-if>
 
     <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
-      <nav style="position:absolute;top:100%;left:0;right:0;z-index:70;border-top:1px solid #1a1a1a;background:#0D0D0D;box-shadow:0 28px 60px rgba(0,0,0,.72);max-height:calc(100vh - 100%);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px clamp(14px,3vw,32px) 18px;display:flex;flex-direction:column;animation:rc-fade .18s ease">
+      <nav data-menu-movil="" style="position:absolute;top:100%;left:0;right:0;z-index:70;border-top:1px solid #1a1a1a;background:#0A0A0A;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px clamp(14px,3vw,32px) 18px;display:flex;flex-direction:column;animation:rc-fade .18s ease">
         <a href="#top" onClick="{{ goHome }}" style="padding:13px 0;border-bottom:1px solid #151515;font-family:'Saira Condensed',sans-serif;font-size:17px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Inicio</a>
         <a href="#top" onClick="{{ openCatalog }}" style="padding:13px 0;border-bottom:1px solid #151515;font-family:'Saira Condensed',sans-serif;font-size:17px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Catálogo completo</a>
         <sc-for list="{{ catFeatured }}" as="cat" hint-placeholder-count="3">
@@ -927,6 +939,81 @@ const CATEGORIAS = [
     accent: '#FF1A27', img: '/assets/cards/pikachu-ex.webp' }
 ];
 
+/* ── Búsqueda ──────────────────────────────────────────────────────────
+   La versión anterior buscaba el texto tal cual, letra por letra: "Mega
+   Evolution" aparecía con "mega evo" pero no con "Evolución" (con tilde y en
+   castellano) ni con "evolcuion" mal tipeado. Ahora:
+   - sin tildes ni mayúsculas,
+   - palabra por palabra y en cualquier orden ("black pitch" = "pitch black"),
+   - cada palabra puede ser el comienzo de una ("evo" encuentra "Evolution"),
+   - tolera un error de tipeo en palabras cortas y dos en las largas, que de
+     paso cubre el castellano de los nombres en inglés ("evolucion",
+     "coleccion"),
+   - y algunos sinónimos de cómo se dicen las cosas acá ("sobre" = pack).
+   Cada palabra buscada tiene que aparecer: así "sobre pitch" no trae todos
+   los sobres. */
+const sinTildes = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const palabrasDe = (t) => sinTildes(t).split(/[^a-z0-9]+/).filter(Boolean);
+const SINONIMOS = {
+  sobre: ['pack', 'booster'], sobres: ['pack', 'booster'],
+  caja: ['box'], cajas: ['box'], lata: ['tin'], latas: ['tin'],
+  carta: ['card'], cartas: ['card', 'cards', 'singles'],
+  coleccion: ['collection'], entrenador: ['trainer'], paquete: ['bundle', 'pack'],
+};
+
+/** Levenshtein, cortando apenas pasa el tope: nunca hace falta el número exacto. */
+function distancia(a, b, tope) {
+  if (Math.abs(a.length - b.length) > tope) return tope + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    let minFila = i;
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (cur[j] < minFila) minFila = cur[j];
+    }
+    if (minFila > tope) return tope + 1;
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+/** Cuánto se parece una palabra buscada a una del producto (0 = nada). */
+function parecido(q, w) {
+  if (w === q) return 4;
+  if (w.startsWith(q)) return 3;
+  if (q.length >= 3 && w.includes(q)) return 2;
+  if (q.length < 4) return 0;
+  const tope = q.length >= 7 ? 2 : 1;
+  const d = Math.min(distancia(q, w, tope), distancia(q, w.slice(0, q.length), tope));
+  return d <= tope ? 1.5 - d * 0.3 : 0;
+}
+
+/** Puntaje del producto para la consulta; 0 si alguna palabra no aparece. */
+function puntajeBusqueda(p, consulta) {
+  const qs = palabrasDe(consulta);
+  if (!qs.length) return 0;
+  const cat = (CATEGORIAS.find(c => c.key === p.cat) || {}).name || p.cat;
+  const texto = palabrasDe([p.name, p.set, cat, p.cat, p.meta || '', p.id].join(' '));
+  let total = 0;
+  for (const q of qs) {
+    let mejor = 0;
+    for (const variante of [q].concat(SINONIMOS[q] || [])) {
+      // Un sinónimo vale un poco menos que la palabra tal cual: «sobre pitch»
+      // tiene que traer primero el sobre suelto y después el bundle.
+      const peso = variante === q ? 1 : 0.9;
+      for (const w of texto) {
+        const v = parecido(variante, w) * peso;
+        if (v > mejor) mejor = v;
+        if (mejor === 4) break;
+      }
+    }
+    if (!mejor) return 0;
+    total += mejor;
+  }
+  return total;
+}
+
 const CAT_IMG = CATEGORIAS.reduce((o, c) => { o[c.key] = c.img; return o; }, {});
 const CAT_KEYS = CATEGORIAS.map(c => c.key);
 const catCount = (key) => CATALOG.filter(p => p.cat === key).length;
@@ -1079,6 +1166,7 @@ class Component extends DCLogic {
     document.addEventListener('click', this._onDocClick);
   }
   componentWillUnmount() {
+    document.documentElement.classList.remove('rc-menu-abierto');
     document.removeEventListener('keydown', this._onTeclas);
     window.removeEventListener('resize', this._onResize);
     window.removeEventListener('scroll', this._onScroll);
@@ -1277,6 +1365,9 @@ class Component extends DCLogic {
   // Ojo: el runtime llama componentDidUpdate(prevProps) y NO pasa prevState,
   // así que el estado anterior lo guardamos nosotros.
   componentDidUpdate() {
+    // Con el menú del teléfono abierto, la página de atrás queda quieta.
+    const menuAbierto = this.state.menuOpen && this.state.w < 1180;
+    document.documentElement.classList.toggle('rc-menu-abierto', menuAbierto);
     this.syncUrl();
     this.syncRails();
     if (this._lastView !== this.state.view) {
@@ -1551,7 +1642,12 @@ class Component extends DCLogic {
         clearTimeout(this._searchTimer);
         this._searchTimer = setTimeout(() => {
           const t = q.trim().toLowerCase();
-          const r = t ? CATALOG.filter(p => (p.name + ' ' + p.set + ' ' + p.cat + ' ' + (p.meta || '') + ' ' + p.id).toLowerCase().includes(t)).slice(0, 6) : [];
+          const r = t ? CATALOG
+            .map(p => ({ p, puntos: puntajeBusqueda(p, t) }))
+            .filter(x => x.puntos > 0)
+            .sort((a, b) => b.puntos - a.puntos)
+            .slice(0, 6)
+            .map(x => x.p) : [];
           this.setState({ results: r, searching: false });
         }, 260);
       },

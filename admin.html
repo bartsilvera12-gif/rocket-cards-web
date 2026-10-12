@@ -1230,6 +1230,12 @@ function pintarModal() {
 // ── Nuevos ingresos ──────────────────────────────────────────────────────
 
 function hojaNuevos(hoja) {
+  // El orden sale siempre de lo que hay en la base. La versión anterior
+  // anotaba cada movimiento en el estado de la pantalla antes de guardarlo:
+  // el panel mostraba el orden nuevo como si ya estuviera guardado, y si se
+  // salía de la pestaña sin tocar "Guardar orden" el cambio se perdía sin
+  // aviso (y al volver, el botón aparecía apagado). Ahora cada movimiento se
+  // guarda en el momento.
   const enCarrusel = estado.productos
     .filter((p) => p.nuevo_orden)
     .sort((a, b) => a.nuevo_orden - b.nuevo_orden);
@@ -1242,7 +1248,7 @@ function hojaNuevos(hoja) {
       <div class="herramientas">
         <h2 style="font-size:16px">Carrusel de la portada</h2>
         <div style="flex:1"></div>
-        <button class="btn" id="guardar-orden" disabled>Guardar orden</button>
+        <span class="col" id="estado-orden">Cada cambio se guarda solo.</span>
       </div>
       ${enCarrusel.length ? `<ul class="orden" id="lista">
         ${enCarrusel.map((p, i) => `
@@ -1253,9 +1259,9 @@ function hojaNuevos(hoja) {
               <div class="nom">${esc(p.nombre)}</div>
               <div class="sku">${esc(p.id)}</div>
             </div>
-            <button class="icono" data-sube title="Subir">↑</button>
-            <button class="icono" data-baja title="Bajar">↓</button>
-            <button class="icono peligro" data-saca title="Sacar del carrusel">✕</button>
+            <button class="icono" data-sube title="Subir" aria-label="Subir ${esc(p.nombre)}">↑</button>
+            <button class="icono" data-baja title="Bajar" aria-label="Bajar ${esc(p.nombre)}">↓</button>
+            <button class="icono peligro" data-saca title="Sacar del carrusel" aria-label="Sacar ${esc(p.nombre)} del carrusel">✕</button>
           </li>`).join('')}
       </ul>` : '<div class="vacio">El carrusel está vacío.</div>'}
       <div class="herramientas" style="border-top:1px solid var(--linea);border-bottom:0">
@@ -1265,51 +1271,37 @@ function hojaNuevos(hoja) {
         </select>
       </div>
     </div>
-    <p class="ayuda">Hasta 12 productos. El orden es el que ve el cliente al deslizar.</p>`;
+    <p class="ayuda">Hasta 12 productos. El orden es el que ve el cliente al deslizar, y cambia en la tienda al instante.</p>`;
 
-  let ids = enCarrusel.map((p) => p.id);
-  const original = ids.join(',');
-  const refrescar = () => {
-    estado.productos.forEach((p) => {
-      const i = ids.indexOf(p.id);
-      p.nuevo_orden = i >= 0 ? i + 1 : null;
-    });
-    hojaNuevos(hoja);
-    if (ids.join(',') !== original) $('#guardar-orden').disabled = false;
+  const ids = enCarrusel.map((p) => p.id);
+
+  /** Guarda el orden nuevo y recién ahí vuelve a pintar, con lo que quedó en la base. */
+  const guardar = async (nuevos, aviso) => {
+    hoja.querySelectorAll('button, select').forEach((b) => { b.disabled = true; });
+    $('#estado-orden', hoja).textContent = 'Guardando…';
+    propio();
+    // Por función y no con varios UPDATE: adentro es una sola transacción,
+    // así el carrusel nunca queda a medias para quien esté en la tienda.
+    const { error } = await sb.rpc('guardar_nuevos', { ids: nuevos });
+    if (error) brindis('No se guardó el orden: ' + motivo(error), true);
+    else brindis(aviso);
+    await cargar();   // vuelve a pintar con lo que de verdad quedó guardado
   };
 
   hoja.querySelectorAll('#lista li').forEach((li, i) => {
+    const mover = (a, b) => { const n = ids.slice(); [n[a], n[b]] = [n[b], n[a]]; return n; };
     li.querySelector('[data-sube]').disabled = i === 0;
     li.querySelector('[data-baja]').disabled = i === ids.length - 1;
-    li.querySelector('[data-sube]').addEventListener('click', () => {
-      [ids[i - 1], ids[i]] = [ids[i], ids[i - 1]]; refrescar();
-    });
-    li.querySelector('[data-baja]').addEventListener('click', () => {
-      [ids[i + 1], ids[i]] = [ids[i], ids[i + 1]]; refrescar();
-    });
-    li.querySelector('[data-saca]').addEventListener('click', () => { ids.splice(i, 1); refrescar(); });
+    li.querySelector('[data-sube]').addEventListener('click', () => guardar(mover(i, i - 1), 'Orden guardado'));
+    li.querySelector('[data-baja]').addEventListener('click', () => guardar(mover(i, i + 1), 'Orden guardado'));
+    li.querySelector('[data-saca]').addEventListener('click', () =>
+      guardar(ids.filter((_, k) => k !== i), 'Sacado del carrusel'));
   });
 
-  $('#agregar').addEventListener('change', (e) => {
+  $('#agregar', hoja).addEventListener('change', (e) => {
     if (!e.target.value) return;
-    if (ids.length >= 12) return brindis('El carrusel no lleva más de 12', true);
-    ids.push(e.target.value);
-    refrescar();
-  });
-
-  $('#guardar-orden').addEventListener('click', async (e) => {
-    e.target.disabled = true;
-    propio();
-    // Por función y no con dos UPDATE: adentro es una sola transacción, así
-    // el carrusel no queda vacío en el medio para quien esté en la tienda.
-    const { error } = await sb.rpc('guardar_nuevos', { ids });
-    if (error) {
-      brindis(motivo(error), true);
-      e.target.disabled = false;
-      return;
-    }
-    brindis('Orden guardado');
-    await cargar();
+    if (ids.length >= 12) { e.target.value = ''; return brindis('El carrusel no lleva más de 12', true); }
+    guardar([...ids, e.target.value], 'Agregado al carrusel (va último)');
   });
 }
 
@@ -1329,7 +1321,7 @@ function hojaCategorias(hoja) {
           <th style="text-align:right">Productos</th><th style="text-align:right">Orden</th><th></th>
         </tr></thead>
         <tbody>
-        ${estado.categorias.map((c) => `
+        ${estado.categorias.map((c, i) => `
           <tr data-key="${esc(c.key)}">
             <td><span class="sku">/catalogo/${esc(c.key)}</span></td>
             <td class="fila">
@@ -1338,8 +1330,10 @@ function hojaCategorias(hoja) {
             </td>
             <td class="ocultar-chico"><input type="text" value="${esc(c.nota)}" data-campo="nota"></td>
             <td style="text-align:right" class="col">${c.productos}</td>
-            <td style="text-align:right">
-              <input class="num" style="width:68px" type="number" value="${c.orden}" data-campo="orden">
+            <td style="text-align:right;white-space:nowrap">
+              <span class="pos" style="font-family:var(--titulo);font-weight:900;font-style:italic;color:var(--rojo);margin-right:6px">${String(i + 1).padStart(2, '0')}</span>
+              <button class="icono" data-sube title="Subir" aria-label="Subir ${esc(c.nombre)}" ${i === 0 ? 'disabled' : ''}>↑</button>
+              <button class="icono" data-baja title="Bajar" aria-label="Bajar ${esc(c.nombre)}" ${i === estado.categorias.length - 1 ? 'disabled' : ''}>↓</button>
             </td>
             <td><div class="acciones">
               <button class="icono peligro" data-borrar title="Borrar" ${c.productos ? 'disabled' : ''}>✕</button>
@@ -1348,7 +1342,31 @@ function hojaCategorias(hoja) {
         </tbody>
       </table></div>
     </div>
-    <p class="ayuda">La clave aparece en la URL y no se cambia desde acá. Una categoría con productos no se puede borrar.</p>`;
+    <p class="ayuda">El orden con ↑ ↓ es el de la tienda (tarjetas de la portada y menú) y se guarda en el momento. La clave aparece en la URL y no se cambia desde acá. Una categoría con productos no se puede borrar.</p>`;
+
+  /**
+   * Mueve una categoría y renumera todas 1, 2, 3… en la base, en el orden
+   * nuevo. Antes el orden se escribía a mano en una casilla y sólo se
+   * guardaba al salir del campo: era fácil cambiar el número, irse a otra
+   * pestaña y quedarse con el cambio sin guardar.
+   */
+  const moverCategoria = async (desde, hasta) => {
+    const keys = estado.categorias.map((x) => x.key);
+    [keys[desde], keys[hasta]] = [keys[hasta], keys[desde]];
+    hoja.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+    propio();
+    let fallo = null;
+    for (let k = 0; k < keys.length; k++) {
+      const actual = estado.categorias.find((x) => x.key === keys[k]);
+      if (actual.orden === k + 1) continue;
+      const { data, error } = await sb.from('categoria')
+        .update({ orden: k + 1 }).eq('key', keys[k]).select().maybeSingle();
+      if (error || !data) { fallo = error || { message: 'La base no aceptó el cambio' }; break; }
+    }
+    if (fallo) brindis('No se guardó el orden: ' + motivo(fallo), true);
+    else brindis('Orden guardado');
+    await cargar();   // vuelve a pintar con lo que de verdad quedó guardado
+  };
 
   hoja.querySelectorAll('tbody tr').forEach((tr) => {
     const key = tr.dataset.key;
@@ -1371,6 +1389,9 @@ function hojaCategorias(hoja) {
       campo.addEventListener('blur', guardar);
       campo.addEventListener('keydown', (e) => { if (e.key === 'Enter') campo.blur(); });
     });
+    const i = estado.categorias.indexOf(c);
+    tr.querySelector('[data-sube]').addEventListener('click', () => moverCategoria(i, i - 1));
+    tr.querySelector('[data-baja]').addEventListener('click', () => moverCategoria(i, i + 1));
     tr.querySelector('[data-borrar]').addEventListener('click', async () => {
       const seguro = await confirmar('Borrar categoría',
         '«' + c.nombre + '»\n\nNo se puede deshacer.', 'Borrar');
