@@ -12,11 +12,19 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.10/dist/umd/supabase.js"></script>
 <script src="/rocketcards-config.js"></script>
 <style>
+  /* Paleta de la marca —dorado, negro y rojo— sobre fondo claro. La primera
+     versión era negra de punta a punta: en una sesión larga de carga
+     cansaba la vista y las cajas se perdían contra el fondo. Ahora el negro
+     queda para la barra de arriba y los encabezados, el rojo para lo que se
+     toca y el dorado para el fondo y los acentos. */
   :root {
-    --fondo: #050505; --panel: #0D0D0D; --panel2: #121212;
-    --linea: #1f1f1f; --linea2: #2a2a2a;
-    --texto: #F5F5F5; --suave: #A7A7A7; --tenue: #6e6e6e;
-    --rojo: #E30613; --oro: #C9A227; --verde: #3FB950;
+    --fondo: #F3E9CC;  --panel: #FFFDF6;  --panel2: #F8F0DB;  --hover: #FBF4E2;
+    --linea: #E6D9B2;  --linea2: #D2BF86;
+    --texto: #16130D;  --suave: #5C533F;  --tenue: #8A7F67;
+    --rojo: #C8102E;   --rojo-hover: #A50D26;
+    --oro: #C9A227;    --oro-osc: #8A6A0E;  --oro-claro: #E9D38A;
+    --negro: #111010;  --sobre-negro: #F7F1E1;
+    --verde: #1E8449;  --verde-claro: #D7EEDD;
     --titulo: 'Saira Condensed', sans-serif;
     --mono: 'IBM Plex Mono', monospace;
   }
@@ -28,28 +36,34 @@
   }
   h1, h2, h3 { font-family: var(--titulo); text-transform: uppercase; margin: 0; line-height: 1; }
   button, input, select, textarea { font: inherit; color: inherit; }
-  a { color: var(--oro); }
+  a { color: var(--oro-osc); }
 
   /* ── Estructura ── */
   .barra {
     position: sticky; top: 0; z-index: 20; display: flex; align-items: center;
     gap: 16px; padding: 12px clamp(14px, 3vw, 28px);
-    background: rgba(5,5,5,.94); backdrop-filter: blur(8px);
-    border-bottom: 1px solid var(--linea);
+    background: var(--negro); color: var(--sobre-negro);
+    border-bottom: 3px solid var(--oro);
   }
   .marca { font-family: var(--titulo); font-weight: 900; font-size: 19px; letter-spacing: .04em; }
   .marca em { color: var(--rojo); font-style: normal; }
+  .barra .marca { color: var(--oro); }
+  .barra .marca em { color: #FF3B52; }
+  .barra a { color: var(--oro-claro) !important; }
+  .barra .icono { background: transparent; color: var(--sobre-negro); border-color: #3A362C; }
+  .barra .icono:hover { border-color: var(--oro); color: #fff; background: transparent; }
+  .barra .vivo { color: #B9AE94; }
   .barra .crece { flex: 1; }
 
   .pestanas { display: flex; gap: 2px; overflow-x: auto; padding: 0 clamp(14px, 3vw, 28px);
-              border-bottom: 1px solid var(--linea); background: var(--fondo);
-              position: sticky; top: 53px; z-index: 19; }
+              border-bottom: 1px solid var(--linea2); background: var(--panel);
+              position: sticky; top: 55px; z-index: 19; }
   .pestanas button {
     background: none; border: 0; border-bottom: 2px solid transparent; cursor: pointer;
     padding: 12px 14px; font-family: var(--titulo); font-weight: 800; font-size: 13px;
     letter-spacing: .12em; text-transform: uppercase; color: var(--suave); white-space: nowrap;
   }
-  .pestanas button[aria-selected="true"] { color: var(--texto); border-bottom-color: var(--rojo); }
+  .pestanas button[aria-selected="true"] { color: var(--texto); border-bottom: 3px solid var(--rojo); }
   .pestanas button:hover { color: var(--texto); }
 
   main { padding: clamp(16px, 3vw, 28px); max-width: 1500px; margin: 0 auto; }
@@ -58,7 +72,7 @@
   .vivo { display: flex; align-items: center; gap: 7px; font-family: var(--mono);
           font-size: 10.5px; letter-spacing: .1em; color: var(--tenue); white-space: nowrap; }
   .punto { width: 7px; height: 7px; border-radius: 50%; background: var(--tenue); flex: 0 0 auto; }
-  .vivo[data-on="1"] .punto { background: var(--verde); box-shadow: 0 0 0 3px rgba(63,185,80,.16); }
+  .vivo[data-on="1"] .punto { background: #3FB950; box-shadow: 0 0 0 3px rgba(63,185,80,.25); }
   .vivo[data-on="0"] .punto { background: var(--rojo); }
 
   /* ── Controles ── */
@@ -66,68 +80,72 @@
      fue un error: el día que apareció un type=email quedó blanco con letra
      blanca, invisible. */
   input:not([type=checkbox]):not([type=radio]), select, textarea {
-    background: var(--panel); border: 1px solid var(--linea2); color: var(--texto);
-    padding: 9px 11px; border-radius: 3px; width: 100%; outline: 0;
+    background: #fff; border: 1px solid var(--linea2); color: var(--texto);
+    padding: 9px 11px; border-radius: 4px; width: 100%; outline: 0;
   }
-  input:focus, select:focus, textarea:focus { border-color: var(--oro); }
+  input:focus, select:focus, textarea:focus { border-color: var(--oro); box-shadow: 0 0 0 3px rgba(201,162,39,.25); }
+  input::placeholder, textarea::placeholder { color: #A99E84; }
+  /* El campo que el formulario rechazó: borde rojo hasta que se vuelve a guardar. */
+  .con-error, .con-error:focus { border-color: var(--rojo) !important; box-shadow: 0 0 0 3px rgba(200,16,46,.18) !important; }
   input[type=number] { font-family: var(--mono); }
   label { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .14em;
-          text-transform: uppercase; color: var(--suave); margin-bottom: 5px; }
+          text-transform: uppercase; color: var(--suave); font-weight: 500; margin-bottom: 5px; }
   .btn {
     background: var(--rojo); border: 0; color: #fff; cursor: pointer;
     font-family: var(--titulo); font-weight: 800; font-size: 12.5px; letter-spacing: .12em;
-    text-transform: uppercase; padding: 10px 18px; border-radius: 3px;
+    text-transform: uppercase; padding: 10px 18px; border-radius: 4px;
   }
-  .btn.gris { background: var(--panel2); border: 1px solid var(--linea2); color: var(--texto); }
-  .btn.oro { background: var(--oro); color: #050505; }
+  .btn:hover:not(:disabled) { background: var(--rojo-hover); }
+  .btn.gris { background: #fff; border: 1px solid var(--linea2); color: var(--texto); }
+  .btn.gris:hover:not(:disabled) { background: var(--panel2); border-color: var(--oro); }
+  .btn.oro { background: var(--oro); color: var(--negro); }
   .btn.chico { padding: 6px 11px; font-size: 11px; }
   .btn:disabled { opacity: .45; cursor: not-allowed; }
-  .btn:hover:not(:disabled) { filter: brightness(1.12); }
-  .icono { background: none; border: 1px solid var(--linea2); color: var(--suave);
+  .icono { background: #fff; border: 1px solid var(--linea2); color: var(--suave);
            cursor: pointer; border-radius: 3px; padding: 5px 9px; font-size: 13px; line-height: 1; }
-  .icono:hover { color: var(--texto); border-color: var(--oro); }
+  .icono:hover { color: var(--texto); border-color: var(--oro); background: var(--panel2); }
   .icono.peligro:hover { color: var(--rojo); border-color: var(--rojo); }
   /* ── Galería de fotos del producto ── */
   .galeria { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px; }
-  .foto-g { margin: 0; position: relative; border: 1px solid var(--linea2); border-radius: 4px; overflow: hidden; background: var(--panel2); }
+  .foto-g { margin: 0; position: relative; border: 1px solid var(--linea2); border-radius: 4px; overflow: hidden; background: #fff; }
   .foto-g .foto-img { aspect-ratio: 1 / 1; background: #fff center / contain no-repeat; }
   .foto-g .portada {
-    position: absolute; top: 6px; left: 6px; background: var(--oro); color: #050505;
+    position: absolute; top: 6px; left: 6px; background: var(--oro); color: var(--negro);
     font-family: var(--titulo); font-weight: 800; font-size: 9.5px; letter-spacing: .12em;
     text-transform: uppercase; padding: 3px 6px; border-radius: 2px;
   }
   .foto-g .foto-acc { display: flex; justify-content: space-between; gap: 2px; padding: 5px; }
   .foto-g .foto-acc .icono { padding: 4px 7px; font-size: 12px; }
   .soltar {
-    margin-top: 10px; border: 1.5px dashed var(--linea2); border-radius: 4px; padding: 18px 14px;
-    text-align: center; color: var(--suave); cursor: pointer; display: grid; gap: 4px;
+    margin-top: 10px; border: 1.5px dashed var(--oro); border-radius: 6px; padding: 18px 14px;
+    text-align: center; color: var(--suave); cursor: pointer; display: grid; gap: 4px; background: #fff;
     transition: border-color .15s, background .15s;
   }
   .soltar b { color: var(--texto); font-weight: 600; }
-  .soltar:hover, .soltar.encima { border-color: var(--oro); background: rgba(201,162,39,.08); }
+  .soltar:hover, .soltar.encima { border-color: var(--rojo); background: #FFF7E3; }
   .soltar.lleno { opacity: .45; pointer-events: none; }
 
   /* La estrella encendida: el producto ya está en el carrusel de la portada. */
-  .icono.activo { color: var(--oro); border-color: var(--oro); background: rgba(201,162,39,.12); }
+  .icono.activo { color: var(--negro); border-color: var(--oro); background: var(--oro); }
   .icono:disabled { opacity: .4; cursor: wait; }
 
   /* ── Tabla ── */
-  .caja { background: var(--panel); border: 1px solid var(--linea); border-radius: 4px; }
+  .caja { background: var(--panel); border: 1px solid var(--linea2); border-radius: 6px; box-shadow: 0 1px 2px rgba(60,45,10,.06), 0 6px 18px rgba(60,45,10,.06); }
   .herramientas { display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
-                  padding: 12px; border-bottom: 1px solid var(--linea); }
+                  padding: 12px; border-bottom: 1px solid var(--linea); background: var(--panel2); border-radius: 6px 6px 0 0; }
   .herramientas input[type=search] { max-width: 300px; }
   .herramientas select { max-width: 190px; }
   table { width: 100%; border-collapse: collapse; }
   th { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
        color: var(--suave); text-align: left; font-weight: 500; padding: 10px 12px;
-       border-bottom: 1px solid var(--linea); white-space: nowrap; }
-  td { padding: 9px 12px; border-bottom: 1px solid #141414; vertical-align: middle; }
+       border-bottom: 2px solid var(--linea2); white-space: nowrap; }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--linea); vertical-align: middle; }
   tr:last-child td { border-bottom: 0; }
-  tr:hover td { background: #0F0F0F; }
-  .sku { font-family: var(--mono); font-size: 11px; color: var(--oro); }
+  tr:hover td { background: var(--hover); }
+  .sku { font-family: var(--mono); font-size: 11px; color: var(--oro-osc); }
   .nom { font-weight: 600; font-size: 13px; }
   .col { font-size: 11.5px; color: var(--suave); }
-  .foto { width: 46px; height: 46px; object-fit: contain; background: #Fff; border-radius: 3px;
+  .foto { width: 46px; height: 46px; object-fit: contain; background: #fff; border-radius: 3px;
           border: 1px solid var(--linea2); }
   .sinfoto { width: 46px; height: 46px; border-radius: 3px; border: 1px dashed var(--linea2);
              display: grid; place-items: center; color: var(--tenue); font-size: 9px; }
@@ -140,28 +158,33 @@
   /* ── Interruptor ── */
   .sw { position: relative; width: 38px; height: 21px; flex: 0 0 auto; }
   .sw input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
-  .sw span { position: absolute; inset: 0; background: #262626; border-radius: 11px; transition: background .18s; pointer-events: none; }
+  .sw span { position: absolute; inset: 0; background: #D6CBAA; border-radius: 11px; transition: background .18s; pointer-events: none; }
   .sw span::after { content: ''; position: absolute; left: 3px; top: 3px; width: 15px; height: 15px;
-                    border-radius: 50%; background: var(--suave); transition: transform .18s, background .18s; }
-  .sw input:checked + span { background: rgba(63,185,80,.3); }
-  .sw input:checked + span::after { transform: translateX(17px); background: var(--verde); }
+                    border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .18s, background .18s; }
+  .sw input:checked + span { background: var(--verde); }
+  .sw input:checked + span::after { transform: translateX(17px); background: #fff; }
 
   /* ── Modal ── */
-  .velo { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.72);
+  .velo { position: fixed; inset: 0; z-index: 60; background: rgba(28,22,8,.55);
           display: grid; place-items: center; padding: 16px; overflow: auto; }
-  .modal { background: var(--panel); border: 1px solid var(--linea2); border-radius: 5px;
+  .modal { background: var(--panel); border: 1px solid var(--linea2); border-radius: 8px;
            width: min(680px, 100%); max-height: 92vh; overflow: auto;
-           box-shadow: 0 30px 80px rgba(0,0,0,.75); }
-  .modal header { display: flex; align-items: center; gap: 12px; padding: 16px 20px;
-                  border-bottom: 1px solid var(--linea); position: sticky; top: 0; background: var(--panel); }
+           box-shadow: 0 30px 80px rgba(40,30,5,.35); }
+  .modal header { display: flex; align-items: center; gap: 12px; padding: 16px 20px; z-index: 2;
+                  border-bottom: 3px solid var(--oro); position: sticky; top: 0;
+                  background: var(--negro); color: var(--sobre-negro); }
+  .modal header .icono { background: transparent; color: var(--sobre-negro); border-color: #3A362C; }
   .modal .cuerpo { padding: 20px; display: grid; gap: 14px;
                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
   .modal .cuerpo .ancho { grid-column: 1 / -1; }
   .modal footer { display: flex; gap: 10px; justify-content: flex-end; padding: 16px 20px;
-                  border-top: 1px solid var(--linea); position: sticky; bottom: 0; background: var(--panel); }
+                  border-top: 1px solid var(--linea); position: sticky; bottom: 0; background: var(--panel2); }
 
   /* ── Login ── */
-  .entrada { min-height: 100dvh; display: grid; place-items: center; padding: 20px; }
+  /* La entrada sobre dorado, con la caja blanca bien recortada: negro sobre
+     negro, la caja se perdía. */
+  .entrada { min-height: 100dvh; display: grid; place-items: center; padding: 20px;
+             background: radial-gradient(120% 90% at 50% 0%, #E9CF72 0%, #C9A227 55%, #9C7A12 100%); }
   /* Chrome pinta de blanco los campos que autocompleta y deja el texto
      ilegible sobre nuestro fondo oscuro. Ese fondo no se puede cambiar con
      background: hay que taparlo con una sombra interior enorme. La
@@ -171,22 +194,25 @@
   input:-webkit-autofill:focus,
   input:-webkit-autofill:active {
     -webkit-text-fill-color: var(--texto);
-    -webkit-box-shadow: 0 0 0 1000px var(--panel) inset;
-    box-shadow: 0 0 0 1000px var(--panel) inset;
+    -webkit-box-shadow: 0 0 0 1000px #fff inset;
+    box-shadow: 0 0 0 1000px #fff inset;
     caret-color: var(--texto);
     transition: background-color 9999s ease-in-out 0s;
   }
-  .entrada form { width: min(360px, 100%); display: grid; gap: 14px;
-                  background: var(--panel); border: 1px solid var(--linea); padding: 28px; border-radius: 5px; }
+  .entrada form { width: min(380px, 100%); display: grid; gap: 14px;
+                  background: var(--panel); padding: 30px 28px 28px; border-radius: 10px;
+                  border-top: 5px solid var(--rojo);
+                  box-shadow: 0 2px 0 var(--negro), 0 24px 60px rgba(60,40,0,.35); }
+  .entrada .marca { font-size: 26px; color: var(--negro); }
 
   /* ── Avisos ── */
   .aviso { padding: 10px 13px; border-radius: 3px; font-size: 13px; border-left: 3px solid; }
-  .aviso.mal { background: rgba(227,6,19,.1); border-color: var(--rojo); }
-  .aviso.bien { background: rgba(63,185,80,.1); border-color: var(--verde); }
+  .aviso.mal { background: #FCE6E9; border-color: var(--rojo); color: #7A0A1C; }
+  .aviso.bien { background: var(--verde-claro); border-color: var(--verde); color: #0F4A28; }
   #brindis { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 80;
              display: grid; gap: 8px; justify-items: center; pointer-events: none; }
-  #brindis div { background: #0D0D0D; border: 1px solid var(--linea2); border-left: 3px solid var(--oro);
-                 padding: 11px 16px; font-size: 13px; box-shadow: 0 16px 40px rgba(0,0,0,.7);
+  #brindis div { background: var(--negro); color: var(--sobre-negro); border-left: 4px solid var(--oro);
+                 padding: 11px 16px; font-size: 13px; border-radius: 4px; box-shadow: 0 16px 40px rgba(40,30,5,.35);
                  animation: subir .25s ease; }
   @keyframes subir { from { opacity: 0; transform: translateY(10px); } }
 
@@ -195,10 +221,10 @@
   /* Las cinco cartas de la portada, en el mismo orden que en la tienda. */
   .abanico { display: grid; gap: 12px; padding: 12px;
              grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-  .abanico .carta { display: grid; gap: 7px; background: var(--panel2);
+  .abanico .carta { display: grid; gap: 7px; background: #fff;
                     border: 1px solid var(--linea); border-radius: 4px; padding: 10px; }
   .abanico .pos { font-family: var(--mono); font-size: 10px; letter-spacing: .14em;
-                  text-transform: uppercase; color: var(--oro); }
+                  text-transform: uppercase; color: var(--oro-osc); }
   /* Proporción de carta: 2.5 × 3.5 pulgadas, igual que en la tienda. */
   .abanico .mini { aspect-ratio: 2.5/3.5; border-radius: 4px; border: 1px solid var(--linea2);
                    background: #fff center/contain no-repeat; display: grid; place-items: center;
@@ -206,11 +232,11 @@
   textarea { resize: vertical; min-height: 68px; line-height: 1.5; }
   .ayuda { font-size: 11.5px; color: var(--tenue); margin-top: 4px; }
   .orden { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
-  .orden li { display: flex; align-items: center; gap: 10px; background: var(--panel2);
+  .orden li { display: flex; align-items: center; gap: 10px; background: #fff;
               border: 1px solid var(--linea); border-radius: 3px; padding: 8px 10px; }
   .orden { list-style: none; margin: 0; }
   .orden .pos { font-family: var(--titulo); font-weight: 900; font-style: italic; font-size: 18px;
-                color: var(--oro); min-width: 26px; }
+                color: var(--rojo); min-width: 26px; }
   @media (max-width: 760px) {
     .ocultar-chico { display: none; }
     main { padding: 12px; }
@@ -263,6 +289,20 @@ function brindis(texto, mal) {
   setTimeout(() => d.remove(), 3600);
 }
 
+/** Las reglas de la base (db/rocketcards.sql), dichas para quien carga. */
+const REGLAS = {
+  producto_id_check: 'El SKU sólo puede tener letras, números, punto, guion y guion bajo: sin espacios, acentos ni barras. Ejemplo: SV-PIKA-238.',
+  producto_nombre_check: 'Falta el nombre del producto.',
+  producto_precio_check: 'El precio no puede ser negativo.',
+  producto_precio_anterior_check: 'El precio anterior tiene que ser MAYOR que el precio (es el precio tachado). Si no hay oferta, dejalo vacío.',
+  producto_stock_check: 'El stock no puede ser negativo.',
+  producto_etiqueta_check: 'La etiqueta no puede quedar en blanco.',
+  producto_imagenes_max: 'Un producto puede tener hasta 10 fotos.',
+  categoria_key_check: 'La clave de la categoría va en minúsculas, sin espacios ni acentos.',
+  categoria_nombre_check: 'Falta el nombre de la categoría.',
+  categoria_accent_check: 'El color tiene que ser del tipo #RRGGBB.',
+};
+
 /** Traduce los errores de PostgREST a algo que se entienda. */
 function motivo(err) {
   if (!err) return 'Error desconocido';
@@ -276,7 +316,11 @@ function motivo(err) {
       : 'Ya existe un producto con ese SKU';
   }
   if (err.code === '23503') return 'Esa categoría no existe, o todavía tiene productos';
-  if (err.code === '23514') return 'Algún valor no cumple las reglas de la base';
+  if (err.code === '23514') {
+    // La base dice qué regla se rompió por su nombre; lo traducimos al campo.
+    const regla = (m.match(/constraint "([^"]+)"/) || [])[1] || '';
+    return REGLAS[regla] || ('Algún valor no cumple las reglas de la base (' + (regla || 'sin detalle') + ')');
+  }
   if (err.code === 'PGRST205' || /schema cache/i.test(m)) {
     return 'PostgREST no ve el esquema. Agregá "rocketcards" a Exposed schemas y corré: notify pgrst, \'reload schema\';';
   }
@@ -552,7 +596,7 @@ function hojaProductos(hoja) {
             </td>
             <td class="ocultar-chico col">${esc(p.categoria_nombre || p.categoria)}</td>
             <td style="text-align:right">
-              <input class="num" type="number" min="0" step="1000" value="${p.precio}" data-campo="precio">
+              <input class="num" type="number" min="0" step="1" value="${p.precio}" data-campo="precio">
               ${p.precio_anterior ? `<div class="col" style="text-align:right">antes ${gs(p.precio_anterior)}</div>` : ''}
             </td>
             <td style="text-align:right">
@@ -843,11 +887,11 @@ function pintarModal() {
         </div>
         <div>
           <label for="m-precio">Precio (Gs.)</label>
-          <input id="m-precio" type="number" min="0" step="1000" value="${p.precio ?? ''}" required>
+          <input id="m-precio" type="number" min="0" step="1" value="${p.precio ?? ''}" required>
         </div>
         <div>
           <label for="m-antes">Precio anterior</label>
-          <input id="m-antes" type="number" min="0" step="1000" value="${p.precio_anterior ?? ''}" placeholder="vacío = sin oferta">
+          <input id="m-antes" type="number" min="0" step="1" value="${p.precio_anterior ?? ''}" placeholder="vacío = sin oferta">
         </div>
         <div>
           <label for="m-stock">Stock</label>
@@ -1004,6 +1048,30 @@ function pintarModal() {
       err.style.display = '';
       return;
     }
+    // Los mismos chequeos que hace la base, pero acá: así el mensaje dice
+    // qué campo está mal y lo marca, en vez de un error genérico.
+    velo.querySelectorAll('.con-error').forEach((x) => x.classList.remove('con-error'));
+    const fallar = (sel, texto) => {
+      const campo = $(sel, velo);
+      if (campo) { campo.classList.add('con-error'); campo.focus(); }
+      err.className = 'aviso mal ancho';
+      err.textContent = texto;
+      err.style.display = '';
+      err.scrollIntoView({ block: 'nearest' });
+    };
+    const entero = (v) => v !== '' && /^\d+$/.test(String(v).trim());
+    const sku = $('#m-id', velo).value.trim();
+    const precioTxt = $('#m-precio', velo).value;
+    const stockTxt = $('#m-stock', velo).value || '0';
+
+    if (esNuevo && !sku) return fallar('#m-id', 'Falta el SKU.');
+    if (esNuevo && !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(sku)) return fallar('#m-id', REGLAS.producto_id_check);
+    if (!$('#m-nom', velo).value.trim()) return fallar('#m-nom', REGLAS.producto_nombre_check);
+    if (!entero(precioTxt)) return fallar('#m-precio', 'El precio va en guaraníes, sin puntos ni decimales. Ejemplo: 37500.');
+    if (antes !== '' && !entero(antes)) return fallar('#m-antes', 'El precio anterior va en guaraníes, sin puntos ni decimales.');
+    if (antes !== '' && Number(antes) <= Number(precioTxt)) return fallar('#m-antes', REGLAS.producto_precio_anterior_check);
+    if (!entero(stockTxt)) return fallar('#m-stock', 'El stock tiene que ser un número entero, 0 o más.');
+
     // La portada se copia a "img": el resto de la tienda (tarjetas,
     // carruseles, carrito) sigue leyendo ese campo.
     const img = fotos[0] || '';
@@ -1030,11 +1098,16 @@ function pintarModal() {
       : await sb.from('producto').update(datos).eq('id', p.id).select().maybeSingle();
 
     if (r.error || !r.data) {
-      err.className = 'aviso mal ancho';
-      err.textContent = r.error ? motivo(r.error) : 'La base no aceptó el cambio: esta cuenta no es el admin.';
-      err.style.display = '';
       boton.disabled = false;
-      return;
+      if (!r.error) return fallar(null, 'La base no aceptó el cambio: esta cuenta no es el admin.');
+      // Si la base nombra la regla, marcamos el campo que la rompió.
+      const regla = ((r.error.message || '').match(/constraint "([^"]+)"/) || [])[1] || '';
+      const campo = {
+        producto_id_check: '#m-id', producto_pkey: '#m-id', producto_nombre_check: '#m-nom',
+        producto_precio_check: '#m-precio', producto_precio_anterior_check: '#m-antes',
+        producto_stock_check: '#m-stock', producto_categoria_fkey: '#m-cat',
+      }[regla] || null;
+      return fallar(campo, motivo(r.error));
     }
     cerrar();
     await cargar();

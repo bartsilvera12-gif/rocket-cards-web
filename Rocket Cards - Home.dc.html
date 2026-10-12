@@ -332,7 +332,7 @@
                 <h3 style="margin:0;font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;font-size:clamp(15px,1.7vw,21px);line-height:1.1;max-width:24ch;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ s.name }}</h3>
                 <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#6e6e6e">Ver detalle del producto →</span>
                 <span style="font-family:'Saira Condensed',sans-serif;font-weight:900;font-size:clamp(19px,2vw,24px)">{{ s.priceLabel }}</span>
-                <button onClick="{{ s.add }}" style="background:#E30613;border:0;color:#fff;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:13px;letter-spacing:.14em;text-transform:uppercase;padding:10px 22px;border-radius:999px;cursor:pointer;transition:background .18s ease" style-hover="background:#FF1A27">Agregar al carrito</button>
+                <sc-if value="{{ s.noEnCarrito }}" hint-placeholder-val="{{ true }}"><button onClick="{{ s.add }}" style="background:#E30613;border:0;color:#fff;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:13px;letter-spacing:.14em;text-transform:uppercase;padding:10px 22px;border-radius:999px;cursor:pointer;transition:background .18s ease" style-hover="background:#FF1A27">Agregar al carrito</button></sc-if><sc-if value="{{ s.hayEnCarrito }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:6px;background:#E30613;border-radius:999px;padding:0 6px"><button onClick="{{ s.menos }}" aria-label="Quitar uno del carrito" style="background:transparent;border:0;color:#fff;width:36px;height:40px;font-size:19px;line-height:1;cursor:pointer">−</button><span style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:#fff;min-width:110px;text-align:center">{{ s.enCarritoLabel }}</span><button onClick="{{ s.mas }}" aria-label="Agregar uno más" style="background:transparent;border:0;color:{{ s.masColor }};width:36px;height:40px;font-size:19px;line-height:1;cursor:{{ s.masCursor }}">+</button></div></sc-if>
               </div>
             </li>
           </sc-for>
@@ -369,8 +369,11 @@
               <sc-if value="{{ p.hasTag }}" hint-placeholder-val="{{ false }}">
                 <span style="position:absolute;top:10px;left:10px;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding:5px 9px;background:{{ p.tagBg }};color:{{ p.tagFg }}">{{ p.tag }}</span>
               </sc-if>
-              <div data-actions="" style="position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:6px;opacity:0;transform:translateY(8px);transition:opacity .22s ease,transform .22s ease">
-                <button onClick="{{ p.add }}" style="flex:1;background:{{ p.btnBg }};border:0;color:{{ p.btnFg }};font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:10px 6px;cursor:{{ p.cursor }};border-radius:2px">{{ p.btnLabel }}</button>
+              <sc-if value="{{ p.hayEnCarrito }}" hint-placeholder-val="{{ false }}">
+                <span style="position:absolute;top:10px;right:10px;z-index:2;background:#E30613;color:#fff;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:5px 10px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.5)">{{ p.enCarritoLabel }}</span>
+              </sc-if>
+              <div data-actions="" data-fijo="{{ p.accFijo }}" style="position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:6px;opacity:{{ p.accOp }};transform:{{ p.accY }};transition:opacity .22s ease,transform .22s ease">
+                <sc-if value="{{ p.noEnCarrito }}" hint-placeholder-val="{{ true }}"><button onClick="{{ p.add }}" style="flex:1;background:{{ p.btnBg }};border:0;color:{{ p.btnFg }};font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:10px 6px;cursor:{{ p.cursor }};border-radius:2px">{{ p.btnLabel }}</button></sc-if><sc-if value="{{ p.hayEnCarrito }}" hint-placeholder-val="{{ false }}"><div style="flex:1;display:flex;align-items:center;justify-content:space-between;background:#E30613;border-radius:2px;min-height:38px"><button onClick="{{ p.menos }}" aria-label="Quitar uno del carrito" style="background:transparent;border:0;color:#fff;width:38px;height:38px;font-size:19px;line-height:1;cursor:pointer">−</button><span style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:#fff">{{ p.enCarritoLabel }}</span><button onClick="{{ p.mas }}" aria-label="Agregar uno más" style="background:transparent;border:0;color:{{ p.masColor }};width:38px;height:38px;font-size:19px;line-height:1;cursor:{{ p.masCursor }}">+</button></div></sc-if>
                 <a href="{{ p.waLink }}" aria-label="Consultar por WhatsApp" style="background:rgba(5,5,5,.9);border:1px solid #2a2a2a;color:#F5F5F5;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:10px;border-radius:2px;display:flex;align-items:center">WA</a>
               </div>
             </div>
@@ -416,8 +419,11 @@
                 <sc-if value="{{ p.hasTag }}" hint-placeholder-val="{{ false }}">
                   <span style="position:absolute;top:10px;left:10px;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding:5px 9px;background:{{ p.tagBg }};color:{{ p.tagFg }}">{{ p.tag }}</span>
                 </sc-if>
-                <div data-actions="" style="position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:6px;opacity:0;transform:translateY(8px);transition:opacity .22s ease,transform .22s ease">
-                  <button onClick="{{ p.add }}" style="flex:1;background:{{ p.btnBg }};border:0;color:{{ p.btnFg }};font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:10px 6px;cursor:{{ p.cursor }};border-radius:2px">{{ p.btnLabel }}</button>
+              <sc-if value="{{ p.hayEnCarrito }}" hint-placeholder-val="{{ false }}">
+                <span style="position:absolute;top:10px;right:10px;z-index:2;background:#E30613;color:#fff;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:5px 10px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.5)">{{ p.enCarritoLabel }}</span>
+              </sc-if>
+                <div data-actions="" data-fijo="{{ p.accFijo }}" style="position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:6px;opacity:{{ p.accOp }};transform:{{ p.accY }};transition:opacity .22s ease,transform .22s ease">
+                  <sc-if value="{{ p.noEnCarrito }}" hint-placeholder-val="{{ true }}"><button onClick="{{ p.add }}" style="flex:1;background:{{ p.btnBg }};border:0;color:{{ p.btnFg }};font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:10px 6px;cursor:{{ p.cursor }};border-radius:2px">{{ p.btnLabel }}</button></sc-if><sc-if value="{{ p.hayEnCarrito }}" hint-placeholder-val="{{ false }}"><div style="flex:1;display:flex;align-items:center;justify-content:space-between;background:#E30613;border-radius:2px;min-height:38px"><button onClick="{{ p.menos }}" aria-label="Quitar uno del carrito" style="background:transparent;border:0;color:#fff;width:38px;height:38px;font-size:19px;line-height:1;cursor:pointer">−</button><span style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:#fff">{{ p.enCarritoLabel }}</span><button onClick="{{ p.mas }}" aria-label="Agregar uno más" style="background:transparent;border:0;color:{{ p.masColor }};width:38px;height:38px;font-size:19px;line-height:1;cursor:{{ p.masCursor }}">+</button></div></sc-if>
                 </div>
               </div>
               <div style="padding:13px 13px 15px;display:flex;flex-direction:column;gap:5px;flex:1">
@@ -459,8 +465,11 @@
               <sc-if value="{{ p.hasTag }}" hint-placeholder-val="{{ false }}">
                 <span style="position:absolute;top:10px;left:10px;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding:5px 9px;background:{{ p.tagBg }};color:{{ p.tagFg }}">{{ p.tag }}</span>
               </sc-if>
-              <div data-actions="" style="position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:6px;opacity:0;transform:translateY(8px);transition:opacity .22s ease,transform .22s ease">
-                <button onClick="{{ p.add }}" style="flex:1;background:{{ p.btnBg }};border:0;color:{{ p.btnFg }};font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:10px 6px;cursor:{{ p.cursor }};border-radius:2px">{{ p.btnLabel }}</button>
+              <sc-if value="{{ p.hayEnCarrito }}" hint-placeholder-val="{{ false }}">
+                <span style="position:absolute;top:10px;right:10px;z-index:2;background:#E30613;color:#fff;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:5px 10px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.5)">{{ p.enCarritoLabel }}</span>
+              </sc-if>
+              <div data-actions="" data-fijo="{{ p.accFijo }}" style="position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:6px;opacity:{{ p.accOp }};transform:{{ p.accY }};transition:opacity .22s ease,transform .22s ease">
+                <sc-if value="{{ p.noEnCarrito }}" hint-placeholder-val="{{ true }}"><button onClick="{{ p.add }}" style="flex:1;background:{{ p.btnBg }};border:0;color:{{ p.btnFg }};font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:10px 6px;cursor:{{ p.cursor }};border-radius:2px">{{ p.btnLabel }}</button></sc-if><sc-if value="{{ p.hayEnCarrito }}" hint-placeholder-val="{{ false }}"><div style="flex:1;display:flex;align-items:center;justify-content:space-between;background:#E30613;border-radius:2px;min-height:38px"><button onClick="{{ p.menos }}" aria-label="Quitar uno del carrito" style="background:transparent;border:0;color:#fff;width:38px;height:38px;font-size:19px;line-height:1;cursor:pointer">−</button><span style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:#fff">{{ p.enCarritoLabel }}</span><button onClick="{{ p.mas }}" aria-label="Agregar uno más" style="background:transparent;border:0;color:{{ p.masColor }};width:38px;height:38px;font-size:19px;line-height:1;cursor:{{ p.masCursor }}">+</button></div></sc-if>
                 <a href="{{ p.waLink }}" aria-label="Consultar por WhatsApp" style="background:rgba(5,5,5,.9);border:1px solid #2a2a2a;color:#F5F5F5;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:10px;border-radius:2px;display:flex;align-items:center">WA</a>
               </div>
             </div>
@@ -556,8 +565,11 @@
                 <sc-if value="{{ p.hasTag }}" hint-placeholder-val="{{ false }}">
                   <span style="position:absolute;top:10px;left:10px;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding:5px 9px;background:{{ p.tagBg }};color:{{ p.tagFg }}">{{ p.tag }}</span>
                 </sc-if>
-                <div data-actions="" style="position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:6px;opacity:0;transform:translateY(8px);transition:opacity .22s ease,transform .22s ease">
-                  <button onClick="{{ p.add }}" style="flex:1;background:{{ p.btnBg }};border:0;color:{{ p.btnFg }};font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:10px 6px;cursor:{{ p.cursor }};border-radius:2px">{{ p.btnLabel }}</button>
+              <sc-if value="{{ p.hayEnCarrito }}" hint-placeholder-val="{{ false }}">
+                <span style="position:absolute;top:10px;right:10px;z-index:2;background:#E30613;color:#fff;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:5px 10px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.5)">{{ p.enCarritoLabel }}</span>
+              </sc-if>
+                <div data-actions="" data-fijo="{{ p.accFijo }}" style="position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:6px;opacity:{{ p.accOp }};transform:{{ p.accY }};transition:opacity .22s ease,transform .22s ease">
+                  <sc-if value="{{ p.noEnCarrito }}" hint-placeholder-val="{{ true }}"><button onClick="{{ p.add }}" style="flex:1;background:{{ p.btnBg }};border:0;color:{{ p.btnFg }};font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:10px 6px;cursor:{{ p.cursor }};border-radius:2px">{{ p.btnLabel }}</button></sc-if><sc-if value="{{ p.hayEnCarrito }}" hint-placeholder-val="{{ false }}"><div style="flex:1;display:flex;align-items:center;justify-content:space-between;background:#E30613;border-radius:2px;min-height:38px"><button onClick="{{ p.menos }}" aria-label="Quitar uno del carrito" style="background:transparent;border:0;color:#fff;width:38px;height:38px;font-size:19px;line-height:1;cursor:pointer">−</button><span style="font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:#fff">{{ p.enCarritoLabel }}</span><button onClick="{{ p.mas }}" aria-label="Agregar uno más" style="background:transparent;border:0;color:{{ p.masColor }};width:38px;height:38px;font-size:19px;line-height:1;cursor:{{ p.masCursor }}">+</button></div></sc-if>
                 </div>
               </div>
               <div style="padding:13px 13px 15px;display:flex;flex-direction:column;gap:5px;flex:1">
@@ -608,6 +620,12 @@
           <span style="font-family:'Saira Condensed',sans-serif;font-weight:900;font-size:clamp(30px,3.6vw,44px);line-height:1">{{ prod.priceLabel }}</span>
           <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:{{ prod.stockColor }}">{{ prod.stockLabel }}</span>
         </div>
+        <sc-if value="{{ prod.hayEnCarrito }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border:1px solid #E30613;background:rgba(227,6,19,.08);padding:10px 14px">
+            <span style="font-size:13.5px;color:#F5F5F5">Ya tenés <b>{{ prod.enCarritoLabel }}</b>.</span>
+            <button onClick="{{ openCart }}" style="background:transparent;border:0;color:#FF1A27;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;padding:0">Ver carrito →</button>
+          </div>
+        </sc-if>
 
         <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
           <div style="display:flex;align-items:center;border:1px solid #242424">
@@ -1139,8 +1157,26 @@ class Component extends DCLogic {
               : p.destacado   ? 'DESTACADO'
               : p.tag;
     const ts = TAG_STYLE[tag] || TAG_STYLE['NUEVO'];
+    // Cuántas unidades de este producto ya están en el carrito. Con eso la
+    // tarjeta muestra la cantidad y el botón pasa a ser un selector − / +,
+    // en vez de un "Agregar" que no dice si ya lo agregaste.
+    const enCarrito = (this.state.cart.find(i => i.id === p.id) || {}).qty || 0;
+    const tope = enCarrito >= p.stock;
+    const frenar = (e) => { if (e) { e.preventDefault(); e.stopPropagation(); } };
     return Object.assign({}, p, {
       tag,
+      hayEnCarrito: enCarrito > 0,
+      noEnCarrito: enCarrito === 0,
+      enCarritoLabel: enCarrito + ' en el carrito',
+      // En el carrito, la barra de la tarjeta queda a la vista sin pasar el
+      // mouse: en el teléfono no hay "pasar el mouse".
+      accFijo: enCarrito > 0 ? '1' : '0',
+      accOp: enCarrito > 0 ? '1' : '0',
+      accY: enCarrito > 0 ? 'none' : 'translateY(8px)',
+      masColor: tope ? 'rgba(255,255,255,.35)' : '#fff',
+      masCursor: tope ? 'not-allowed' : 'pointer',
+      mas: (e) => { frenar(e); this.addToCart(p); },
+      menos: (e) => { frenar(e); this.quitarUno(p.id); },
       priceLabel: this.fmt(p.price),
       oldLabel: p.old ? this.fmt(p.old) : '',
       hasOld: !!p.old,
@@ -1338,6 +1374,11 @@ class Component extends DCLogic {
       } else cart.push({ id: p.id, qty: 1 });
       return { cart, toast: p.name + ' agregado al carrito' };
     }, () => this.armToast());
+  }
+  quitarUno(id) {
+    this.setState(st => ({
+      cart: st.cart.map(x => x.id === id ? Object.assign({}, x, { qty: x.qty - 1 }) : x).filter(x => x.qty > 0)
+    }));
   }
   flash(msg) { this.setState({ toast: msg }, () => this.armToast()); }
   armToast() { clearTimeout(this._toastTimer); this._toastTimer = setTimeout(() => this.setState({ toast: '' }), 2400); }
@@ -1731,7 +1772,7 @@ class Component extends DCLogic {
       cardLeave: (e) => {
         const el = e.currentTarget;
         const img = el.querySelector('[data-img]'); if (img) img.style.transform = 'none';
-        const act = el.querySelector('[data-actions]'); if (act) { act.style.opacity = '0'; act.style.transform = 'translateY(8px)'; }
+        const act = el.querySelector('[data-actions]'); if (act && act.dataset.fijo !== '1') { act.style.opacity = '0'; act.style.transform = 'translateY(8px)'; }
         el.style.setProperty('--glow-intensity', '0');
         el.style.borderColor = '#1c1c1c';
       }

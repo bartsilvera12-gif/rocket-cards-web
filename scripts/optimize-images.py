@@ -26,7 +26,10 @@ BACKUP = ROOT / 'assets-originales'
 # El carrusel muestra 576px como maximo; el resto, bastante menos.
 REGLAS = {
     'catalogo': (1000, 80),   # (lado mayor, calidad)
-    'cards': (600, 82),       # abanico del hero, se ve a ~200px
+    # El abanico del hero: la carta del medio se muestra hasta 328px de ancho
+    # y al tocarla se agranda un 7%. En una pantalla 2x eso pide ~700px de
+    # ancho. Con 600 de alto se veía borrosa. 920 de alto = 660 de ancho.
+    'cards': (920, 78),
     '': (192, 90),            # el logo, que se usa a 44 y a 92px
 }
 
