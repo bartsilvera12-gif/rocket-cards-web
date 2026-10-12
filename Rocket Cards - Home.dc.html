@@ -72,6 +72,24 @@
   }
   /* Mientras el menú está abierto, la página de atrás no se mueve. */
   html.rc-menu-abierto, html.rc-menu-abierto body { overflow: hidden; }
+  /* Catálogo en el teléfono: los productos van primero y los filtros quedan
+     detrás de un botón, en una hoja que cubre la pantalla. Antes la columna
+     de filtros iba arriba y había que bajar un buen rato para ver algo. */
+  #dc-root [data-filtros-barra], #dc-root [data-filtros-solo-movil] { display: none; }
+  @media (max-width: 760px) {
+    #dc-root [data-cat-layout] { display: block !important; }
+    #dc-root [data-filtros-barra] { display: flex; }
+    #dc-root [data-filtros-solo-movil] { display: flex; }
+    #dc-root [data-filtros] {
+      position: fixed; inset: 0; z-index: 95; max-width: none !important;
+      background: #0A0A0A; overflow-y: auto; overscroll-behavior: contain;
+      padding: 0 16px 96px;
+      animation: rc-fade .18s ease;
+    }
+    #dc-root [data-filtros][data-open="0"] { display: none !important; }
+    /* Dos productos por fila: de a uno, cada foto ocupaba toda la pantalla. */
+    #dc-root [data-cat-grid] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  }
   /* Los dos botones del hero, lado a lado también en el teléfono. */
   @media (max-width: 480px) {
     #dc-root [data-hero-cta] { flex-wrap: nowrap; gap: 8px; }
@@ -528,12 +546,26 @@
       <a href="#top" onClick="{{ goHome }}" style="color:#A7A7A7">Inicio</a><span>/</span><span style="color:#F5F5F5">Catálogo</span>
     </div>
     <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:clamp(20px,2.6vw,32px)">
-      <h1 style="margin:0;font-family:'Saira Condensed',sans-serif;font-weight:900;text-transform:uppercase;font-size:clamp(30px,4.6vw,58px);line-height:1">Catálogo completo</h1>
+      <h1 style="margin:0;font-family:'Saira Condensed',sans-serif;font-weight:900;text-transform:uppercase;font-size:clamp(30px,4.6vw,58px);line-height:1">{{ catalogTitulo }}</h1>
       <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#A7A7A7;letter-spacing:.08em">{{ catalogCount }} productos</span>
     </div>
 
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:clamp(18px,2.4vw,34px);align-items:start">
-      <aside style="display:flex;flex-direction:column;gap:22px;max-width:320px">
+    <div data-filtros-barra="" style="gap:8px;margin:-6px 0 16px">
+      <button onClick="{{ abrirFiltros }}" style="flex:1 0 auto;white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:9px;background:#121212;border:1px solid {{ filtrosBorde }};color:#F5F5F5;cursor:pointer;padding:12px 14px;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:14px;letter-spacing:.14em;text-transform:uppercase">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"></path></svg>
+        {{ filtrosLabel }}
+      </button>
+      <sc-if value="{{ hayCategoria }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ quitarCategorias }}" aria-label="Quitar categoría y ver todo" style="flex:0 1 auto;min-width:0;display:flex;align-items:center;gap:8px;background:#E30613;border:0;color:#fff;cursor:pointer;padding:12px 14px;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:13.5px;letter-spacing:.1em;text-transform:uppercase"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ categoriaChip }}</span><span aria-hidden="true">✕</span></button>
+      </sc-if>
+    </div>
+
+    <div data-cat-layout="" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:clamp(18px,2.4vw,34px);align-items:start">
+      <aside data-filtros="" data-open="{{ filtrosOpen }}" style="display:flex;flex-direction:column;gap:22px;max-width:320px">
+        <div data-filtros-solo-movil="" style="position:sticky;top:0;z-index:2;background:#0A0A0A;align-items:center;justify-content:space-between;padding:16px 0 12px;border-bottom:1px solid #1a1a1a;margin-bottom:-6px">
+          <span style="font-family:'Saira Condensed',sans-serif;font-weight:900;font-style:italic;text-transform:uppercase;font-size:24px">Filtros</span>
+          <button onClick="{{ cerrarFiltros }}" aria-label="Cerrar filtros" style="background:transparent;border:1px solid #2a2a2a;color:#F5F5F5;width:40px;height:40px;cursor:pointer;font-size:18px;line-height:1">✕</button>
+        </div>
         <div>
           <div style="font-family:'Poppins',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:#C9A227;margin-bottom:12px">Categoría</div>
           <div style="display:flex;flex-direction:column;gap:1px;background:#1a1a1a;border:1px solid #1a1a1a">
@@ -561,6 +593,9 @@
           </div>
         </div>
         <button onClick="{{ clearFilters }}" style="background:transparent;border:1px solid #242424;color:#A7A7A7;cursor:pointer;padding:11px;font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:12.5px;letter-spacing:.16em;text-transform:uppercase" style-hover="border-color:#E30613;color:#FF1A27">Limpiar filtros</button>
+        <div data-filtros-solo-movil="" style="position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:#0A0A0A;border-top:1px solid #1a1a1a">
+          <button onClick="{{ cerrarFiltros }}" style="flex:1;background:#E30613;border:0;color:#fff;cursor:pointer;padding:15px;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:15px;letter-spacing:.14em;text-transform:uppercase">Ver {{ catalogCount }} productos</button>
+        </div>
       </aside>
 
       <div style="grid-column:span 3;min-width:0">
@@ -570,7 +605,7 @@
             <p style="margin:8px 0 0;color:#A7A7A7;font-size:13.5px">Ningún producto coincide con los filtros seleccionados.</p>
           </div>
         </sc-if>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr));gap:clamp(10px,1.4vw,16px)">
+        <div data-cat-grid="" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr));gap:clamp(10px,1.4vw,16px)">
           <sc-for list="{{ catalogProducts }}" as="p" hint-placeholder-count="8">
             <div onClick="{{ p.open }}" onMouseEnter="{{ cardEnter }}" onMouseMove="{{ cardMove }}" onMouseLeave="{{ cardLeave }}" style-after="content:'';position:absolute;inset:0;padding:1.5px;background:radial-gradient(var(--glow-radius,240px) circle at var(--glow-x,50%) var(--glow-y,50%),rgba(227,6,19,calc(var(--glow-intensity,0) * 0.95)) 0%,rgba(227,6,19,calc(var(--glow-intensity,0) * 0.45)) 32%,transparent 62%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask-composite:exclude;pointer-events:none;border-radius:inherit;z-index:3;transition:opacity .3s ease" style="cursor:pointer;position:relative;background:#121212;border:1px solid #1c1c1c;transition:border-color .22s ease;display:flex;flex-direction:column">
               <div style="position:relative;aspect-ratio:1/1;overflow:hidden;background:#0E0E0E">
@@ -1111,7 +1146,7 @@ function aplicarCatalogo(d) {
 class Component extends DCLogic {
   state = {
     q: '', searchOpen: false, searching: false, results: [], mSearchOpen: false,
-    cart: [], cartOpen: false, toast: '', menuOpen: false, catMenuOpen: false, catHover: 0, car: 0,
+    cart: [], cartOpen: false, toast: '', menuOpen: false, filtrosOpen: false, catMenuOpen: false, catHover: 0, car: 0,
     view: 'home', pid: null, qty: 1, foto: 0, fCats: [], fAvail: false, sort: 'recent', legalDoc: 'privacidad', waHidden: false,
     w: typeof window !== 'undefined' ? window.innerWidth : 1440
   };
@@ -1374,7 +1409,8 @@ class Component extends DCLogic {
   // así que el estado anterior lo guardamos nosotros.
   componentDidUpdate() {
     // Con el menú del teléfono abierto, la página de atrás queda quieta.
-    const menuAbierto = this.state.menuOpen && this.state.w < 1180;
+    const menuAbierto = (this.state.menuOpen && this.state.w < 1180) ||
+      (this.state.filtrosOpen && this.state.view === 'catalog' && this.state.w <= 760);
     document.documentElement.classList.toggle('rc-menu-abierto', menuAbierto);
     this.syncUrl();
     this.syncRails();
@@ -1454,7 +1490,7 @@ class Component extends DCLogic {
   }
 
   openProduct(id) {
-    this.setState({ view: 'product', pid: id, qty: 1, foto: 0, catMenuOpen: false, menuOpen: false, searchOpen: false });
+    this.setState({ view: 'product', pid: id, qty: 1, foto: 0, catMenuOpen: false, menuOpen: false, searchOpen: false, filtrosOpen: false });
     window.scrollTo(0, 0);
   }
   goSection(id) {
@@ -1473,7 +1509,7 @@ class Component extends DCLogic {
   }
 
   openCat(cat) {
-    this.setState({ view: 'catalog', fCats: cat ? [cat] : [], catMenuOpen: false, menuOpen: false });
+    this.setState({ view: 'catalog', fCats: cat ? [cat] : [], catMenuOpen: false, menuOpen: false, filtrosOpen: false });
     window.scrollTo(0, 0);
   }
 
@@ -1871,6 +1907,24 @@ class Component extends DCLogic {
         pick: () => this.setState({ sort: o.key })
       })),
       clearFilters: () => this.setState({ fCats: [], fAvail: false, sort: 'recent' }),
+      filtrosOpen: s.filtrosOpen ? '1' : '0',
+      // Al entrar tocando una categoría, el título dice cuál es (antes decía
+      // "Catálogo completo" aunque se vieran sólo los sobres).
+      catalogTitulo: s.fCats.length === 1
+        ? ((CATEGORIAS.find(c => c.key === s.fCats[0]) || {}).name || 'Catálogo')
+        : 'Catálogo completo',
+      hayCategoria: s.fCats.length > 0,
+      categoriaChip: s.fCats.length === 1
+        ? ((CATEGORIAS.find(c => c.key === s.fCats[0]) || {}).name || s.fCats[0])
+        : s.fCats.length + ' categorías',
+      quitarCategorias: () => this.setState({ fCats: [] }),
+      abrirFiltros: () => this.setState({ filtrosOpen: true }),
+      cerrarFiltros: () => { this.setState({ filtrosOpen: false }); window.scrollTo(0, 0); },
+      filtrosLabel: (() => {
+        const n = s.fCats.length + (s.fAvail ? 1 : 0) + (s.sort !== 'recent' ? 1 : 0);
+        return n ? 'Filtros · ' + n : 'Filtros y orden';
+      })(),
+      filtrosBorde: (s.fCats.length || s.fAvail || s.sort !== 'recent') ? '#E30613' : '#242424',
 
       prod: prodDec,
       prodHayVecinos: !!(prodDec && this.productoVecino(1)),
