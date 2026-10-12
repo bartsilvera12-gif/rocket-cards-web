@@ -602,6 +602,11 @@
           <sc-if value="{{ prod.hasTag }}" hint-placeholder-val="{{ false }}">
             <span style="position:absolute;top:12px;left:12px;font-family:'Saira Condensed',sans-serif;font-weight:800;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;padding:6px 10px;background:{{ prod.tagBg }};color:{{ prod.tagFg }}">{{ prod.tag }}</span>
           </sc-if>
+          <sc-if value="{{ prodHayVecinos }}" hint-placeholder-val="{{ false }}">
+            <button type="button" onClick="{{ prodAnterior }}" aria-label="{{ prodAnteriorEtiqueta }}" title="{{ prodAnteriorEtiqueta }}" style="position:absolute;top:50%;left:10px;transform:translateY(-50%);z-index:2;width:46px;height:46px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(10,10,10,.72);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(4px);-webkit-tap-highlight-color:transparent;transition:background .18s ease,border-color .18s ease" style-hover="background:#E30613;border-color:#E30613"><svg width="18" height="13" viewBox="0 0 17 12" fill="none" aria-hidden="true" style="transform:rotate(180deg)"><path d="M1 6h14M11 1.5 15.5 6 11 10.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+            <button type="button" onClick="{{ prodSiguiente }}" aria-label="{{ prodSiguienteEtiqueta }}" title="{{ prodSiguienteEtiqueta }}" style="position:absolute;top:50%;right:10px;transform:translateY(-50%);z-index:2;width:46px;height:46px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(10,10,10,.72);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(4px);-webkit-tap-highlight-color:transparent;transition:background .18s ease,border-color .18s ease" style-hover="background:#E30613;border-color:#E30613"><svg width="18" height="13" viewBox="0 0 17 12" fill="none" aria-hidden="true"><path d="M1 6h14M11 1.5 15.5 6 11 10.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+            <span style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);z-index:2;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.14em;color:#A7A7A7;background:rgba(10,10,10,.72);padding:4px 10px;border-radius:999px">{{ prodPosLabel }}</span>
+          </sc-if>
         </div>
         <sc-if value="{{ prodVariasFotos }}" hint-placeholder-val="{{ false }}">
           <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1059,12 +1064,22 @@ class Component extends DCLogic {
     window.addEventListener('load', this._onScroll);
     this._waTimer = setInterval(this._onScroll, 500);
     this._onScroll();
+    this._onTeclas = (e) => {
+      if (this.state.view !== 'product' || this.state.cartOpen) return;
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      const t = e.target;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      if (e.key === 'ArrowLeft') { e.preventDefault(); this.irAlVecino(-1); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); this.irAlVecino(1); }
+    };
+    document.addEventListener('keydown', this._onTeclas);
     this._onDocClick = (e) => {
       if (this.state.searchOpen && !e.target.closest('input')) this.setState({ searchOpen: false });
     };
     document.addEventListener('click', this._onDocClick);
   }
   componentWillUnmount() {
+    document.removeEventListener('keydown', this._onTeclas);
     window.removeEventListener('resize', this._onResize);
     window.removeEventListener('scroll', this._onScroll);
     window.removeEventListener('resize', this._onScroll);
@@ -1374,6 +1389,21 @@ class Component extends DCLogic {
       } else cart.push({ id: p.id, qty: 1 });
       return { cart, toast: p.name + ' agregado al carrito' };
     }, () => this.armToast());
+  }
+  /** El producto anterior (dir -1) o siguiente (+1) al que está abierto. */
+  productoVecino(dir) {
+    const actual = CATALOG.find(p => p.id === this.state.pid);
+    if (!actual) return null;
+    const misma = CATALOG.filter(p => p.cat === actual.cat);
+    // Si es el único de su categoría, recorremos todo el catálogo.
+    const lista = misma.length > 1 ? misma : CATALOG;
+    const i = lista.findIndex(p => p.id === actual.id);
+    if (lista.length < 2 || i < 0) return null;
+    return { prod: lista[(i + dir + lista.length) % lista.length], pos: i + 1, total: lista.length };
+  }
+  irAlVecino(dir) {
+    const v = this.productoVecino(dir);
+    if (v) this.openProduct(v.prod.id);
   }
   quitarUno(id) {
     this.setState(st => ({
@@ -1719,6 +1749,12 @@ class Component extends DCLogic {
       clearFilters: () => this.setState({ fCats: [], fAvail: false, sort: 'recent' }),
 
       prod: prodDec,
+      prodHayVecinos: !!(prodDec && this.productoVecino(1)),
+      prodPosLabel: (() => { const v = prodDec && this.productoVecino(1); return v ? v.pos + ' / ' + v.total : ''; })(),
+      prodAnterior: (e) => { if (e) { e.preventDefault(); e.stopPropagation(); } this.irAlVecino(-1); },
+      prodSiguiente: (e) => { if (e) { e.preventDefault(); e.stopPropagation(); } this.irAlVecino(1); },
+      prodAnteriorEtiqueta: (() => { const v = prodDec && this.productoVecino(-1); return v ? 'Anterior: ' + v.prod.name : ''; })(),
+      prodSiguienteEtiqueta: (() => { const v = prodDec && this.productoVecino(1); return v ? 'Siguiente: ' + v.prod.name : ''; })(),
       prodFotoCss: prodFotosRaw.length ? 'url("' + prodFotosRaw[fotoIdx] + '")' : 'none',
       prodVariasFotos: prodFotosRaw.length > 1,
       prodFotos: prodFotosRaw.map((url, i) => ({

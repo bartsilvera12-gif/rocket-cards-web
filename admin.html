@@ -817,7 +817,49 @@ const CALIDAD = 0.85;
  * Si el navegador no sabe escribir WebP, devuelve el archivo original: peor
  * una foto pesada que ninguna.
  */
-async function aWebp(archivo) {
+// Encuadre de fotos de producto: el mismo criterio que scripts/encuadrar-fotos.py
+// para las fotos del repo, así una foto subida acá queda igual que las otras.
+const OCUPA = 0.86;      // el lado mayor del producto ocupa el 86% del cuadrado
+const TOLERANCIA = 14;   // cuánto puede apartarse un pixel del blanco y seguir siendo fondo
+
+/**
+ * Dónde termina el fondo blanco (o transparente) de la foto, en pixeles de
+ * la imagen original. Se analiza una copia chica, que alcanza para ubicar el
+ * borde y no traba el navegador con una foto de 4000px.
+ */
+function bordeDelProducto(img) {
+  const k = Math.min(1, 400 / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * k)), h = Math.max(1, Math.round(img.height * k));
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, w, h);
+  const d = ctx.getImageData(0, 0, w, h).data;
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const fondo = d[i + 3] < 16 ||
+        (255 - d[i] <= TOLERANCIA && 255 - d[i + 1] <= TOLERANCIA && 255 - d[i + 2] <= TOLERANCIA);
+      if (!fondo) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    }
+  }
+  if (x1 < 0) return null;                      // toda blanca: no hay nada que recortar
+  const sx = Math.max(0, (x0 - 1) / k), sy = Math.max(0, (y0 - 1) / k);
+  return {
+    x: sx, y: sy,
+    w: Math.min(img.width, (x1 + 2) / k) - sx,
+    h: Math.min(img.height, (y1 + 2) / k) - sy,
+  };
+}
+
+/**
+ * Con encuadrar, además recorta el margen blanco hasta el borde del producto
+ * y lo centra en un cuadrado blanco con el mismo aire alrededor que el resto
+ * del catálogo. Sin eso, cada foto trae el margen que le puso quien la sacó y
+ * en la tienda unos productos se ven grandes y otros chiquitos.
+ */
+async function aWebp(archivo, { encuadrar = false } = {}) {
   const url = URL.createObjectURL(archivo);
   try {
     const img = await new Promise((listo, falla) => {
@@ -826,11 +868,24 @@ async function aWebp(archivo) {
       i.onerror = () => falla(new Error('No pude leer esa imagen'));
       i.src = url;
     });
-    const escala = Math.min(1, LADO_MAX / Math.max(img.width, img.height));
     const lienzo = document.createElement('canvas');
-    lienzo.width = Math.round(img.width * escala);
-    lienzo.height = Math.round(img.height * escala);
-    lienzo.getContext('2d').drawImage(img, 0, 0, lienzo.width, lienzo.height);
+    if (encuadrar) {
+      const caja = bordeDelProducto(img) || { x: 0, y: 0, w: img.width, h: img.height };
+      const ladoNatural = Math.max(caja.w, caja.h) / OCUPA;
+      const escala = Math.min(1, LADO_MAX / ladoNatural);   // nunca agrandar
+      const lado = Math.round(ladoNatural * escala);
+      lienzo.width = lado; lienzo.height = lado;
+      const ctx = lienzo.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, lado, lado);
+      const dw = caja.w * escala, dh = caja.h * escala;
+      ctx.drawImage(img, caja.x, caja.y, caja.w, caja.h, (lado - dw) / 2, (lado - dh) / 2, dw, dh);
+    } else {
+      const escala = Math.min(1, LADO_MAX / Math.max(img.width, img.height));
+      lienzo.width = Math.round(img.width * escala);
+      lienzo.height = Math.round(img.height * escala);
+      lienzo.getContext('2d').drawImage(img, 0, 0, lienzo.width, lienzo.height);
+    }
     const blob = await new Promise((listo) => lienzo.toBlob(listo, 'image/webp', CALIDAD));
     if (!blob || blob.type !== 'image/webp') return archivo;
     return blob;
@@ -842,11 +897,11 @@ async function aWebp(archivo) {
 }
 
 /** Sube la foto al bucket y devuelve su URL pública. */
-async function subirFoto(archivo, sku) {
+async function subirFoto(archivo, sku, opciones = {}) {
   if (!archivo.type.startsWith('image/')) throw new Error('Eso no es una imagen');
   if (archivo.size > 15 * 1024 * 1024) throw new Error('La foto pesa más de 15 MB');
 
-  const optimizada = await aWebp(archivo);
+  const optimizada = await aWebp(archivo, opciones);
   const base = (sku || 'producto').toLowerCase().replace(/[^a-z0-9._-]+/g, '-').slice(0, 40);
   // El timestamp evita pisar la foto anterior: si alguien tenía la página
   // abierta, su copia en caché sigue sirviendo.
@@ -1027,7 +1082,7 @@ function pintarModal() {
     for (const archivo of tanda) {
       estadoFoto.textContent = 'Subiendo ' + (hechas + fallas + 1) + ' de ' + tanda.length + '…';
       try {
-        fotos.push(await subirFoto(archivo, sku));
+        fotos.push(await subirFoto(archivo, sku, { encuadrar: true }));
         hechas++;
         pintarGaleria();
       } catch (err) {
