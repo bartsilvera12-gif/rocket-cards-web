@@ -9,6 +9,7 @@
      funciona igual con el catálogo escrito más abajo. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.10/dist/umd/supabase.js" defer></script>
 <script src="/rocketcards-config.js" defer></script>
+<script src="/holo.js" defer></script>
 </head>
 <body>
 <x-dc>
@@ -1036,6 +1037,10 @@ const HERO_GEO = [
 
 /* Las fotos de esos cinco lugares, y los datos de contacto. Son los valores
    de respaldo: si hay base, los reemplaza aplicarCatalogo(). */
+/* El brillo holográfico de la carta elegida (holo.js), uno distinto por
+   lugar del abanico para que valga la pena tocarlas todas. */
+const HOLO_PRESETS = ['shards', 'stars', 'bursts', 'cosmos', 'rainbow'];
+
 const PORTADA = [
   { img: '/assets/cards/rayquaza-v.webp', alt: 'Rayquaza V · Evolving Skies 194/203' },
   { img: '/assets/cards/leafeon-ex.webp', alt: 'Leafeon ex · Prismatic Evolutions 144/131' },
@@ -1338,6 +1343,9 @@ class Component extends DCLogic {
 
   /** Devuelve una carta del abanico a su posición de reposo. */
   heroReset(el) {
+    clearTimeout(el._holoEspera);
+    if (el._holoApagar) { el._holoApagar(); el._holoApagar = null; }
+    el.style.transition = 'transform .34s cubic-bezier(.2,.7,.2,1),box-shadow .34s ease';
     el.dataset.picked = '0';
     el.style.transform = 'rotate(' + el.dataset.rot + ') translateY(' + el.dataset.lift + ')';
     el.style.zIndex = el.dataset.z;
@@ -1658,6 +1666,7 @@ class Component extends DCLogic {
       })),
       heroEnter: (e) => {
         const el = e.currentTarget;
+        if (el.dataset.picked === '1') return;   // ya la mueve el brillo
         el.style.transform = 'rotate(0deg) translateY(calc(' + el.dataset.lift + ' - 34px)) scale(1.07)';
         el.style.zIndex = '20';
         el.style.boxShadow = '0 34px 70px rgba(0,0,0,.95), 0 0 0 1px rgba(227,6,19,.5)';
@@ -1676,9 +1685,28 @@ class Component extends DCLogic {
         }
         if (yaEstaba) { this.heroReset(el); return; }
         el.dataset.picked = '1';
-        el.style.transform = 'rotate(0deg) translateY(calc(' + el.dataset.lift + ' - 34px)) scale(1.07)';
+        const base = 'rotate(0deg) translateY(calc(' + el.dataset.lift + ' - 34px)) scale(1.07)';
+        el.style.transform = base;
         el.style.zIndex = '20';
         el.style.boxShadow = '0 34px 70px rgba(0,0,0,.95), 0 0 0 1px rgba(227,6,19,.5)';
+        // Cuando termina de subir, se enciende el brillo holográfico: desde
+        // ahí la inclinación la maneja holo.js cuadro a cuadro, así que la
+        // transición de transform se saca (si no, cada cuadro llega tarde).
+        clearTimeout(el._holoEspera);
+        el._holoEspera = setTimeout(() => {
+          if (el.dataset.picked !== '1' || !window.RCHolo || el._holoApagar) return;
+          const img = el.querySelector('img');
+          const lugar = Array.prototype.indexOf.call(el.parentElement.children, el);
+          el.style.transition = 'box-shadow .34s ease';
+          el._holoApagar = window.RCHolo.encender(el, {
+            imagen: img && (img.currentSrc || img.src),
+            preset: HOLO_PRESETS[lugar] || 'bursts',
+            base,
+            radius: 7,
+            intensity: 0.75,
+            frame: 4,
+          });
+        }, 340);
       },
       goTop: (e) => { if (e) e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); },
       topBandEnter: (e) => {
