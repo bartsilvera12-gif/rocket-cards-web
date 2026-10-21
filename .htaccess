@@ -37,6 +37,15 @@ DirectoryIndex index.html
   # navegador muestra la imagen rota igual, pero un módulo JS que falte da
   # un error de MIME incomprensible en vez de decir que no está, y los
   # buscadores terminan indexando la home bajo mil URLs inventadas.
+  # Servimos la app directamente: el archivo real si está (cuando se publica
+  # el repo tal cual, rama main), o index.html (cuando se publica la versión
+  # construida). Así el link directo a un producto abre la ficha en vez de
+  # dar 404, en los dos casos. Si el archivo real no está, cae en la regla
+  # de abajo, que es el comportamiento de siempre: red de seguridad.
+  RewriteCond %{REQUEST_URI} !\.[a-zA-Z0-9]{1,8}$
+  RewriteCond "%{DOCUMENT_ROOT}/Rocket Cards - Home.dc.html" -f
+  RewriteRule ^ "Rocket Cards - Home.dc.html" [L]
+
   RewriteCond %{REQUEST_URI} !\.[a-zA-Z0-9]{1,8}$
   RewriteRule ^ index.html [L]
 </IfModule>
