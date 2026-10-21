@@ -23,6 +23,14 @@ DirectoryIndex index.html
   RewriteCond %{HTTP:X-Forwarded-Proto} !=https
   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
+  # Seguridad: con el repo publicado tal cual, estas carpetas y archivos
+  # internos no tienen por qué verse desde la web. Va ANTES de la regla que
+  # sirve archivos reales, para que un pedido directo reciba 403 y no el
+  # contenido. En la versión construida (publicado) ni siquiera existen, así
+  # que esta regla ahí no molesta.
+  RewriteRule ^(db|scripts)(/|$) - [F]
+  RewriteRule \.md$ - [F]
+
   # Un archivo o carpeta que existe de verdad se sirve tal cual. Esto cubre
   # /admin.html, /support.js, /assets/... y hay que dejarlo ANTES de la
   # regla de abajo, que si no se traga todo.
