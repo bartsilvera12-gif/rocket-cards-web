@@ -957,6 +957,29 @@ function pintarModal() {
           <label for="m-col">Colección</label>
           <input id="m-col" type="text" value="${esc(p.coleccion || '')}" placeholder="Mega Evolution · ETB">
         </div>
+        <div>
+          <label for="m-idioma">Idioma</label>
+          <input id="m-idioma" type="text" list="m-idiomas" value="${esc(p.idioma ?? 'Inglés')}" placeholder="Inglés">
+          <datalist id="m-idiomas">
+            ${['Inglés', 'Español', 'Japonés', 'Portugués', 'Coreano', 'Chino'].map((t) => `<option value="${t}">`).join('')}
+          </datalist>
+        </div>
+        <div>
+          <label for="m-estado-p">Estado</label>
+          <input id="m-estado-p" type="text" list="m-estados" value="${esc(p.estado ?? 'Sellado de fábrica')}" placeholder="Sellado de fábrica">
+          <datalist id="m-estados">
+            ${['Sellado de fábrica', 'Abierto', 'Near Mint', 'Lightly Played', 'Played', 'Gradeada'].map((t) => `<option value="${t}">`).join('')}
+          </datalist>
+        </div>
+        <div class="ancho">
+          <label for="m-desc">Descripción</label>
+          <textarea id="m-desc" rows="3" placeholder="Vacío = texto automático: «Producto sellado original de (colección). Se envía en su empaque de fábrica…»">${esc(p.descripcion || '')}</textarea>
+        </div>
+        <div class="ancho">
+          <label for="m-entrega">Opciones de entrega</label>
+          <textarea id="m-entrega" rows="3" placeholder="Vacío = usa las de Configuración. Una opción por renglón.">${esc(p.entrega || '')}</textarea>
+          <div class="ayuda">Sólo si este producto se entrega distinto al resto. Las generales se editan en Configuración.</div>
+        </div>
         <div class="ancho">
           <label>Fotos <span class="ayuda" style="margin:0;text-transform:none;letter-spacing:0">— la primera es la portada · hasta ${MAX_FOTOS}</span></label>
           <div id="m-galeria" class="galeria"></div>
@@ -1191,6 +1214,10 @@ function pintarModal() {
     const datos = {
       nombre: $('#m-nom', velo).value.trim(),
       coleccion: $('#m-col', velo).value.trim(),
+      idioma: $('#m-idioma', velo).value.trim(),
+      estado: $('#m-estado-p', velo).value.trim(),
+      descripcion: $('#m-desc', velo).value.trim(),
+      entrega: $('#m-entrega', velo).value.trim(),
       categoria: $('#m-cat', velo).value,
       img,
       imagenes: fotos,

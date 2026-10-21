@@ -709,9 +709,9 @@
         <div>
           <div style="font-family:'Poppins',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:#C9A227;margin-bottom:9px">Opciones de entrega</div>
           <div style="display:flex;flex-direction:column;gap:7px;color:#A7A7A7;font-size:13px">
-            <span>Retiro en Asunción — coordinado por WhatsApp.</span>
-            <span>Delivery en Gran Asunción — Gs. 35.000.</span>
-            <span>Envío al interior — según courier, se cotiza al confirmar.</span>
+            <sc-for list="{{ prodEntrega }}" as="linea" hint-placeholder-count="3">
+              <span>{{ linea.texto }}</span>
+            </sc-for>
           </div>
         </div>
       </div>
@@ -1087,7 +1087,9 @@ const PORTADA = [
 const CONFIG = {
   whatsapp: '595981377541',
   instagram: 'rocketcardspy',
-  descripcion: 'Tienda especializada en Pokémon TCG y coleccionismo. Producto sellado original y envíos a todo Paraguay.'
+  descripcion: 'Tienda especializada en Pokémon TCG y coleccionismo. Producto sellado original y envíos a todo Paraguay.',
+  // Una opción por renglón. Cada producto puede traer la suya en p.entrega.
+  entrega: 'Retiro en Ciudad del Este — coordinado por WhatsApp.\nDelivery en Ciudad del Este — se coordina por WhatsApp.\nEnvío al interior — según courier, se cotiza al confirmar.'
 };
 
 /** El numero tal cual lo escribe la gente: 0981 377 541 */
@@ -1153,6 +1155,10 @@ class Component extends DCLogic {
 
   componentDidMount() {
     // Vista inicial segun la URL, y el boton atras del navegador.
+    // La dirección original se guarda: si el producto todavía no está en el
+    // catálogo escrito acá (lo cargaron desde el panel), se resuelve cuando
+    // llegue la base en vez de dejar al cliente en /catalogo.
+    this._rutaOriginal = location.pathname;
     const inicial = this.routeFrom(location.pathname);
     if (inicial.view !== 'home') this.setState(inicial);
     const ruta0 = Object.assign({}, this.state, inicial);
@@ -1273,7 +1279,13 @@ class Component extends DCLogic {
     try {
       const { data, error } = await this._sb.rpc('catalogo');
       if (error || !data) return;
-      if (aplicarCatalogo(data)) this.forceUpdate();
+      if (!aplicarCatalogo(data)) return;
+      const original = this._rutaOriginal;
+      this._rutaOriginal = null;
+      const ruta = original && this.routeFrom(original);
+      // Sólo si el cliente no se movió mientras tanto.
+      if (ruta && ruta.view === 'product' && this.state.view === 'catalog' && !this.state.pid) this.setState(ruta);
+      else this.forceUpdate();
     } catch (_) {
       // Sin base, la página se queda con el catálogo que ya tenía.
     }
@@ -1335,7 +1347,7 @@ class Component extends DCLogic {
       add: (e) => { if (e) { e.preventDefault(); e.stopPropagation(); } this.addToCart(p); },
       shortName: p.name.length > 42 ? p.name.slice(0, 42) + '…' : p.name,
       imgCss: 'url("' + p.img + '")',
-      desc: 'Producto sellado original de ' + p.set.split(' · ')[0] + '. Se envía en su empaque de fábrica, sin abrir. Stock real verificado en depósito; el inventario se descuenta al confirmar el pedido.',
+      desc: p.desc || 'Producto sellado original de ' + p.set.split(' · ')[0] + '. Se envía en su empaque de fábrica, sin abrir. Stock real verificado en depósito; el inventario se descuenta al confirmar el pedido.',
       open: (e) => { if (e) { e.preventDefault(); e.stopPropagation(); } this.openProduct(p.id); },
       addQty: () => { for (let i = 0; i < this.state.qty; i++) this.addToCart(p); },
       buyNow: () => { for (let i = 0; i < this.state.qty; i++) this.addToCart(p); this.setState({ cartOpen: true, toast: '' }); }
@@ -1941,15 +1953,17 @@ class Component extends DCLogic {
         etiqueta: 'Ver foto ' + (i + 1) + ' de ' + prodFotosRaw.length,
         ver: () => this.setState({ foto: i })
       })),
-      checkoutLink: 'https://wa.me/595981377541?text=' + encodeURIComponent(pedido),
+      checkoutLink: 'https://wa.me/' + CONFIG.whatsapp + '?text=' + encodeURIComponent(pedido),
       prodAttrs: prodDec ? [
-        { k: 'Categoría', v: { sellados: 'Sellados y coleccionables', sobres: 'Sobres', etb: 'Elite Trainer Box' }[prodDec.cat] },
+        { k: 'Categoría', v: (CATEGORIAS.find(c => c.key === prodDec.cat) || {}).name || prodDec.cat },
         { k: 'Colección', v: prodDec.set.split(' · ')[0] },
-        { k: 'Idioma', v: 'Inglés' },
-        { k: 'Estado', v: 'Sellado de fábrica' },
+        { k: 'Idioma', v: prodDec.idioma || 'Inglés' },
+        { k: 'Estado', v: prodDec.estado || 'Sellado de fábrica' },
         { k: 'Stock', v: String(prodDec.stock) },
         { k: 'SKU', v: prodDec.id }
-      ] : [],
+      ].filter(a => a.v) : [],
+      prodEntrega: prodDec ? String(prodDec.entrega || CONFIG.entrega || '')
+        .split('\n').map(t => t.trim()).filter(Boolean).map(texto => ({ texto })) : [],
       related: prodDec ? CATALOG.filter(p => p.cat === prodDec.cat && p.id !== prodDec.id).slice(0, 4).map(p => this.decorate(p)) : [],
       qty: s.qty,
       qtyIncColor: prodDec && s.qty >= prodDec.stock ? '#3a3a3a' : '#F5F5F5',

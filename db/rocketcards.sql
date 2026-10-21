@@ -240,6 +240,14 @@ BEGIN
 END
 $$;
 
+-- Ficha del producto. Vacío en descripción o entrega = la página usa el
+-- texto general (la descripción automática y la entrega de Configuración),
+-- así sólo se escribe a mano lo que cambia en ese producto.
+ALTER TABLE producto ADD COLUMN IF NOT EXISTS idioma      text NOT NULL DEFAULT 'Inglés';
+ALTER TABLE producto ADD COLUMN IF NOT EXISTS estado      text NOT NULL DEFAULT 'Sellado de fábrica';
+ALTER TABLE producto ADD COLUMN IF NOT EXISTS descripcion text NOT NULL DEFAULT '';
+ALTER TABLE producto ADD COLUMN IF NOT EXISTS entrega     text NOT NULL DEFAULT '';
+
 CREATE INDEX IF NOT EXISTS producto_categoria_idx
   ON producto (categoria) WHERE publicado;
 
@@ -282,7 +290,11 @@ INSERT INTO config (clave, valor, etiqueta, ayuda, largo, orden) VALUES
   ('instagram', 'rocketcardspy', 'Instagram',
    'El usuario, sin la arroba', false, 2),
   ('descripcion', 'Tienda especializada en Pokémon TCG y coleccionismo. Producto sellado original y envíos a todo Paraguay.',
-   'Descripción del pie', 'El texto chico que aparece abajo a la izquierda', true, 3)
+   'Descripción del pie', 'El texto chico que aparece abajo a la izquierda', true, 3),
+  ('entrega', 'Retiro en Ciudad del Este — coordinado por WhatsApp.
+Delivery en Ciudad del Este — se coordina por WhatsApp.
+Envío al interior — según courier, se cotiza al confirmar.',
+   'Opciones de entrega', 'Una opción por renglón. Sale en todos los productos, salvo los que tengan su propia entrega', true, 4)
 ON CONFLICT (clave) DO UPDATE
   SET etiqueta = EXCLUDED.etiqueta,
       ayuda    = EXCLUDED.ayuda,
@@ -489,7 +501,9 @@ AS $$
                'cat', p.categoria, 'img', p.img, 'price', p.precio,
                'old', p.precio_anterior, 'stock', p.stock, 'tag', p.etiqueta,
                'destacado', CASE WHEN p.destacado THEN true END,
-               'imagenes', CASE WHEN cardinality(p.imagenes) > 0 THEN to_jsonb(p.imagenes) END
+               'imagenes', CASE WHEN cardinality(p.imagenes) > 0 THEN to_jsonb(p.imagenes) END,
+               'idioma', NULLIF(p.idioma, ''), 'estado', NULLIF(p.estado, ''),
+               'desc', NULLIF(p.descripcion, ''), 'entrega', NULLIF(p.entrega, '')
              )) ORDER BY p.destacado DESC, p.nombre)
       FROM producto p
       WHERE p.publicado
